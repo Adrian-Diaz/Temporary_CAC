@@ -28,6 +28,7 @@ class AtomVecCAC_Charge : public AtomVec {
  public:
   AtomVecCAC_Charge(class LAMMPS *);
   virtual ~AtomVecCAC_Charge() {}
+  virtual void init();
   void grow(int);
   void grow_reset();
   void copy(int, int, int);

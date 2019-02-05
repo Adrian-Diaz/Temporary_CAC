@@ -537,6 +537,20 @@ if(quadrature_rank==5)
 
 memory->create(shape_quad_result, max_nodes_per_element, quadrature_node_count*quadrature_node_count*quadrature_node_count, "pairCAC:shape_quad_result");
 memory->create(shape_quad_interior, max_nodes_per_element, quadrature_node_count*quadrature_node_count*quadrature_node_count, "pairCAC:shape_quad_interior");
+
+//place search range initialization here now for convenience
+
+	atom->initial_size=10;
+		 memory->grow(atom->scale_search_range, atom->initial_size, "atom:scale_search_range");
+		memory->grow(atom->scale_list, atom->initial_size, "atom:scale_search_range");
+		atom->scale_search_range[0]=0;
+		atom->scale_list[0]=1;
+		for(int i=1; i<atom->initial_size; i++){ 
+			atom->scale_search_range[i]=0;
+			atom->scale_list[i]=0;
+			}
+			atom->scale_count=1;
+
 }
 
 //---------------------------------------------------------------------
