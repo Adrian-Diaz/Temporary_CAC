@@ -32,7 +32,7 @@ AtomVecCAC_Charge::AtomVecCAC_Charge(LAMMPS *lmp) : AtomVec(lmp)
   molecular = 0;
   mass_type = 1;
   element_type_count = 0;
-
+  scale_count=0;
   comm_x_only = comm_f_only = 0;
   size_forward = 3;
   size_reverse = 3;
@@ -83,9 +83,18 @@ if(narg==3){
   xcol_data = 4;
 }
 
+void AtomVecCAC_Charge::init()
+{
+  	
+  deform_vremap = domain->deform_vremap;
+  deform_groupbit = domain->deform_groupbit;
+  h_rate = domain->h_rate;
 
+  if (lmp->kokkos != NULL && !kokkosable)
+    error->all(FLERR,"KOKKOS package requires a kokkos enabled atom_style");
 
-
+		  
+}
 
 /* ----------------------------------------------------------------------
    grow atom arrays
@@ -1235,9 +1244,14 @@ int AtomVecCAC_Charge::unpack_exchange(double *buf)
 int AtomVecCAC_Charge::size_restart()
 {
   int i;
-
+  int current_node_count; 
   int nlocal = atom->nlocal;
-  int n = (16+12*nodes_per_element*maxpoly+2*maxpoly) * nlocal;
+  int n=0;
+  for (i=0; i < nlocal; i++){
+  if(element_type[i]==0) current_node_count=1;
+  if(element_type[i]==1) current_node_count=8;
+   n += (16+12*current_node_count*poly_count[i]+2*poly_count[i]);
+  }
 
   if (atom->nextra_restart)
     for (int iextra = 0; iextra < atom->nextra_restart; iextra++)
@@ -1256,6 +1270,7 @@ int AtomVecCAC_Charge::size_restart()
 int AtomVecCAC_Charge::pack_restart(int i, double *buf)
 {
   int m = 1;
+  int current_node_count; 
   buf[m++] = x[i][0];
   buf[m++] = x[i][1];
   buf[m++] = x[i][2];
@@ -1267,19 +1282,20 @@ int AtomVecCAC_Charge::pack_restart(int i, double *buf)
   buf[m++] = v[i][1];
   buf[m++] = v[i][2];
   buf[m++] = ubuf(element_type[i]).d;
-
   buf[m++] = ubuf(element_scale[i][0]).d;
   buf[m++] = ubuf(element_scale[i][1]).d;
   buf[m++] = ubuf(element_scale[i][2]).d;
-
   buf[m++] = ubuf(poly_count[i]).d;
-  for (int type_map = 0; type_map < maxpoly; type_map++) {
+  if(element_type[i]==0) current_node_count=1;
+  if(element_type[i]==1) current_node_count=8;
+  
+  for (int type_map = 0; type_map < poly_count[i]; type_map++) {
 	  buf[m++] = ubuf(node_types[i][type_map]).d;
 	  buf[m++] = node_charges[i][type_map];
   }
 
-  for (int nodecount = 0; nodecount< nodes_per_element; nodecount++) {
-	  for (int poly_index = 0; poly_index < maxpoly; poly_index++)
+  for (int nodecount = 0; nodecount< current_node_count; nodecount++) {
+	  for (int poly_index = 0; poly_index < poly_count[i]; poly_index++)
 	  {
 		  buf[m++] = nodal_positions[i][nodecount][poly_index][0];
 		  buf[m++] = nodal_positions[i][nodecount][poly_index][1];
@@ -1312,6 +1328,10 @@ int AtomVecCAC_Charge::unpack_restart(double *buf)
   int current_node_count;	
   int nlocal = atom->nlocal;
   int *node_count_list;
+  scale_search_range=atom->scale_search_range;
+  scale_list=atom->scale_list;
+  scale_count=atom->scale_count;
+  initial_size=atom->initial_size;
   if (nlocal == nmax) {
     grow(0);
     if (atom->nextra_store)
@@ -1335,19 +1355,19 @@ int AtomVecCAC_Charge::unpack_restart(double *buf)
   v[nlocal][0] = buf[m++];
   v[nlocal][1] = buf[m++];
   v[nlocal][2] = buf[m++];
-  element_type[nlocal] = (int)ubuf(buf[m++]).i;
-  element_scale[nlocal][0] = (int)ubuf(buf[m++]).i;
-  element_scale[nlocal][1] = (int)ubuf(buf[m++]).i;
-  element_scale[nlocal][2] = (int)ubuf(buf[m++]).i;
-  poly_count[nlocal] = (int)ubuf(buf[m++]).i;
+  element_type[nlocal] = (int) ubuf(buf[m++]).i;
+  element_scale[nlocal][0] = (int) ubuf(buf[m++]).i;
+  element_scale[nlocal][1] = (int) ubuf(buf[m++]).i;
+  element_scale[nlocal][2] = (int) ubuf(buf[m++]).i;
+  poly_count[nlocal] = (int) ubuf(buf[m++]).i;
   if(element_type[nlocal]==0) current_node_count=1;
   if(element_type[nlocal]==1) current_node_count=8;
-  for (int type_map = 0; type_map < maxpoly; type_map++) {
-	  node_types[nlocal][type_map] = (int)ubuf(buf[m++]).i;
+  for (int type_map = 0; type_map < poly_count[nlocal]; type_map++) {
+	  node_types[nlocal][type_map] = (int) ubuf(buf[m++]).i;
 	  node_charges[nlocal][type_map] = buf[m++];
   }
-  for (int nodecount = 0; nodecount < nodes_per_element; nodecount++) {
-	  for (int poly_index = 0; poly_index < maxpoly; poly_index++)
+  for (int nodecount = 0; nodecount < current_node_count; nodecount++) {
+	  for (int poly_index = 0; poly_index < poly_count[nlocal]; poly_index++)
 	  {
 		  nodal_positions[nlocal][nodecount][poly_index][0] = buf[m++];
 		  nodal_positions[nlocal][nodecount][poly_index][1] = buf[m++];
@@ -1376,18 +1396,7 @@ int AtomVecCAC_Charge::unpack_restart(double *buf)
   int match[3];
 //edit scale search ranges and scale counts if necessary
 	if(!atom->oneflag){
-		if(initial_size==0){
-		initial_size=10;
-		scale_search_range= memory->grow(atom->scale_search_range, initial_size, "atom:scale_search_range");
-		scale_list= memory->grow(atom->scale_list, initial_size, "atom:scale_search_range");
-		scale_search_range[0]=0;
-		scale_list[0]=1;
-		for(int i=1; i<initial_size; i++){ 
-			scale_search_range[i]=0;
-			scale_list[i]=0;
-			}
-			scale_count=1;
-		}
+		
 		/*
 	if(scale_count==0&&element_type[nlocal]!=1){
 		
@@ -1489,10 +1498,15 @@ int AtomVecCAC_Charge::unpack_restart(double *buf)
 		}
 		scale_count+=expand;
 		scale_search_range[scale_count-1]=search_radius;
-		if(expand>1)
+		scale_list[scale_count-1]=element_scale[nlocal][0];
+		if(expand>1){
 		scale_search_range[scale_count-2]=search_radius;
-		if(expand>2)
+		scale_list[scale_count-2]=element_scale[nlocal][0];
+		}
+		if(expand>2){
 		scale_search_range[scale_count-3]=search_radius;
+		scale_list[scale_count-3]=element_scale[nlocal][0];
+		}
 		
 		
 		
@@ -1580,6 +1594,11 @@ void AtomVecCAC_Charge::data_atom(double *coord, imageint imagetmp, char **value
 	int tmp;
 	int *node_count_list;
 	int types_filled = 0;
+    scale_search_range=atom->scale_search_range;
+    scale_list=atom->scale_list;
+    scale_count=atom->scale_count;
+    initial_size=atom->initial_size;
+	
 	poly_index = 0;
 	tag[nlocal] = ATOTAGINT(values[0]);
 	char* element_type_read;
@@ -1712,18 +1731,7 @@ void AtomVecCAC_Charge::data_atom(double *coord, imageint imagetmp, char **value
   int expand=0;
   int match[3];
 	if(!atom->oneflag){
-		if(initial_size==0){
-		initial_size=10;
-		scale_search_range= memory->grow(atom->scale_search_range, initial_size, "atom:scale_search_range");
-		scale_list= memory->grow(atom->scale_list, initial_size, "atom:scale_search_range");
-		scale_search_range[0]=0;
-		scale_list[0]=1;
-		for(int i=1; i<initial_size; i++){ 
-			scale_search_range[i]=0;
-			scale_list[i]=0;
-			}
-			scale_count=1;
-		}
+	
 		/*
 	if(scale_count==0&&element_type[nlocal]!=1){
 		
@@ -1825,10 +1833,15 @@ void AtomVecCAC_Charge::data_atom(double *coord, imageint imagetmp, char **value
 		}
 		scale_count+=expand;
 		scale_search_range[scale_count-1]=search_radius;
-		if(expand>1)
+		scale_list[scale_count-1]=element_scale[nlocal][0];
+		if(expand>1){
 		scale_search_range[scale_count-2]=search_radius;
-		if(expand>2)
+		scale_list[scale_count-2]=element_scale[nlocal][0];
+		}
+		if(expand>2){
 		scale_search_range[scale_count-3]=search_radius;
+		scale_list[scale_count-3]=element_scale[nlocal][0];
+		}
 		
 		
 		
