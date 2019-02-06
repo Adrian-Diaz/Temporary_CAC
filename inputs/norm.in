@@ -1,0 +1,34 @@
+units       metal
+
+dimension    3
+boundary     s s s 
+
+#two CAC element styles currently available
+#one has charge and the other does not
+#the first number specified is the maximum number
+#of nodes an element can have in your input model
+#the second is the maximum number of internal 
+#degrees of freedom an element can have in the model
+atom_style     atomic
+
+region	    box block 0 6 0 6 0 6 units box
+create_box  1 box
+
+
+ create_atoms 1 single 0.1 0.1 0.1 
+ create_atoms 1 single 3.715 0.1 0.1
+ create_atoms 1 single 0.1 3.715 0.1
+ create_atoms 1 single 0.1 0.1 3.715 
+
+thermo_style custom step pe
+thermo 1
+pair_style eam
+pair_coeff * * Cu_u3.eam
+
+dump 1 all xyz 1 lammps.xyz
+
+min_style CAC_cg
+minimize 1.0e-4 1.0e-6 100 1000
+
+#fix NVE all nve
+#run 10

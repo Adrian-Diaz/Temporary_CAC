@@ -1,0 +1,15 @@
+model_input.in
+
+4 CAC_elements
+1 atom types
+
+0.0 6 xlo xhi
+0.0 6 ylo yhi
+0.0 6 zlo zhi
+Masses
+
+1 64.546
+CAC_Elements
+
+1  	Eight_Node 	8 	10 	10 	10
+	1	1	1 	0.1	0.1	0.1

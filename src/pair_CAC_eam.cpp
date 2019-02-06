@@ -865,6 +865,8 @@ int distanceflag=0;
 	int listtype;
 	int scan_type, scan_type2;
 	int listindex;
+	int poly_grad_scan;
+	double force_contribution[3];
 	int poly_index;
 	int element_index;
 	int *ilist, *jlist, *numneigh, **firstneigh;
@@ -1012,7 +1014,6 @@ int distanceflag=0;
 		rho[l+1] += ((coeff[3] * p + coeff[4])*p + coeff[5])*p + coeff[6];
 
 
-
 		for (int k = 0; k < neigh_max_inner; k++) {
 
 			scan_type2 = inner_neighbor_types[k];
@@ -1036,22 +1037,14 @@ int distanceflag=0;
 			p = MIN(p, 1.0);
 			coeff = rhor_spline[type2rhor[scan_type2][scan_type]][m];
 			rho[l + 1] += ((coeff[3] * p + coeff[4])*p + coeff[5])*p + coeff[6];
-
-
-
-
 		}
+
 		for (int k = 0; k < neigh_max_outer; k++) {
-			
 
 			scan_type2 = outer_neighbor_types[k];
 			scan_position[0] = outer_neighbor_coords[k][0];
 			scan_position[1] = outer_neighbor_coords[k][1];
 			scan_position[2] = outer_neighbor_coords[k][2];
-
-
-
-
 
 			delr2[0] = scan_position[0] - inner_scan_position[0];
 			delr2[1] = scan_position[1] - inner_scan_position[1];
@@ -1066,13 +1059,9 @@ int distanceflag=0;
 			p = MIN(p, 1.0);
 			coeff = rhor_spline[type2rhor[scan_type2][scan_type]][m];
 			rho[l + 1] += ((coeff[3] * p + coeff[4])*p + coeff[5])*p + coeff[6];
-
-
-
-
 		}
-
 	}
+
 	//compute derivative of the embedding energy for the origin atom
 	scan_type = node_types[element_index][poly_index];
 	p = rho[0] * rdrho + 1.0;
@@ -1081,7 +1070,14 @@ int distanceflag=0;
 	p -= m;
 	p = MIN(p, 1.0);
 	coeff = frho_spline[type2frho[origin_type]][m];
+	
 	fp[0] = (coeff[0] * p + coeff[1])*p + coeff[2];
+		if (quad_eflag){
+		phi = ((coeff[3]*p + coeff[4])*p + coeff[5])*p + coeff[6];
+		if (rho[0] > rhomax) phi += fp[0] * (rho[0]-rhomax);
+ 		phi *= scale[origin_type][scan_type];
+  		quadrature_energy += phi;
+	}
 	//compute derivative of the embedding energy for all atoms in the inner neighborlist
 	for (int l = 0; l < neigh_max_inner; l++) {
 
@@ -1149,6 +1145,46 @@ int distanceflag=0;
 		force_densityx += delx*fpair;
 		force_densityy += dely*fpair;
 		force_densityz += delz*fpair;
+		force_contribution[0] = delx*fpair;
+		force_contribution[1] = dely*fpair;
+		force_contribution[2] = delz*fpair;
+
+		if (quad_eflag) {
+
+			scanning_unit_cell[0] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][0];
+			scanning_unit_cell[1] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][1];
+			scanning_unit_cell[2] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][2];
+			poly_grad_scan = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][2];
+			listtype = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][0];
+
+			quadrature_energy += 0.5*scale[origin_type][scan_type]*phi;
+
+			//compute gradients of the potential with respect to nodes
+			//the calculation is the chain rule derivative evaluation of the integral of the energy density
+			//added for every internal degree of freedom i.e. u=u1+u2+u3..upoly defines the total unit cell energy density to integrate
+			//differentiating with nodal positions leaves terms of force contributions times shape function at the particle locations
+			//corresponding to the force contributions at that quadrature point
+            if (!atomic_flag){
+    			for (int js = 0; js < nodes_per_element; js++) {
+    				for (int jj = 0; jj < 3; jj++) {
+    					current_nodal_gradients[js][poly_counter][jj] += coefficients*force_contribution[jj] *
+    						shape_function(s, t, w, 2, js + 1)/2;
+    					//listtype determines if the neighbor virtual atom belongs to the current element or a neighboring element
+    					//derivative contributions are zero for jth virtual atoms in other elements that depend on other nodal variables
+    					if (listtype == 0) {
+    						current_nodal_gradients[js][poly_grad_scan][jj] -= coefficients*force_contribution[jj] *
+    							shape_function(scanning_unit_cell[0], scanning_unit_cell[1], scanning_unit_cell[2], 2, js + 1)/2;
+    					}
+
+    				}
+    			}
+            }
+            else{
+                for (int jj = 0; jj < 3; jj++){
+                    current_nodal_gradients[0][poly_counter][jj] += coefficients*force_contribution[jj];
+                }
+            }
+        }
 	}
 
 
