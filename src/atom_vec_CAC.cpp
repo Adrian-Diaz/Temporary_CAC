@@ -83,9 +83,21 @@ void AtomVecCAC::process_args(int narg, char **arg)
   xcol_data = 3;
 }
 
+/* ----------------------------------------------------------------------
+  initialize arrays
+------------------------------------------------------------------------- */
+void AtomVecCAC::init()
+{
+  	
+    deform_vremap = domain->deform_vremap;
+  	deform_groupbit = domain->deform_groupbit;
+  	h_rate = domain->h_rate;
 
+  	if (lmp->kokkos != NULL && !kokkosable)
+    error->all(FLERR,"KOKKOS package requires a kokkos enabled atom_style");
 
-
+		
+}
 
 /* ----------------------------------------------------------------------
    grow atom arrays
@@ -1273,8 +1285,12 @@ int AtomVecCAC::pack_restart(int i, double *buf)
 int AtomVecCAC::unpack_restart(double *buf)
 {
   int nlocal = atom->nlocal;
-   int current_node_count;
-   int *node_count_list;
+  int current_node_count;
+  int *node_count_list;
+  scale_search_range=atom->scale_search_range;
+  scale_list=atom->scale_list;
+  scale_count=atom->scale_count;
+  initial_size=atom->initial_size;
   if (nlocal == nmax) {
     grow(0);
     if (atom->nextra_store)
@@ -1338,18 +1354,7 @@ if(element_type[nlocal]==1) current_node_count=8;
   int match[3];
 //edit scale search ranges and scale counts if necessary
 	if(!atom->oneflag){
-		if(initial_size==0){
-		initial_size=10;
-		scale_search_range= memory->grow(atom->scale_search_range, initial_size, "atom:scale_search_range");
-		scale_list= memory->grow(atom->scale_list, initial_size, "atom:scale_search_range");
-		scale_search_range[0]=0;
-		scale_list[0]=1;
-		for(int i=1; i<initial_size; i++){ 
-			scale_search_range[i]=0;
-			scale_list[i]=0;
-			}
-			scale_count=1;
-		}
+	
 		/*
 	if(scale_count==0&&element_type[nlocal]!=1){
 		
@@ -1451,10 +1456,15 @@ if(element_type[nlocal]==1) current_node_count=8;
 		}
 		scale_count+=expand;
 		scale_search_range[scale_count-1]=search_radius;
-		if(expand>1)
+		scale_list[scale_count-1]=element_scale[nlocal][0];
+		if(expand>1){
 		scale_search_range[scale_count-2]=search_radius;
-		if(expand>2)
+		scale_list[scale_count-2]=element_scale[nlocal][0];
+		}
+		if(expand>2){
 		scale_search_range[scale_count-3]=search_radius;
+		scale_list[scale_count-3]=element_scale[nlocal][0];
+		}
 		
 		
 		
@@ -1540,7 +1550,10 @@ void AtomVecCAC::data_atom(double *coord, imageint imagetmp, char **values)
 	int tmp;
 	int types_filled = 0;
 	int *node_count_list;
-	
+	scale_search_range=atom->scale_search_range;
+    scale_list=atom->scale_list;
+    scale_count=atom->scale_count;
+    initial_size=atom->initial_size;
 
 	poly_index = 0;
 	tag[nlocal] = ATOTAGINT(values[0]);
@@ -1671,18 +1684,7 @@ void AtomVecCAC::data_atom(double *coord, imageint imagetmp, char **values)
   int expand=0;
   int match[3];
 	if(!atom->oneflag){
-		if(initial_size==0){
-		initial_size=10;
-		scale_search_range= memory->grow(atom->scale_search_range, initial_size, "atom:scale_search_range");
-		scale_list= memory->grow(atom->scale_list, initial_size, "atom:scale_search_range");
-		scale_search_range[0]=0;
-		scale_list[0]=1;
-		for(int i=1; i<initial_size; i++){ 
-			scale_search_range[i]=0;
-			scale_list[i]=0;
-			}
-			scale_count=1;
-		}
+	
 		/*
 	if(scale_count==0&&element_type[nlocal]!=1){
 		
@@ -1784,10 +1786,15 @@ void AtomVecCAC::data_atom(double *coord, imageint imagetmp, char **values)
 		}
 		scale_count+=expand;
 		scale_search_range[scale_count-1]=search_radius;
-		if(expand>1)
+		scale_list[scale_count-1]=element_scale[nlocal][0];
+		if(expand>1){
 		scale_search_range[scale_count-2]=search_radius;
-		if(expand>2)
+		scale_list[scale_count-2]=element_scale[nlocal][0];
+		}
+		if(expand>2){
 		scale_search_range[scale_count-3]=search_radius;
+		scale_list[scale_count-3]=element_scale[nlocal][0];
+		}
 		
 		
 		

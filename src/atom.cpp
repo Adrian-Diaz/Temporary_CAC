@@ -121,6 +121,11 @@ Atom::Atom(LAMMPS *lmp) : Pointers(lmp)
   nodes_per_element_list = NULL;
   scale_search_range = NULL;
   scale_list = NULL;
+  scale_count=0;
+  oneflag=0;
+  CAC_cut=0;
+  max_search_range=0;
+  initial_size=0;
   // USER-MESO
 
   cc = cc_flux = NULL;

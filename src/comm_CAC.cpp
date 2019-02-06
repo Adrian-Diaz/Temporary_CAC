@@ -12,7 +12,7 @@
 ------------------------------------------------------------------------- */
 
 /* ----------------------------------------------------------------------
-   Contributing author (multi) : Adrian Diaz (University of Florida)
+   Contributing author (CAC) : Adrian Diaz (University of Florida)
 ------------------------------------------------------------------------- */
 
 #include <cstring>
@@ -131,6 +131,10 @@ void CommCAC::init()
 
   if (triclinic)
     error->all(FLERR,"Cannot yet use comm_style tiled with triclinic box");
+
+  //CAC atom style check
+  if (!atom->CAC_flag==1)
+  error->all(FLERR,"Cannot use comm_style CAC with non CAC atom style");
 
 }
 
