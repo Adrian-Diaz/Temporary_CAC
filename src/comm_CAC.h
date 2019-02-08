@@ -62,6 +62,8 @@ class CommCAC : public CommTiled {
   int *sendself;                // 1 if send to self per swap
   int *nprocmax;                // current max # of send procs per swap
   int **sendproc,**recvproc;    // procs to send/recv to/from per swap
+  int **sendsize,**recvsize; // size of buffer sent by each overlap proc per swap
+  int **sendoffset,**recvoffset; // size of buffer sent by each overlap proc per swap
   int **sendnum,**recvnum;      // # of atoms to send/recv per swap/proc
   int **size_forward_recv;      // # of values to recv in each forward swap/proc
   int **firstrecv;              // where to put 1st recv atom per swap/proc
