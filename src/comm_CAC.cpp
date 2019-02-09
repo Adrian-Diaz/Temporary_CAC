@@ -96,7 +96,7 @@ void CommCAC::init_buffers()
   // atomvec, fix reset these 2 maxexchange values if needed
   // only necessary if their size > BUFEXTRA
   
-  maxexchange = maxexchange_atom + maxexchange_fix;
+  maxexchange = 0;
   bufextra = maxexchange + BUFEXTRA;
 
   maxsend = BUFMIN;
@@ -138,6 +138,14 @@ void CommCAC::init()
   if (!atom->CAC_flag==1)
   error->all(FLERR,"Cannot use comm_style CAC with non CAC atom style");
   
+  //check if init buffer made the initial size large enough based on whether max exchange 
+  //variables were set since the init_buffer method is called before they're set
+  if(maxexchange_atom||maxexchange_fix){
+
+     maxexchange = maxexchange_atom + maxexchange_fix;
+     bufextra = maxexchange + BUFEXTRA;
+     memory->grow(buf_send,maxsend+bufextra,"comm:buf_send");
+  }
   
 }
 
