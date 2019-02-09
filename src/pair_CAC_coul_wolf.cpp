@@ -338,7 +338,8 @@ double maxds=0;
 double maxdt=0;
 double maxdw=0;
 int neighbor_cell_count[3];
-int nodes_per_element = 1;
+int nodes_per_element;
+int *nodes_count_list = atom->nodes_per_element_list;	
 int neighbor_nodes_per_element;
 
 //equivalent isoparametric cutoff range for a cube of rcut
@@ -377,7 +378,7 @@ int distanceflag=0;
     current_position[2]=0;
 
 	if (!atomic_flag) {
-		if (current_element_type == 1) { nodes_per_element = 8; }
+		nodes_per_element = nodes_count_list[current_element_type];
 		for (int kkk = 0; kkk < nodes_per_element; kkk++) {
 			shape_func = shape_function(unit_cell[0], unit_cell[1], unit_cell[2], 2, kkk + 1);
 			current_position[0] += current_nodal_positions[kkk][poly_counter][0] * shape_func;
