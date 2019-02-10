@@ -146,6 +146,7 @@ void CommCAC::init()
      bufextra = maxexchange + BUFEXTRA;
      memory->grow(buf_send,maxsend+bufextra,"comm:buf_send");
   }
+
    //needed here for shrink wrap
    if (layout != Comm::LAYOUT_TILED) {
     box_drop = &CommCAC::box_drop_brick;
@@ -158,6 +159,7 @@ void CommCAC::init()
     box_touch = &CommCAC::box_touch_tiled;
     point_drop = &CommCAC::point_drop_tiled;
   }
+
 }
 
 /* ----------------------------------------------------------------------

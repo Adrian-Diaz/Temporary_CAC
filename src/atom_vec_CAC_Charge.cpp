@@ -84,6 +84,7 @@ if(narg==3){
 
 	comm->maxexchange_atom=size_border;	
 
+
 	if(element_type_count==0){
 		element_type_count = 2; //increase if new types added
 		memory->grow(atom->nodes_per_element_list, element_type_count, "atom:nodes_per_element_list");
@@ -91,6 +92,7 @@ if(narg==3){
 		atom->nodes_per_element_list[0] = 1;
 		atom->nodes_per_element_list[1] = 8;
 	}	
+
 }
 
 void AtomVecCAC_Charge::init()
@@ -103,7 +105,6 @@ void AtomVecCAC_Charge::init()
   if (lmp->kokkos != NULL && !kokkosable)
     error->all(FLERR,"KOKKOS package requires a kokkos enabled atom_style");
 
- 	  
 }
 
 /* ----------------------------------------------------------------------
@@ -1340,7 +1341,9 @@ int AtomVecCAC_Charge::unpack_restart(double *buf)
 {
   int current_node_count;	
   int nlocal = atom->nlocal;
+
   int *nodes_count_list = atom->nodes_per_element_list;
+
   scale_search_range=atom->scale_search_range;
   scale_list=atom->scale_list;
   scale_count=atom->scale_count;
@@ -1350,6 +1353,7 @@ int AtomVecCAC_Charge::unpack_restart(double *buf)
     if (atom->nextra_store)
       memory->grow(atom->extra,nmax,atom->nextra_store,"atom:extra");
   }
+
   int m = 1;
   x[nlocal][0] = buf[m++];
   x[nlocal][1] = buf[m++];
@@ -1598,7 +1602,9 @@ void AtomVecCAC_Charge::data_atom(double *coord, imageint imagetmp, char **value
 	if (nlocal == nmax) grow(0);
 	int nodetotal, npoly;
 	int tmp;
+
 	int *nodes_count_list = atom->nodes_per_element_list;
+
 	int types_filled = 0;
     scale_search_range=atom->scale_search_range;
     scale_list=atom->scale_list;

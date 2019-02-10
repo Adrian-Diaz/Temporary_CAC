@@ -794,7 +794,8 @@ double current_position[3];
 double scan_position[3];
 double rcut;
 
-int nodes_per_element = 1;
+int nodes_per_element;
+int *nodes_count_list = atom->nodes_per_element_list;	
 double cbox_positions[3];
 
 int flagm;
@@ -842,7 +843,7 @@ int distanceflag=0;
     current_position[1]=0;
     current_position[2]=0;
 	if (!atomic_flag) {
-		if (current_element_type == 1) { nodes_per_element = 8; }
+		nodes_per_element = nodes_count_list[current_element_type];
 		for (int kkk = 0; kkk < nodes_per_element; kkk++) {
 			shape_func = shape_function(unit_cell[0], unit_cell[1], unit_cell[2], 2, kkk + 1);
 			current_position[0] += current_nodal_positions[kkk][poly_counter][0] * shape_func;
@@ -865,9 +866,9 @@ int distanceflag=0;
 	int listtype;
 	int scan_type, scan_type2;
 	int listindex;
+	int poly_index;
 	int poly_grad_scan;
 	double force_contribution[3];
-	int poly_index;
 	int element_index;
 	int *ilist, *jlist, *numneigh, **firstneigh;
 	int neigh_max_inner = quad_list_container[iii].inner_quadrature_neighbor_count[neigh_quad_counter];
@@ -1014,6 +1015,7 @@ int distanceflag=0;
 		rho[l+1] += ((coeff[3] * p + coeff[4])*p + coeff[5])*p + coeff[6];
 
 
+
 		for (int k = 0; k < neigh_max_inner; k++) {
 
 			scan_type2 = inner_neighbor_types[k];
@@ -1037,14 +1039,22 @@ int distanceflag=0;
 			p = MIN(p, 1.0);
 			coeff = rhor_spline[type2rhor[scan_type2][scan_type]][m];
 			rho[l + 1] += ((coeff[3] * p + coeff[4])*p + coeff[5])*p + coeff[6];
-		}
 
+
+
+
+		}
 		for (int k = 0; k < neigh_max_outer; k++) {
+			
 
 			scan_type2 = outer_neighbor_types[k];
 			scan_position[0] = outer_neighbor_coords[k][0];
 			scan_position[1] = outer_neighbor_coords[k][1];
 			scan_position[2] = outer_neighbor_coords[k][2];
+
+
+
+
 
 			delr2[0] = scan_position[0] - inner_scan_position[0];
 			delr2[1] = scan_position[1] - inner_scan_position[1];
@@ -1059,9 +1069,13 @@ int distanceflag=0;
 			p = MIN(p, 1.0);
 			coeff = rhor_spline[type2rhor[scan_type2][scan_type]][m];
 			rho[l + 1] += ((coeff[3] * p + coeff[4])*p + coeff[5])*p + coeff[6];
-		}
-	}
 
+
+
+
+		}
+
+	}
 	//compute derivative of the embedding energy for the origin atom
 	scan_type = node_types[element_index][poly_index];
 	p = rho[0] * rdrho + 1.0;
@@ -1070,14 +1084,7 @@ int distanceflag=0;
 	p -= m;
 	p = MIN(p, 1.0);
 	coeff = frho_spline[type2frho[origin_type]][m];
-	
 	fp[0] = (coeff[0] * p + coeff[1])*p + coeff[2];
-		if (quad_eflag){
-		phi = ((coeff[3]*p + coeff[4])*p + coeff[5])*p + coeff[6];
-		if (rho[0] > rhomax) phi += fp[0] * (rho[0]-rhomax);
- 		phi *= scale[origin_type][scan_type];
-  		quadrature_energy += phi;
-	}
 	//compute derivative of the embedding energy for all atoms in the inner neighborlist
 	for (int l = 0; l < neigh_max_inner; l++) {
 
@@ -1148,7 +1155,6 @@ int distanceflag=0;
 		force_contribution[0] = delx*fpair;
 		force_contribution[1] = dely*fpair;
 		force_contribution[2] = delz*fpair;
-
 		if (quad_eflag) {
 
 			scanning_unit_cell[0] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][0];

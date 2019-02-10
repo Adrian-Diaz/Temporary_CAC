@@ -1298,7 +1298,9 @@ int AtomVecCAC::unpack_restart(double *buf)
 {
   int nlocal = atom->nlocal;
   int current_node_count;
+
   int *nodes_count_list = atom->nodes_per_element_list;
+
   scale_search_range=atom->scale_search_range;
   scale_list=atom->scale_list;
   scale_count=atom->scale_count;
@@ -1308,7 +1310,7 @@ int AtomVecCAC::unpack_restart(double *buf)
     if (atom->nextra_store)
       memory->grow(atom->extra,nmax,atom->nextra_store,"atom:extra");
   }
-  	
+
   int m = 1;
   x[nlocal][0] = buf[m++];
   x[nlocal][1] = buf[m++];
