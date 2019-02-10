@@ -83,6 +83,16 @@ if(narg==3){
   xcol_data = 4;
 
 	comm->maxexchange_atom=size_border;	
+
+
+	if(element_type_count==0){
+		element_type_count = 2; //increase if new types added
+		memory->grow(atom->nodes_per_element_list, element_type_count, "atom:nodes_per_element_list");
+		//define number of nodes for existing element types
+		atom->nodes_per_element_list[0] = 1;
+		atom->nodes_per_element_list[1] = 8;
+	}	
+
 }
 
 void AtomVecCAC_Charge::init()
@@ -95,7 +105,6 @@ void AtomVecCAC_Charge::init()
   if (lmp->kokkos != NULL && !kokkosable)
     error->all(FLERR,"KOKKOS package requires a kokkos enabled atom_style");
 
-	  
 }
 
 /* ----------------------------------------------------------------------
@@ -1332,7 +1341,9 @@ int AtomVecCAC_Charge::unpack_restart(double *buf)
 {
   int current_node_count;	
   int nlocal = atom->nlocal;
-  int *nodes_count_list;
+
+  int *nodes_count_list = atom->nodes_per_element_list;
+
   scale_search_range=atom->scale_search_range;
   scale_list=atom->scale_list;
   scale_count=atom->scale_count;
@@ -1342,13 +1353,7 @@ int AtomVecCAC_Charge::unpack_restart(double *buf)
     if (atom->nextra_store)
       memory->grow(atom->extra,nmax,atom->nextra_store,"atom:extra");
   }
-  	if(element_type_count==0){
-		element_type_count = 2; //increase if new types added
-		nodes_count_list = memory->grow(atom->nodes_per_element_list, element_type_count, "atom:nodes_per_element_list");
-		//define number of nodes for existing element types
-		nodes_count_list[0] = 1;
-		nodes_count_list[1] = 8;
-	}
+
   int m = 1;
   x[nlocal][0] = buf[m++];
   x[nlocal][1] = buf[m++];
@@ -1597,7 +1602,9 @@ void AtomVecCAC_Charge::data_atom(double *coord, imageint imagetmp, char **value
 	if (nlocal == nmax) grow(0);
 	int nodetotal, npoly;
 	int tmp;
-	int *nodes_count_list;
+
+	int *nodes_count_list = atom->nodes_per_element_list;
+
 	int types_filled = 0;
     scale_search_range=atom->scale_search_range;
     scale_list=atom->scale_list;
@@ -1609,16 +1616,7 @@ void AtomVecCAC_Charge::data_atom(double *coord, imageint imagetmp, char **value
 	char* element_type_read;
 	element_type_read = values[1];
 	type[nlocal] = 1;
-	if (element_type_count == 0) {
-		element_type_count = 2; //inccrease if new types added
-		nodes_count_list = memory->grow(atom->nodes_per_element_list, element_type_count, "atom:nodes_per_element_list");
-		//define number of nodes for existing element types
-		//define array assignment of node count consisten with element type index
-		//i.e. nodes_count_list[n] is for element_type=n
-		//make sure you do the same for the unpack restart routine above
-		nodes_count_list[0] = 1;
-		nodes_count_list[1] = 8;
-	}
+
 	npoly = atoi(values[2]);
 	if (npoly > maxpoly)
 		error->one(FLERR, "poly count declared in data file was greater than maxpoly in input file");

@@ -36,7 +36,8 @@ class NPairCAC : public NPair {
   double shape_function(double, double, double, int, int);
   void compute_surface_depths(double &x, double &y, double &z,
 	  int &xb, int &yb, int &zb, int flag);
-  int CAC_decide(int index_one, int index_two);
+  int CAC_decide_element2atom(int index_one, int index_two);
+  int CAC_decide_element2element(int index_one, int index_two);
   int CAC_decide_atom2element(int index_one, int index_two);
   double ***current_nodal_positions;
   double CAC_cut;

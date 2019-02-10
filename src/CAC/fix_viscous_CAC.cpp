@@ -114,6 +114,7 @@ void FixViscousCAC::post_force(int vflag)
 
   double ****nodal_velocities = atom->nodal_velocities;
   double ****nodal_forces = atom->nodal_forces;
+  int *nodes_count_list = atom->nodes_per_element_list;	
   int *mask = atom->mask;
   int *type = atom->type;
   int nlocal = atom->nlocal;
@@ -126,12 +127,9 @@ void FixViscousCAC::post_force(int vflag)
 
   for (int i = 0; i < nlocal; i++)
     if (mask[i] & groupbit) {
-		if (element_type[i] == 1) {
-			nodes_per_element = 8;
-		}
-		else {
-			nodes_per_element = 1;
-		}
+	
+			nodes_per_element = nodes_count_list[element_type[i]];
+	
 		for (int j = 0; j < nodes_per_element; j++) {
 			for (int k = 0; k < poly_count[i]; k++) {
 				drag = gamma[type[i]];

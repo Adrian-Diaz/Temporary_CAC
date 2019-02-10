@@ -82,6 +82,14 @@ void AtomVecCAC::process_args(int narg, char **arg)
   xcol_data = 3;
 
   comm->maxexchange_atom=size_border;
+  
+  if(element_type_count==0){
+		element_type_count = 2; //increase if new types added
+		 memory->grow(atom->nodes_per_element_list, element_type_count, "atom:nodes_per_element_list");
+		//define number of nodes for existing element types
+		atom->nodes_per_element_list[0] = 1;
+		atom->nodes_per_element_list[1] = 8;
+	}	
 }
 
 /* ----------------------------------------------------------------------
@@ -97,7 +105,7 @@ void AtomVecCAC::init()
   	if (lmp->kokkos != NULL && !kokkosable)
     error->all(FLERR,"KOKKOS package requires a kokkos enabled atom_style");
     
-		
+	
 }
 
 /* ----------------------------------------------------------------------
@@ -1290,7 +1298,9 @@ int AtomVecCAC::unpack_restart(double *buf)
 {
   int nlocal = atom->nlocal;
   int current_node_count;
-  int *nodes_count_list;
+
+  int *nodes_count_list = atom->nodes_per_element_list;
+
   scale_search_range=atom->scale_search_range;
   scale_list=atom->scale_list;
   scale_count=atom->scale_count;
@@ -1300,13 +1310,7 @@ int AtomVecCAC::unpack_restart(double *buf)
     if (atom->nextra_store)
       memory->grow(atom->extra,nmax,atom->nextra_store,"atom:extra");
   }
-  	if(element_type_count==0){
-		element_type_count = 2; //increase if new types added
-		nodes_count_list = memory->grow(atom->nodes_per_element_list, element_type_count, "atom:nodes_per_element_list");
-		//define number of nodes for existing element types
-		nodes_count_list[0] = 1;
-		nodes_count_list[1] = 8;
-	}
+
   int m = 1;
   x[nlocal][0] = buf[m++];
   x[nlocal][1] = buf[m++];
@@ -1563,16 +1567,7 @@ void AtomVecCAC::data_atom(double *coord, imageint imagetmp, char **values)
 	char* element_type_read;
 	element_type_read = values[1];
 	type[nlocal] = 1;
-	if(element_type_count==0){
-		element_type_count = 2; //increase if new types added
-		nodes_count_list = memory->grow(atom->nodes_per_element_list, element_type_count, "atom:nodes_per_element_list");
-		//define number of nodes for existing element types
-		//define array assignment of node count consisten with element type index
-		//i.e. nodes_count_list[n] is for element_type=n
-		//make sure you do the same for the unpack restart routine above
-		nodes_count_list[0] = 1;
-		nodes_count_list[1] = 8;
-	}
+
 	npoly = atoi(values[2]);
 	if (npoly > maxpoly)
 		error->one(FLERR, "poly count declared in data file was greater than maxpoly in input file");

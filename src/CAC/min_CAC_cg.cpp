@@ -99,9 +99,9 @@ void CACMinCG::setup_style()
   // memory for x0,g,h for atomic dof
 	// original values for the add_vectors was 3
 	// changed to maxpoly*nodes_per_element since thats the quantity of nodal values per element
-  fix_minimize->add_vector(atom->maxpoly*atom->nodes_per_element);
-  fix_minimize->add_vector(atom->maxpoly*atom->nodes_per_element);
-  fix_minimize->add_vector(atom->maxpoly*atom->nodes_per_element);
+  fix_minimize->add_vector(3*atom->maxpoly*atom->nodes_per_element);
+  fix_minimize->add_vector(3*atom->maxpoly*atom->nodes_per_element);
+  fix_minimize->add_vector(3*atom->maxpoly*atom->nodes_per_element);
 
   // memory for g,h for extra global dof, fix stores x0
   //I think those flags for extra evaluate to zero when CAC runs usually unless you put something
@@ -137,7 +137,7 @@ void CACMinCG::reset_vectors()
   //original nvec count
   //nvec = 3 * atom->nlocal;
   //CAC nvec count
-	nvec = atom->maxpoly*atom->nodes_per_element * atom->nlocal;
+	nvec = 3*atom->maxpoly*atom->nodes_per_element * atom->nlocal;
   //if (nvec) xvec = atom->x[0];
   //if (nvec) fvec = atom->f[0];
 	//lammps uses a 1D representation of N-D arrays constructed with memory->grow and memory->create
