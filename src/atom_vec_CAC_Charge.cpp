@@ -81,6 +81,16 @@ if(narg==3){
   size_data_atom = 3*nodes_per_element*maxpoly +10+ 2 * maxpoly;
   size_data_vel = 12*nodes_per_element*maxpoly +9+ 2 * maxpoly;
   xcol_data = 4;
+
+	comm->maxexchange_atom=size_border;	
+
+	if(element_type_count==0){
+		element_type_count = 2; //increase if new types added
+		memory->grow(atom->nodes_per_element_list, element_type_count, "atom:nodes_per_element_list");
+		//define number of nodes for existing element types
+		atom->nodes_per_element_list[0] = 1;
+		atom->nodes_per_element_list[1] = 8;
+	}	
 }
 
 void AtomVecCAC_Charge::init()
@@ -93,7 +103,7 @@ void AtomVecCAC_Charge::init()
   if (lmp->kokkos != NULL && !kokkosable)
     error->all(FLERR,"KOKKOS package requires a kokkos enabled atom_style");
 
-		  
+ 	  
 }
 
 /* ----------------------------------------------------------------------
@@ -1248,11 +1258,11 @@ int AtomVecCAC_Charge::size_restart()
 {
   int i;
   int current_node_count; 
+	int *nodes_count_list = atom->nodes_per_element_list;
   int nlocal = atom->nlocal;
   int n=0;
   for (i=0; i < nlocal; i++){
-  if(element_type[i]==0) current_node_count=1;
-  if(element_type[i]==1) current_node_count=8;
+  current_node_count=nodes_count_list[element_type[i]];
    n += (16+12*current_node_count*poly_count[i]+2*poly_count[i]);
   }
 
@@ -1274,6 +1284,7 @@ int AtomVecCAC_Charge::pack_restart(int i, double *buf)
 {
   int m = 1;
   int current_node_count; 
+	int *nodes_count_list = atom->nodes_per_element_list;
   buf[m++] = x[i][0];
   buf[m++] = x[i][1];
   buf[m++] = x[i][2];
@@ -1289,8 +1300,7 @@ int AtomVecCAC_Charge::pack_restart(int i, double *buf)
   buf[m++] = ubuf(element_scale[i][1]).d;
   buf[m++] = ubuf(element_scale[i][2]).d;
   buf[m++] = ubuf(poly_count[i]).d;
-  if(element_type[i]==0) current_node_count=1;
-  if(element_type[i]==1) current_node_count=8;
+  current_node_count=nodes_count_list[element_type[i]];
   
   for (int type_map = 0; type_map < poly_count[i]; type_map++) {
 	  buf[m++] = ubuf(node_types[i][type_map]).d;
@@ -1330,7 +1340,7 @@ int AtomVecCAC_Charge::unpack_restart(double *buf)
 {
   int current_node_count;	
   int nlocal = atom->nlocal;
-  int *node_count_list;
+  int *nodes_count_list = atom->nodes_per_element_list;
   scale_search_range=atom->scale_search_range;
   scale_list=atom->scale_list;
   scale_count=atom->scale_count;
@@ -1340,13 +1350,6 @@ int AtomVecCAC_Charge::unpack_restart(double *buf)
     if (atom->nextra_store)
       memory->grow(atom->extra,nmax,atom->nextra_store,"atom:extra");
   }
-  	if(element_type_count==0){
-		element_type_count = 2; //increase if new types added
-		node_count_list = memory->grow(atom->nodes_per_element_list, element_type_count, "atom:nodes_per_element_list");
-		//define number of nodes for existing element types
-		node_count_list[0] = 1;
-		node_count_list[1] = 8;
-	}
   int m = 1;
   x[nlocal][0] = buf[m++];
   x[nlocal][1] = buf[m++];
@@ -1363,8 +1366,8 @@ int AtomVecCAC_Charge::unpack_restart(double *buf)
   element_scale[nlocal][1] = (int) ubuf(buf[m++]).i;
   element_scale[nlocal][2] = (int) ubuf(buf[m++]).i;
   poly_count[nlocal] = (int) ubuf(buf[m++]).i;
-  if(element_type[nlocal]==0) current_node_count=1;
-  if(element_type[nlocal]==1) current_node_count=8;
+  
+	current_node_count=nodes_count_list[element_type[nlocal]];
   for (int type_map = 0; type_map < poly_count[nlocal]; type_map++) {
 	  node_types[nlocal][type_map] = (int) ubuf(buf[m++]).i;
 	  node_charges[nlocal][type_map] = buf[m++];
@@ -1595,7 +1598,7 @@ void AtomVecCAC_Charge::data_atom(double *coord, imageint imagetmp, char **value
 	if (nlocal == nmax) grow(0);
 	int nodetotal, npoly;
 	int tmp;
-	int *node_count_list;
+	int *nodes_count_list = atom->nodes_per_element_list;
 	int types_filled = 0;
     scale_search_range=atom->scale_search_range;
     scale_list=atom->scale_list;
@@ -1607,21 +1610,17 @@ void AtomVecCAC_Charge::data_atom(double *coord, imageint imagetmp, char **value
 	char* element_type_read;
 	element_type_read = values[1];
 	type[nlocal] = 1;
-	if (element_type_count == 0) {
-		element_type_count = 2; //inccrease if new types added
-		node_count_list = memory->grow(atom->nodes_per_element_list, element_type_count, "atom:nodes_per_element_list");
-		//define number of nodes for existing element types
-		//define array assignment of node count consisten with element type index
-		//i.e. node_count_list[n] is for element_type=n
-		node_count_list[0] = 1;
-		node_count_list[1] = 8;
-	}
+
 	npoly = atoi(values[2]);
 	if (npoly > maxpoly)
 		error->one(FLERR, "poly count declared in data file was greater than maxpoly in input file");
+		//add a block for new element types; this does not have to be done in unpack restart
+		//by convention atoms are element type 0; this has nothing to do with the mass type.
+		// you should only be setting the name of your element in the read comparison check
+		// and the corresponding numerical id for this type
 	if (strcmp(element_type_read, "Eight_Node") == 0) {
 		element_type[nlocal] = 1;
-		nodetotal = 8;
+		nodetotal = nodes_count_list[element_type[nlocal]];
 		poly_count[nlocal] = npoly;
 		element_scale[nlocal][0] = atoi(values[3]);
 		element_scale[nlocal][1] = atoi(values[4]);
@@ -1629,7 +1628,7 @@ void AtomVecCAC_Charge::data_atom(double *coord, imageint imagetmp, char **value
 	}
 	else if (strcmp(element_type_read, "Atom") == 0) {
 		element_type[nlocal] = 0;
-		nodetotal = 1;
+		nodetotal = nodes_count_list[element_type[nlocal]];
 		npoly = 1;
 		poly_count[nlocal] = npoly;
 		element_scale[nlocal][0] = 1;
@@ -1879,6 +1878,7 @@ void AtomVecCAC_Charge::data_atom(double *coord, imageint imagetmp, char **value
 void AtomVecCAC_Charge::pack_data(double **buf)
 {
   int nlocal = atom->nlocal;
+	int *nodes_count_list = atom->nodes_per_element_list;
   for (int i = 0; i < nlocal; i++) {
        int m=0;
     buf[i][m++] = ubuf(tag[i]).d;
@@ -1895,7 +1895,7 @@ void AtomVecCAC_Charge::pack_data(double **buf)
 		buf[i][m++] = node_charges[i][type_map];
 	}
 
-	for (int nodecount = 0; nodecount< nodes_per_element; nodecount++) {
+	for (int nodecount = 0; nodecount< nodes_count_list[element_type[i]]; nodecount++) {
 		for (int poly_index = 0; poly_index < maxpoly; poly_index++)
 		{
 			buf[i][m++] = nodal_positions[i][nodecount][poly_index][0];

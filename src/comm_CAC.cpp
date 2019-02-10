@@ -96,7 +96,7 @@ void CommCAC::init_buffers()
   // atomvec, fix reset these 2 maxexchange values if needed
   // only necessary if their size > BUFEXTRA
   
-  maxexchange = maxexchange_atom + maxexchange_fix;
+  maxexchange = 0;
   bufextra = maxexchange + BUFEXTRA;
 
   maxsend = BUFMIN;
@@ -138,7 +138,26 @@ void CommCAC::init()
   if (!atom->CAC_flag==1)
   error->all(FLERR,"Cannot use comm_style CAC with non CAC atom style");
   
-  
+  //check if init buffer made the initial size large enough based on whether max exchange 
+  //variables were set since the init_buffer method is called before they're set
+  if(maxexchange_atom||maxexchange_fix){
+
+     maxexchange = maxexchange_atom + maxexchange_fix;
+     bufextra = maxexchange + BUFEXTRA;
+     memory->grow(buf_send,maxsend+bufextra,"comm:buf_send");
+  }
+   //needed here for shrink wrap
+   if (layout != Comm::LAYOUT_TILED) {
+    box_drop = &CommCAC::box_drop_brick;
+    box_other = &CommCAC::box_other_brick;
+    box_touch = &CommCAC::box_touch_brick;
+    point_drop = &CommCAC::point_drop_brick;
+  } else {
+    box_drop = &CommCAC::box_drop_tiled;
+    box_other = &CommCAC::box_other_tiled;
+    box_touch = &CommCAC::box_touch_tiled;
+    point_drop = &CommCAC::point_drop_tiled;
+  }
 }
 
 /* ----------------------------------------------------------------------
@@ -573,12 +592,6 @@ void CommCAC::forward_comm(int /*dummy*/)
           MPI_Send(buf_send,n,MPI_DOUBLE,sendproc[iswap][i],0,world);
         }
       }
-      if (sendself[iswap]) {
-        avec->pack_comm_vel(sendnum[iswap][nsend],sendlist[iswap][nsend],
-                        buf_send,pbc_flag[iswap][nsend],pbc[iswap][nsend]);
-        avec->unpack_comm_vel(recvnum[iswap][nrecv],firstrecv[iswap][nrecv],
-                          buf_send);
-      }
       if (recvother[iswap]) {
         size_offset=0;
         for (i = 0; i < nrecv; i++) {
@@ -588,6 +601,12 @@ void CommCAC::forward_comm(int /*dummy*/)
           avec->unpack_comm_vel(recvnum[iswap][irecv],firstrecv[iswap][irecv],
                             &buf_recv[recvoffset[iswap][irecv]-size_offset]);
         }
+      }
+      if (sendself[iswap]) {
+        avec->pack_comm_vel(sendnum[iswap][nsend],sendlist[iswap][nsend],
+                        buf_send,pbc_flag[iswap][nsend],pbc[iswap][nsend]);
+        avec->unpack_comm_vel(recvnum[iswap][nrecv],firstrecv[iswap][nrecv],
+                          buf_send);
       }
     
   }
@@ -655,12 +674,6 @@ void CommCAC::reverse_comm()
           MPI_Send(buf_send,n,MPI_DOUBLE,recvproc[iswap][i],0,world);
         }
       }
-      if (sendself[iswap]) {
-        avec->pack_reverse(recvnum[iswap][nrecv],firstrecv[iswap][nrecv],
-                           buf_send);
-        avec->unpack_reverse(sendnum[iswap][nsend],sendlist[iswap][nsend],
-                             buf_send);
-      }
       if (sendother[iswap]) {
         for (i = 0; i < nsend; i++) {
           MPI_Waitany(nsend,requests,&irecv,MPI_STATUS_IGNORE);
@@ -668,6 +681,12 @@ void CommCAC::reverse_comm()
                                &buf_recv[size_reverse*
                                          reverse_recv_offset[iswap][irecv]]);
         }
+      }
+       if (sendself[iswap]) {
+        avec->pack_reverse(recvnum[iswap][nrecv],firstrecv[iswap][nrecv],
+                           buf_send);
+        avec->unpack_reverse(sendnum[iswap][nsend],sendlist[iswap][nsend],
+                             buf_send);
       }
     }
   }
@@ -1064,17 +1083,17 @@ void CommCAC::borders()
           MPI_DOUBLE,sendproc[iswap][m],0,world);
         }
       }
-      if (sendself[iswap]) {
-        avec->pack_border(sendnum[iswap][nsend],sendlist[iswap][nsend],
-                          buf_send,pbc_flag[iswap][nsend],pbc[iswap][nsend]);
-        avec->unpack_border(recvnum[iswap][nsend],firstrecv[iswap][nsend],
-                            buf_send);
-      }
       if (recvother[iswap]) {
         MPI_Waitall(nrecv,requests,MPI_STATUS_IGNORE);
         for (m = 0; m < nrecv; m++)
           avec->unpack_border(recvnum[iswap][m],firstrecv[iswap][m],
                               &buf_recv[recvoffset[iswap][m]]);
+      }
+      if (sendself[iswap]) {
+        avec->pack_border(sendnum[iswap][nsend],sendlist[iswap][nsend],
+                          buf_send,pbc_flag[iswap][nsend],pbc[iswap][nsend]);
+        avec->unpack_border(recvnum[iswap][nsend],firstrecv[iswap][nsend],
+                            buf_send);
       }
     
     //compute maximum buffer size so far
@@ -1130,14 +1149,6 @@ void CommCAC::forward_comm_pair(Pair *pair)
         MPI_Send(buf_send,n,MPI_DOUBLE,sendproc[iswap][i],0,world);
       }
     }
-
-    if (sendself[iswap]) {
-      pair->pack_forward_comm(sendnum[iswap][nsend],sendlist[iswap][nsend],
-                              buf_send,pbc_flag[iswap][nsend],
-                              pbc[iswap][nsend]);
-      pair->unpack_forward_comm(recvnum[iswap][nrecv],firstrecv[iswap][nrecv],
-                                buf_send);
-    }
     if (recvother[iswap]) {
       for (i = 0; i < nrecv; i++) {
         MPI_Waitany(nrecv,requests,&irecv,MPI_STATUS_IGNORE);
@@ -1145,6 +1156,13 @@ void CommCAC::forward_comm_pair(Pair *pair)
                                   &buf_recv[nsize*
                                             forward_recv_offset[iswap][irecv]]);
       }
+    }
+    if (sendself[iswap]) {
+      pair->pack_forward_comm(sendnum[iswap][nsend],sendlist[iswap][nsend],
+                              buf_send,pbc_flag[iswap][nsend],
+                              pbc[iswap][nsend]);
+      pair->unpack_forward_comm(recvnum[iswap][nrecv],firstrecv[iswap][nrecv],
+                                buf_send);
     }
   }
 }
@@ -1177,12 +1195,6 @@ void CommCAC::reverse_comm_pair(Pair *pair)
         MPI_Send(buf_send,n,MPI_DOUBLE,recvproc[iswap][i],0,world);
       }
     }
-    if (sendself[iswap]) {
-      pair->pack_reverse_comm(recvnum[iswap][nrecv],firstrecv[iswap][nrecv],
-                              buf_send);
-      pair->unpack_reverse_comm(sendnum[iswap][nsend],sendlist[iswap][nsend],
-                                buf_send);
-    }
     if (sendother[iswap]) {
       for (i = 0; i < nsend; i++) {
         MPI_Waitany(nsend,requests,&irecv,MPI_STATUS_IGNORE);
@@ -1190,6 +1202,12 @@ void CommCAC::reverse_comm_pair(Pair *pair)
                                   &buf_recv[nsize*
                                             reverse_recv_offset[iswap][irecv]]);
       }
+    }
+     if (sendself[iswap]) {
+      pair->pack_reverse_comm(recvnum[iswap][nrecv],firstrecv[iswap][nrecv],
+                              buf_send);
+      pair->unpack_reverse_comm(sendnum[iswap][nsend],sendlist[iswap][nsend],
+                                buf_send);
     }
   }
 }
@@ -1227,13 +1245,6 @@ void CommCAC::forward_comm_fix(Fix *fix, int size)
         MPI_Send(buf_send,n,MPI_DOUBLE,sendproc[iswap][i],0,world);
       }
     }
-    if (sendself[iswap]) {
-      fix->pack_forward_comm(sendnum[iswap][nsend],sendlist[iswap][nsend],
-                             buf_send,pbc_flag[iswap][nsend],
-                             pbc[iswap][nsend]);
-      fix->unpack_forward_comm(recvnum[iswap][nrecv],firstrecv[iswap][nrecv],
-                               buf_send);
-    }
     if (recvother[iswap]) {
       for (i = 0; i < nrecv; i++) {
         MPI_Waitany(nrecv,requests,&irecv,MPI_STATUS_IGNORE);
@@ -1241,6 +1252,13 @@ void CommCAC::forward_comm_fix(Fix *fix, int size)
                                  &buf_recv[nsize*
                                            forward_recv_offset[iswap][irecv]]);
       }
+    }
+    if (sendself[iswap]) {
+      fix->pack_forward_comm(sendnum[iswap][nsend],sendlist[iswap][nsend],
+                             buf_send,pbc_flag[iswap][nsend],
+                             pbc[iswap][nsend]);
+      fix->unpack_forward_comm(recvnum[iswap][nrecv],firstrecv[iswap][nrecv],
+                               buf_send);
     }
   }
 }
@@ -1278,12 +1296,6 @@ void CommCAC::reverse_comm_fix(Fix *fix, int size)
         MPI_Send(buf_send,n,MPI_DOUBLE,recvproc[iswap][i],0,world);
       }
     }
-    if (sendself[iswap]) {
-      fix->pack_reverse_comm(recvnum[iswap][nrecv],firstrecv[iswap][nrecv],
-                             buf_send);
-      fix->unpack_reverse_comm(sendnum[iswap][nsend],sendlist[iswap][nsend],
-                               buf_send);
-    }
     if (sendother[iswap]) {
       for (i = 0; i < nsend; i++) {
         MPI_Waitany(nsend,requests,&irecv,MPI_STATUS_IGNORE);
@@ -1291,6 +1303,12 @@ void CommCAC::reverse_comm_fix(Fix *fix, int size)
                                  &buf_recv[nsize*
                                            reverse_recv_offset[iswap][irecv]]);
       }
+    }
+    if (sendself[iswap]) {
+      fix->pack_reverse_comm(recvnum[iswap][nrecv],firstrecv[iswap][nrecv],
+                             buf_send);
+      fix->unpack_reverse_comm(sendnum[iswap][nsend],sendlist[iswap][nsend],
+                               buf_send);
     }
   }
 }
@@ -1336,13 +1354,6 @@ void CommCAC::forward_comm_compute(Compute *compute)
         MPI_Send(buf_send,n,MPI_DOUBLE,sendproc[iswap][i],0,world);
       }
     }
-    if (sendself[iswap]) {
-      compute->pack_forward_comm(sendnum[iswap][nsend],sendlist[iswap][nsend],
-                                 buf_send,pbc_flag[iswap][nsend],
-                                 pbc[iswap][nsend]);
-      compute->unpack_forward_comm(recvnum[iswap][nrecv],
-                                   firstrecv[iswap][nrecv],buf_send);
-    }
     if (recvother[iswap]) {
       for (i = 0; i < nrecv; i++) {
         MPI_Waitany(nrecv,requests,&irecv,MPI_STATUS_IGNORE);
@@ -1351,6 +1362,13 @@ void CommCAC::forward_comm_compute(Compute *compute)
                               &buf_recv[nsize*
                                         forward_recv_offset[iswap][irecv]]);
       }
+    }
+    if (sendself[iswap]) {
+      compute->pack_forward_comm(sendnum[iswap][nsend],sendlist[iswap][nsend],
+                                 buf_send,pbc_flag[iswap][nsend],
+                                 pbc[iswap][nsend]);
+      compute->unpack_forward_comm(recvnum[iswap][nrecv],
+                                   firstrecv[iswap][nrecv],buf_send);
     }
   }
 }
@@ -1383,12 +1401,6 @@ void CommCAC::reverse_comm_compute(Compute *compute)
         MPI_Send(buf_send,n,MPI_DOUBLE,recvproc[iswap][i],0,world);
       }
     }
-    if (sendself[iswap]) {
-      compute->pack_reverse_comm(recvnum[iswap][nrecv],firstrecv[iswap][nrecv],
-                                 buf_send);
-      compute->unpack_reverse_comm(sendnum[iswap][nsend],sendlist[iswap][nsend],
-                                   buf_send);
-    }
     if (sendother[iswap]) {
       for (i = 0; i < nsend; i++) {
         MPI_Waitany(nsend,requests,&irecv,MPI_STATUS_IGNORE);
@@ -1397,6 +1409,12 @@ void CommCAC::reverse_comm_compute(Compute *compute)
                               &buf_recv[nsize*
                                         reverse_recv_offset[iswap][irecv]]);
       }
+    }
+    if (sendself[iswap]) {
+      compute->pack_reverse_comm(recvnum[iswap][nrecv],firstrecv[iswap][nrecv],
+                                 buf_send);
+      compute->unpack_reverse_comm(sendnum[iswap][nsend],sendlist[iswap][nsend],
+                                   buf_send);
     }
   }
 }
@@ -1430,13 +1448,6 @@ void CommCAC::forward_comm_dump(Dump *dump)
         MPI_Send(buf_send,n,MPI_DOUBLE,sendproc[iswap][i],0,world);
       }
     }
-    if (sendself[iswap]) {
-      dump->pack_forward_comm(sendnum[iswap][nsend],sendlist[iswap][nsend],
-                              buf_send,pbc_flag[iswap][nsend],
-                              pbc[iswap][nsend]);
-      dump->unpack_forward_comm(recvnum[iswap][nrecv],
-                                firstrecv[iswap][nrecv],buf_send);
-    }
     if (recvother[iswap]) {
       for (i = 0; i < nrecv; i++) {
         MPI_Waitany(nrecv,requests,&irecv,MPI_STATUS_IGNORE);
@@ -1444,6 +1455,13 @@ void CommCAC::forward_comm_dump(Dump *dump)
                                   &buf_recv[nsize*
                                             forward_recv_offset[iswap][irecv]]);
       }
+    }
+     if (sendself[iswap]) {
+      dump->pack_forward_comm(sendnum[iswap][nsend],sendlist[iswap][nsend],
+                              buf_send,pbc_flag[iswap][nsend],
+                              pbc[iswap][nsend]);
+      dump->unpack_forward_comm(recvnum[iswap][nrecv],
+                                firstrecv[iswap][nrecv],buf_send);
     }
   }
 }
@@ -1476,12 +1494,6 @@ void CommCAC::reverse_comm_dump(Dump *dump)
         MPI_Send(buf_send,n,MPI_DOUBLE,recvproc[iswap][i],0,world);
       }
     }
-    if (sendself[iswap]) {
-      dump->pack_reverse_comm(recvnum[iswap][nrecv],firstrecv[iswap][nrecv],
-                              buf_send);
-      dump->unpack_reverse_comm(sendnum[iswap][nsend],sendlist[iswap][nsend],
-                                buf_send);
-    }
     if (sendother[iswap]) {
       for (i = 0; i < nsend; i++) {
         MPI_Waitany(nsend,requests,&irecv,MPI_STATUS_IGNORE);
@@ -1489,6 +1501,12 @@ void CommCAC::reverse_comm_dump(Dump *dump)
                                   &buf_recv[nsize*
                                             reverse_recv_offset[iswap][irecv]]);
       }
+    }
+    if (sendself[iswap]) {
+      dump->pack_reverse_comm(recvnum[iswap][nrecv],firstrecv[iswap][nrecv],
+                              buf_send);
+      dump->unpack_reverse_comm(sendnum[iswap][nsend],sendlist[iswap][nsend],
+                                buf_send);
     }
   }
 }
@@ -1534,6 +1552,16 @@ void CommCAC::forward_comm_array(int nsize, double **array)
                  MPI_DOUBLE,sendproc[iswap][i],0,world);
       }
     }
+    if (recvother[iswap]) {
+      for (i = 0; i < nrecv; i++) {
+        MPI_Waitany(nrecv,requests,&irecv,MPI_STATUS_IGNORE);
+        m = nsize*forward_recv_offset[iswap][irecv];
+        last = firstrecv[iswap][irecv] + recvnum[iswap][irecv];
+        for (iatom = firstrecv[iswap][irecv]; iatom < last; iatom++)
+          for (k = 0; k < nsize; k++)
+            array[iatom][k] = buf_recv[m++];
+      }
+    }
     if (sendself[iswap]) {
       m = 0;
       for (iatom = 0; iatom < sendnum[iswap][nsend]; iatom++) {
@@ -1546,17 +1574,6 @@ void CommCAC::forward_comm_array(int nsize, double **array)
       for (iatom = firstrecv[iswap][nrecv]; iatom < last; iatom++)
         for (k = 0; k < nsize; k++)
           array[iatom][k] = buf_send[m++];
-    }
-
-    if (recvother[iswap]) {
-      for (i = 0; i < nrecv; i++) {
-        MPI_Waitany(nrecv,requests,&irecv,MPI_STATUS_IGNORE);
-        m = nsize*forward_recv_offset[iswap][irecv];
-        last = firstrecv[iswap][irecv] + recvnum[iswap][irecv];
-        for (iatom = firstrecv[iswap][irecv]; iatom < last; iatom++)
-          for (k = 0; k < nsize; k++)
-            array[iatom][k] = buf_recv[m++];
-      }
     }
   }
 }
