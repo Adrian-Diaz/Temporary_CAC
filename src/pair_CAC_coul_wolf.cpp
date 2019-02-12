@@ -338,7 +338,8 @@ double maxds=0;
 double maxdt=0;
 double maxdw=0;
 int neighbor_cell_count[3];
-int nodes_per_element = 1;
+int nodes_per_element;
+int *nodes_count_list = atom->nodes_per_element_list;	
 int neighbor_nodes_per_element;
 
 //equivalent isoparametric cutoff range for a cube of rcut
@@ -377,7 +378,7 @@ int distanceflag=0;
     current_position[2]=0;
 
 	if (!atomic_flag) {
-		if (current_element_type == 1) { nodes_per_element = 8; }
+		nodes_per_element = nodes_count_list[current_element_type];
 		for (int kkk = 0; kkk < nodes_per_element; kkk++) {
 			shape_func = shape_function(unit_cell[0], unit_cell[1], unit_cell[2], 2, kkk + 1);
 			current_position[0] += current_nodal_positions[kkk][poly_counter][0] * shape_func;
@@ -426,20 +427,11 @@ int distanceflag=0;
 				scanning_unit_cell[0] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][0];
 				scanning_unit_cell[1] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][1];
 				scanning_unit_cell[2] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][2];
-				listtype = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][0];
-				listindex = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][1];
-				poly_index = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][2];
-				if (listtype == 0) {
-					element_index = ilist[listindex];
-					element_index &= NEIGHMASK;
-				}
-				else if (listtype == 1) {
-					element_index = jlist[listindex];
-					element_index &= NEIGHMASK;
-				}
-				else {
-					error->one(FLERR, "neighbor listing bug in Pair_CAC.cpp");
-				}
+				//listtype = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][0];
+				listindex = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][0];
+				poly_index = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][1];
+				element_index = listindex;
+			    element_index &= NEIGHMASK;
 				inner_neighbor_types[l] = node_types[element_index][poly_index];
 				inner_neighbor_charges[l] = node_charges[element_index][poly_index];
 				neigh_list_cord(inner_neighbor_coords[l][0], inner_neighbor_coords[l][1], inner_neighbor_coords[l][2],
