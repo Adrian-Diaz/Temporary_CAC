@@ -198,7 +198,8 @@ void FixCAC_Set_Velocity::init()
 
 	double ****nodal_positions = atom->nodal_positions;
 	double ****nodal_velocities = atom->nodal_velocities;
-	int nodes_per_element = atom->nodes_per_element;
+	int nodes_per_element;
+	int *nodes_count_list = atom->nodes_per_element_list;	
 	//double ****initial_nodal_positions = atom->initial_nodal_positions;
 	int *element_type = atom->element_type;
 	int *poly_count = atom->poly_count;
@@ -226,6 +227,7 @@ void FixCAC_Set_Velocity::init()
 	
 	for (int i = 0; i < nlocal; i++) {
 		if (mask[i] & groupbit) {
+			nodes_per_element = nodes_count_list[element_type[i]];
 			for (int j = 0; j < nodes_per_element; j++) {
 				for (int l = 0; l < poly_count[i]; l++) {
 
@@ -288,6 +290,7 @@ void FixCAC_Set_Velocity::initial_integrate(int vflag)
   double **f = atom->f;
   double ****nodal_forces = atom->nodal_forces;
   int nodes_per_element;
+	int *nodes_count_list = atom->nodes_per_element_list;	
   int *mask = atom->mask;
   int nlocal = atom->nlocal;
  double dt = update->dt;
@@ -399,10 +402,6 @@ void FixCAC_Set_Velocity::initial_integrate(int vflag)
   
   if (varflag == CONSTANT) {
 	  for (int i = 0; i < nlocal; i++) {
-		  if (element_type[i] == 1) {
-			  nodes_per_element = 8;
-		  }
-		  else { nodes_per_element = 1; }
 		  if (mask[i] & groupbit) {
 
 			  x[i][0] = 0;
@@ -411,7 +410,7 @@ void FixCAC_Set_Velocity::initial_integrate(int vflag)
 			  v[i][0] = 0;
 			  v[i][1] = 0;
 			  v[i][2] = 0;
-
+        nodes_per_element = nodes_count_list[element_type[i]];
 			  for (int j = 0; j < nodes_per_element; j++) {
 				  for (int l = 0; l < poly_count[i]; l++) {
 					  if (region && !region->match(x[i][0], x[i][1], x[i][2])) continue;

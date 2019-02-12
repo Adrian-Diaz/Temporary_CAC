@@ -70,7 +70,7 @@ class Atom : protected Pointers {
   double **node_charges, ****nodal_positions, ****nodal_velocities, ****nodal_forces,
 	  ****nodal_gradients, ****initial_nodal_positions, *scale_search_range;
   int *poly_count, **node_types,  *element_type,
-	  **element_scale, *nodes_per_element_list, scale_count, oneflag, *scale_list;
+	  **element_scale, *nodes_per_element_list, scale_count, oneflag, *scale_list, initial_size;
  
   double CAC_cut,max_search_range;				//used by npair styles
 
