@@ -1,4 +1,5 @@
 #include "min_CAC_cg.h"
+#include "min_CAC_fire.h"
 #include "min_cg.h"
 #include "min_fire.h"
 #include "min_hftn.h"
