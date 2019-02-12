@@ -274,9 +274,10 @@ void PairCAC::compute(int eflag, int vflag) {
 		}
 		atomic_counter = 0;
 		for (ii = 0; ii < inum; ii++) {
-			current_list_index = ii;
+			
 			atomic_flag = 0;
 			i = ilist[ii];
+			current_list_index = i;
 			xtmp = x[i][0];
 			ytmp = x[i][1];
 			ztmp = x[i][2];
@@ -1487,21 +1488,21 @@ void PairCAC::quad_list_build(int iii, double s, double t, double w) {
 										neighbor_copy_ucell[copy_count][2] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[copy_count][2];
 										neighbor_copy_index[copy_count][0] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[copy_count][0];
 										neighbor_copy_index[copy_count][1] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[copy_count][1];
-										neighbor_copy_index[copy_count][2] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[copy_count][2];
+										//neighbor_copy_index[copy_count][2] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[copy_count][2];
 									}
 									
 									memory->destroy(quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords);
 									memory->destroy(quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes);
 									
 									memory->create(quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords, maxneigh_quad_inner + expansion_count_inner*EXPAND, 3, "Pair CAC:cell coords expand");
-									memory->create(quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes, maxneigh_quad_inner + expansion_count_inner*EXPAND, 3, "Pair CAC:cell indexes expand");
+									memory->create(quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes, maxneigh_quad_inner + expansion_count_inner*EXPAND, 2, "Pair CAC:cell indexes expand");
 									for (int copy_count = 0; copy_count < inner_neigh_index; copy_count++) {
 										quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[copy_count][0] = neighbor_copy_ucell[copy_count][0];
 										quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[copy_count][1] = neighbor_copy_ucell[copy_count][1];
 										quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[copy_count][2] = neighbor_copy_ucell[copy_count][2];
 										quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[copy_count][0] = neighbor_copy_index[copy_count][0];
 										quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[copy_count][1] = neighbor_copy_index[copy_count][1];
-										quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[copy_count][2] = neighbor_copy_index[copy_count][2];
+										//quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[copy_count][2] = neighbor_copy_index[copy_count][2];
 									}
 
 									if (expansion_count_inner > max_expansion_count_inner) { 
@@ -1511,14 +1512,14 @@ void PairCAC::quad_list_build(int iii, double s, double t, double w) {
 												memory->destroy(neighbor_copy_ucell);
 												memory->destroy(neighbor_copy_index);
 												memory->create(neighbor_copy_ucell, maxneigh_quad_inner + max_expansion_count_inner*EXPAND, 3, "Pair CAC:copy_ucell");
-												memory->create(neighbor_copy_index, maxneigh_quad_inner + max_expansion_count_inner*EXPAND, 3, "Pair CAC:copy_index");
+												memory->create(neighbor_copy_index, maxneigh_quad_inner + max_expansion_count_inner*EXPAND, 2, "Pair CAC:copy_index");
 											}
 										}
 										else {
 											memory->destroy(neighbor_copy_ucell);
 											memory->destroy(neighbor_copy_index);
 											memory->create(neighbor_copy_ucell, maxneigh_quad_inner + max_expansion_count_inner*EXPAND, 3, "Pair CAC:copy_ucell");
-											memory->create(neighbor_copy_index, maxneigh_quad_inner + max_expansion_count_inner*EXPAND, 3, "Pair CAC:copy_index");
+											memory->create(neighbor_copy_index, maxneigh_quad_inner + max_expansion_count_inner*EXPAND, 2, "Pair CAC:copy_index");
 										}
 
 									}
@@ -1527,9 +1528,9 @@ void PairCAC::quad_list_build(int iii, double s, double t, double w) {
 								quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[inner_neigh_index][0] = (float)scanning_unit_cell[0];
 								quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[inner_neigh_index][1] = (float)scanning_unit_cell[1];
 								quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[inner_neigh_index][2] = (float)scanning_unit_cell[2];
-								quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[inner_neigh_index][0] = 0;
-								quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[inner_neigh_index][1] = current_list_index;
-								quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[inner_neigh_index][2] = polyscan;
+								//quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[inner_neigh_index][0] = 0;
+								quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[inner_neigh_index][0] = current_list_index;
+								quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[inner_neigh_index][1] = polyscan;
 
 								inner_neigh_index++;
 
@@ -1549,21 +1550,21 @@ void PairCAC::quad_list_build(int iii, double s, double t, double w) {
 											neighbor_copy_ucell[copy_count][2] = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[copy_count][2];
 											neighbor_copy_index[copy_count][0] = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[copy_count][0];
 											neighbor_copy_index[copy_count][1] = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[copy_count][1];
-											neighbor_copy_index[copy_count][2] = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[copy_count][2];
+											//neighbor_copy_index[copy_count][2] = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[copy_count][2];
 										}
 
 										memory->destroy(quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords);
 										memory->destroy(quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes);
 
 										memory->create(quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords, maxneigh_quad_outer + expansion_count_outer*EXPAND, 3, "Pair CAC:cell coords expand");
-										memory->create(quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes, maxneigh_quad_outer + expansion_count_outer*EXPAND, 3, "Pair CAC:cell indexes expand");
+										memory->create(quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes, maxneigh_quad_outer + expansion_count_outer*EXPAND, 2, "Pair CAC:cell indexes expand");
 										for (int copy_count = 0; copy_count < outer_neigh_index; copy_count++) {
 											quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[copy_count][0] = neighbor_copy_ucell[copy_count][0];
 											quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[copy_count][1] = neighbor_copy_ucell[copy_count][1];
 											quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[copy_count][2] = neighbor_copy_ucell[copy_count][2];
 											quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[copy_count][0] = neighbor_copy_index[copy_count][0];
 											quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[copy_count][1] = neighbor_copy_index[copy_count][1];
-											quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[copy_count][2] = neighbor_copy_index[copy_count][2];
+											//quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[copy_count][2] = neighbor_copy_index[copy_count][2];
 										}
 
 										if (expansion_count_outer > max_expansion_count_outer) {
@@ -1572,7 +1573,7 @@ void PairCAC::quad_list_build(int iii, double s, double t, double w) {
 												memory->destroy(neighbor_copy_ucell);
 												memory->destroy(neighbor_copy_index);
 												memory->create(neighbor_copy_ucell, maxneigh_quad_outer + max_expansion_count_outer*EXPAND, 3, "Pair CAC:copy_ucell");
-												memory->create(neighbor_copy_index, maxneigh_quad_outer + max_expansion_count_outer*EXPAND, 3, "Pair CAC:copy_index");
+												memory->create(neighbor_copy_index, maxneigh_quad_outer + max_expansion_count_outer*EXPAND, 2, "Pair CAC:copy_index");
 											}
 
 
@@ -1581,9 +1582,9 @@ void PairCAC::quad_list_build(int iii, double s, double t, double w) {
 									quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[outer_neigh_index][0] = (float)scanning_unit_cell[0];
 									quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[outer_neigh_index][1] = (float)scanning_unit_cell[1];
 									quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[outer_neigh_index][2] = (float)scanning_unit_cell[2];
-									quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[outer_neigh_index][0] = 0;
-									quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[outer_neigh_index][1] = current_list_index;
-									quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[outer_neigh_index][2] = polyscan;
+									//quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[outer_neigh_index][0] = 0;
+									quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[outer_neigh_index][0] = current_list_index;
+									quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[outer_neigh_index][1] = polyscan;
 
 									outer_neigh_index++;
 
@@ -2364,21 +2365,21 @@ void PairCAC::neighbor_accumulate(double x,double y,double z,int iii,int inner_n
 											neighbor_copy_ucell[copy_count][2] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[copy_count][2];
 											neighbor_copy_index[copy_count][0] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[copy_count][0];
 											neighbor_copy_index[copy_count][1] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[copy_count][1];
-											neighbor_copy_index[copy_count][2] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[copy_count][2];
+											//neighbor_copy_index[copy_count][2] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[copy_count][2];
 										}
 
 										memory->destroy(quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords);
 										memory->destroy(quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes);
 
 										memory->create(quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords, maxneigh_quad_inner + expansion_count_inner*EXPAND, 3, "Pair CAC:cell coords expand");
-										memory->create(quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes, maxneigh_quad_inner + expansion_count_inner*EXPAND, 3, "Pair CAC:cell indexes expand");
+										memory->create(quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes, maxneigh_quad_inner + expansion_count_inner*EXPAND, 2, "Pair CAC:cell indexes expand");
 										for (int copy_count = 0; copy_count < inner_neigh_index; copy_count++) {
 											quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[copy_count][0] = neighbor_copy_ucell[copy_count][0];
 											quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[copy_count][1] = neighbor_copy_ucell[copy_count][1];
 											quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[copy_count][2] = neighbor_copy_ucell[copy_count][2];
 											quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[copy_count][0] = neighbor_copy_index[copy_count][0];
 											quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[copy_count][1] = neighbor_copy_index[copy_count][1];
-											quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[copy_count][2] = neighbor_copy_index[copy_count][2];
+											//quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[copy_count][2] = neighbor_copy_index[copy_count][2];
 										}
 
 										if (expansion_count_inner > max_expansion_count_inner) {
@@ -2388,14 +2389,14 @@ void PairCAC::neighbor_accumulate(double x,double y,double z,int iii,int inner_n
 													memory->destroy(neighbor_copy_ucell);
 													memory->destroy(neighbor_copy_index);
 													memory->create(neighbor_copy_ucell, maxneigh_quad_inner + max_expansion_count_inner*EXPAND, 3, "Pair CAC:copy_ucell");
-													memory->create(neighbor_copy_index, maxneigh_quad_inner + max_expansion_count_inner*EXPAND, 3, "Pair CAC:copy_index");
+													memory->create(neighbor_copy_index, maxneigh_quad_inner + max_expansion_count_inner*EXPAND, 2, "Pair CAC:copy_index");
 												}
 											}
 											else {
 												memory->destroy(neighbor_copy_ucell);
 												memory->destroy(neighbor_copy_index);
 												memory->create(neighbor_copy_ucell, maxneigh_quad_inner + max_expansion_count_inner*EXPAND, 3, "Pair CAC:copy_ucell");
-												memory->create(neighbor_copy_index, maxneigh_quad_inner + max_expansion_count_inner*EXPAND, 3, "Pair CAC:copy_index");
+												memory->create(neighbor_copy_index, maxneigh_quad_inner + max_expansion_count_inner*EXPAND, 2, "Pair CAC:copy_index");
 											}
 
 										}
@@ -2405,9 +2406,9 @@ void PairCAC::neighbor_accumulate(double x,double y,double z,int iii,int inner_n
 									quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[inner_neigh_index][0] = (float)scanning_unit_cell[0];
 									quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[inner_neigh_index][1] = (float)scanning_unit_cell[1];
 									quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[inner_neigh_index][2] = (float)scanning_unit_cell[2];
-									quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[inner_neigh_index][0] = 1;
-									quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[inner_neigh_index][1] = jj;
-									quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[inner_neigh_index][2] = polyscan;
+									//quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[inner_neigh_index][0] = 1;
+									quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[inner_neigh_index][0] = j;
+									quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[inner_neigh_index][1] = polyscan;
 
 									inner_neigh_index++;
 
@@ -2428,21 +2429,21 @@ void PairCAC::neighbor_accumulate(double x,double y,double z,int iii,int inner_n
 											neighbor_copy_ucell[copy_count][2] = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[copy_count][2];
 											neighbor_copy_index[copy_count][0] = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[copy_count][0];
 											neighbor_copy_index[copy_count][1] = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[copy_count][1];
-											neighbor_copy_index[copy_count][2] = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[copy_count][2];
+											//neighbor_copy_index[copy_count][2] = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[copy_count][2];
 										}
 
 										memory->destroy(quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords);
 										memory->destroy(quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes);
 
 										memory->create(quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords, maxneigh_quad_outer + expansion_count_outer*EXPAND, 3, "Pair CAC:cell coords expand");
-										memory->create(quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes, maxneigh_quad_outer + expansion_count_outer*EXPAND, 3, "Pair CAC:cell indexes expand");
+										memory->create(quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes, maxneigh_quad_outer + expansion_count_outer*EXPAND, 2, "Pair CAC:cell indexes expand");
 										for (int copy_count = 0; copy_count < outer_neigh_index; copy_count++) {
 											quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[copy_count][0] = neighbor_copy_ucell[copy_count][0];
 											quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[copy_count][1] = neighbor_copy_ucell[copy_count][1];
 											quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[copy_count][2] = neighbor_copy_ucell[copy_count][2];
 											quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[copy_count][0] = neighbor_copy_index[copy_count][0];
 											quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[copy_count][1] = neighbor_copy_index[copy_count][1];
-											quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[copy_count][2] = neighbor_copy_index[copy_count][2];
+											//quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[copy_count][2] = neighbor_copy_index[copy_count][2];
 										}
 
 										if (expansion_count_outer > max_expansion_count_outer) {
@@ -2451,7 +2452,7 @@ void PairCAC::neighbor_accumulate(double x,double y,double z,int iii,int inner_n
 												memory->destroy(neighbor_copy_ucell);
 												memory->destroy(neighbor_copy_index);
 												memory->create(neighbor_copy_ucell, maxneigh_quad_outer + max_expansion_count_outer*EXPAND, 3, "Pair CAC:copy_ucell");
-												memory->create(neighbor_copy_index, maxneigh_quad_outer + max_expansion_count_outer*EXPAND, 3, "Pair CAC:copy_index");
+												memory->create(neighbor_copy_index, maxneigh_quad_outer + max_expansion_count_outer*EXPAND, 2, "Pair CAC:copy_index");
 											}
 
 
@@ -2460,9 +2461,9 @@ void PairCAC::neighbor_accumulate(double x,double y,double z,int iii,int inner_n
 								quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[outer_neigh_index][0] = (float)scanning_unit_cell[0];
 								quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[outer_neigh_index][1] = (float)scanning_unit_cell[1];
 								quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[outer_neigh_index][2] = (float)scanning_unit_cell[2];
-								quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[outer_neigh_index][0] = 1;
-								quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[outer_neigh_index][1] = jj;
-								quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[outer_neigh_index][2] = polyscan;
+								//quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[outer_neigh_index][0] = 1;
+								quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[outer_neigh_index][0] = j;
+								quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[outer_neigh_index][1] = polyscan;
 
 									outer_neigh_index++;
 
@@ -2503,21 +2504,21 @@ void PairCAC::neighbor_accumulate(double x,double y,double z,int iii,int inner_n
 											neighbor_copy_ucell[copy_count][2] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[copy_count][2];
 											neighbor_copy_index[copy_count][0] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[copy_count][0];
 											neighbor_copy_index[copy_count][1] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[copy_count][1];
-											neighbor_copy_index[copy_count][2] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[copy_count][2];
+											//neighbor_copy_index[copy_count][2] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[copy_count][2];
 										}
 
 										memory->destroy(quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords);
 										memory->destroy(quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes);
 
 										memory->create(quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords, maxneigh_quad_inner + expansion_count_inner*EXPAND, 3, "Pair CAC:cell coords expand");
-										memory->create(quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes, maxneigh_quad_inner + expansion_count_inner*EXPAND, 3, "Pair CAC:cell indexes expand");
+										memory->create(quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes, maxneigh_quad_inner + expansion_count_inner*EXPAND, 2, "Pair CAC:cell indexes expand");
 										for (int copy_count = 0; copy_count < inner_neigh_index; copy_count++) {
 											quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[copy_count][0] = neighbor_copy_ucell[copy_count][0];
 											quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[copy_count][1] = neighbor_copy_ucell[copy_count][1];
 											quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[copy_count][2] = neighbor_copy_ucell[copy_count][2];
 											quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[copy_count][0] = neighbor_copy_index[copy_count][0];
 											quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[copy_count][1] = neighbor_copy_index[copy_count][1];
-											quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[copy_count][2] = neighbor_copy_index[copy_count][2];
+											//quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[copy_count][2] = neighbor_copy_index[copy_count][2];
 										}
 										if (expansion_count_inner > max_expansion_count_inner) {
 											max_expansion_count_inner = expansion_count_inner;
@@ -2526,14 +2527,14 @@ void PairCAC::neighbor_accumulate(double x,double y,double z,int iii,int inner_n
 													memory->destroy(neighbor_copy_ucell);
 													memory->destroy(neighbor_copy_index);
 													memory->create(neighbor_copy_ucell, maxneigh_quad_inner + max_expansion_count_inner*EXPAND, 3, "Pair CAC:copy_ucell");
-													memory->create(neighbor_copy_index, maxneigh_quad_inner + max_expansion_count_inner*EXPAND, 3, "Pair CAC:copy_index");
+													memory->create(neighbor_copy_index, maxneigh_quad_inner + max_expansion_count_inner*EXPAND, 2, "Pair CAC:copy_index");
 												}
 											}
 											else {
 												memory->destroy(neighbor_copy_ucell);
 												memory->destroy(neighbor_copy_index);
 												memory->create(neighbor_copy_ucell, maxneigh_quad_inner + max_expansion_count_inner*EXPAND, 3, "Pair CAC:copy_ucell");
-												memory->create(neighbor_copy_index, maxneigh_quad_inner + max_expansion_count_inner*EXPAND, 3, "Pair CAC:copy_index");
+												memory->create(neighbor_copy_index, maxneigh_quad_inner + max_expansion_count_inner*EXPAND, 2, "Pair CAC:copy_index");
 											}
 
 										}
@@ -2543,9 +2544,9 @@ void PairCAC::neighbor_accumulate(double x,double y,double z,int iii,int inner_n
 								quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[inner_neigh_index][0] = coords[j][0];
 								quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[inner_neigh_index][1] = coords[j][1];
 								quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[inner_neigh_index][2] = coords[j][2];
-								quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[inner_neigh_index][0] = 1;
-								quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[inner_neigh_index][1] = jj;
-								quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[inner_neigh_index][2] = 0;
+								//quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[inner_neigh_index][0] = 1;
+								quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[inner_neigh_index][0] = j;
+								quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[inner_neigh_index][1] = 0;
 
 									inner_neigh_index++;
 
@@ -2565,21 +2566,21 @@ void PairCAC::neighbor_accumulate(double x,double y,double z,int iii,int inner_n
 											neighbor_copy_ucell[copy_count][2] = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[copy_count][2];
 											neighbor_copy_index[copy_count][0] = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[copy_count][0];
 											neighbor_copy_index[copy_count][1] = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[copy_count][1];
-											neighbor_copy_index[copy_count][2] = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[copy_count][2];
+											//neighbor_copy_index[copy_count][2] = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[copy_count][1];
 										}
 
 										memory->destroy(quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords);
 										memory->destroy(quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes);
 
 										memory->create(quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords, maxneigh_quad_outer + expansion_count_outer*EXPAND, 3, "Pair CAC:cell coords expand");
-										memory->create(quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes, maxneigh_quad_outer + expansion_count_outer*EXPAND, 3, "Pair CAC:cell indexes expand");
+										memory->create(quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes, maxneigh_quad_outer + expansion_count_outer*EXPAND, 2, "Pair CAC:cell indexes expand");
 										for (int copy_count = 0; copy_count < outer_neigh_index; copy_count++) {
 											quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[copy_count][0] = neighbor_copy_ucell[copy_count][0];
 											quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[copy_count][1] = neighbor_copy_ucell[copy_count][1];
 											quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[copy_count][2] = neighbor_copy_ucell[copy_count][2];
 											quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[copy_count][0] = neighbor_copy_index[copy_count][0];
 											quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[copy_count][1] = neighbor_copy_index[copy_count][1];
-											quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[copy_count][2] = neighbor_copy_index[copy_count][2];
+											//quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[copy_count][2] = neighbor_copy_index[copy_count][2];
 										}
 
 										if (expansion_count_outer > max_expansion_count_outer) {
@@ -2588,7 +2589,7 @@ void PairCAC::neighbor_accumulate(double x,double y,double z,int iii,int inner_n
 												memory->destroy(neighbor_copy_ucell);
 												memory->destroy(neighbor_copy_index);
 												memory->create(neighbor_copy_ucell, maxneigh_quad_outer + max_expansion_count_outer*EXPAND, 3, "Pair CAC:copy_ucell");
-												memory->create(neighbor_copy_index, maxneigh_quad_outer + max_expansion_count_outer*EXPAND, 3, "Pair CAC:copy_index");
+												memory->create(neighbor_copy_index, maxneigh_quad_outer + max_expansion_count_outer*EXPAND, 2, "Pair CAC:copy_index");
 											}
 
 
@@ -2597,9 +2598,9 @@ void PairCAC::neighbor_accumulate(double x,double y,double z,int iii,int inner_n
 						quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[outer_neigh_index][0] = coords[j][0];
 						quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[outer_neigh_index][1] = coords[j][1];
 						quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[outer_neigh_index][2] = coords[j][2];
-						quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[outer_neigh_index][0] = 1;
-						quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[outer_neigh_index][1] = jj;
-						quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[outer_neigh_index][2] = 0;
+						//quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[outer_neigh_index][0] = 1;
+						quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[outer_neigh_index][0] = j;
+						quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[outer_neigh_index][1] = 0;
 
 									outer_neigh_index++;
 
@@ -3384,12 +3385,12 @@ void PairCAC::allocate_quad_neigh_list(int n1,int n2,int n3,int quad) {
 			if (element_type[init] == 0) {
 				memory->create(quad_list_container[init].inner_list2ucell, 1, "Pair CAC:inner_list2ucell");
 				memory->create(quad_list_container[init].inner_list2ucell[0].cell_coords, maxneigh_quad_inner, 3, "Pair CAC:innercell_coords");
-				memory->create(quad_list_container[init].inner_list2ucell[0].cell_indexes, maxneigh_quad_inner, 3, "Pair CAC:innercell_indexes");
+				memory->create(quad_list_container[init].inner_list2ucell[0].cell_indexes, maxneigh_quad_inner, 2, "Pair CAC:innercell_indexes");
 				memory->create(quad_list_container[init].inner_quadrature_neighbor_count, 1, "Pair CAC:quadrature_neighbor_count");
 				if (outer_neighflag) {
 					memory->create(quad_list_container[init].outer_list2ucell, 1, "Pair CAC:outer_list2ucell");
 					memory->create(quad_list_container[init].outer_list2ucell[0].cell_coords, maxneigh_quad_outer, 3, "Pair CAC:outercell_coords");
-					memory->create(quad_list_container[init].outer_list2ucell[0].cell_indexes, maxneigh_quad_outer, 3, "Pair CAC:outercell_indexes");
+					memory->create(quad_list_container[init].outer_list2ucell[0].cell_indexes, maxneigh_quad_outer, 2, "Pair CAC:outercell_indexes");
 					memory->create(quad_list_container[init].outer_quadrature_neighbor_count, 1, "Pair CAC:outer_quadrature_neighbor_count");
 				}
 			}
@@ -3398,14 +3399,14 @@ void PairCAC::allocate_quad_neigh_list(int n1,int n2,int n3,int quad) {
 				memory->create(quad_list_container[init].inner_quadrature_neighbor_count, quad_count*atom->maxpoly, "Pair CAC:quadrature_neighbor_count");
 				for (int neigh_loop = 0; neigh_loop < quad_count*atom->maxpoly; neigh_loop++) {
 					memory->create(quad_list_container[init].inner_list2ucell[neigh_loop].cell_coords, maxneigh_quad_inner, 3, "Pair CAC:innercell_coords");
-					memory->create(quad_list_container[init].inner_list2ucell[neigh_loop].cell_indexes, maxneigh_quad_inner, 3, "Pair CAC:innercell_indexes");
+					memory->create(quad_list_container[init].inner_list2ucell[neigh_loop].cell_indexes, maxneigh_quad_inner, 2, "Pair CAC:innercell_indexes");
 				}
 				if (outer_neighflag) {
 					memory->create(quad_list_container[init].outer_list2ucell, quad_count*atom->maxpoly, "Pair CAC:outer_list2ucell");
 					memory->create(quad_list_container[init].outer_quadrature_neighbor_count,  quad_count*atom->maxpoly, "Pair CAC:outer_quadrature_neighbor_count");
 					for (int neigh_loop = 0; neigh_loop < quad_count*atom->maxpoly; neigh_loop++) {
 						memory->create(quad_list_container[init].outer_list2ucell[neigh_loop].cell_coords, maxneigh_quad_outer, 3, "Pair CAC:outercell_coords");
-						memory->create(quad_list_container[init].outer_list2ucell[neigh_loop].cell_indexes, maxneigh_quad_outer, 3, "Pair CAC:outercell_indexes");
+						memory->create(quad_list_container[init].outer_list2ucell[neigh_loop].cell_indexes, maxneigh_quad_outer, 2, "Pair CAC:outercell_indexes");
 					}
 				}
 			}
@@ -3437,11 +3438,11 @@ void PairCAC::allocate_quad_neigh_list(int n1,int n2,int n3,int quad) {
 	
 	if (outer_neighflag) {
 		memory->create(neighbor_copy_ucell, maxneigh_quad_outer, 3, "Pair CAC:copy_ucell");
-		memory->create(neighbor_copy_index, maxneigh_quad_outer, 3, "Pair CAC:copy_index");
+		memory->create(neighbor_copy_index, maxneigh_quad_outer, 2, "Pair CAC:copy_index");
 	}
 	else {
 		memory->create(neighbor_copy_ucell, maxneigh_quad_inner, 3, "Pair CAC:copy_ucell");
-		memory->create(neighbor_copy_index, maxneigh_quad_inner, 3, "Pair CAC:copy_index");
+		memory->create(neighbor_copy_index, maxneigh_quad_inner, 2, "Pair CAC:copy_index");
 	}
 	quad_allocated = 1;
 	old_atom_count = atom->nlocal;

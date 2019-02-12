@@ -907,20 +907,12 @@ int distanceflag=0;
 		scanning_unit_cell[0] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][0];
 		scanning_unit_cell[1] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][1];
 		scanning_unit_cell[2] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][2];
-		listtype = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][0];
-		listindex = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][1];
-		poly_index = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][2];
-		if (listtype == 0) {
-			element_index = ilist[listindex];
-			element_index &= NEIGHMASK;
-		}
-		else if (listtype == 1) {
-			element_index = jlist[listindex];
-			element_index &= NEIGHMASK;
-		}
-		else {
-			error->one(FLERR, "neighbor listing bug in Pair_CAC.cpp");
-		}
+		//listtype = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][0];
+		listindex = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][0];
+		poly_index = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][1];
+		
+		element_index = listindex;
+		element_index &= NEIGHMASK;
 		inner_neighbor_types[l] = node_types[element_index][poly_index];
 		neigh_list_cord(inner_neighbor_coords[l][0], inner_neighbor_coords[l][1], inner_neighbor_coords[l][2],
 			element_index, poly_index, scanning_unit_cell[0], scanning_unit_cell[1], scanning_unit_cell[2]);
@@ -933,21 +925,12 @@ int distanceflag=0;
 		scanning_unit_cell[0] = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[l][0];
 		scanning_unit_cell[1] = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[l][1];
 		scanning_unit_cell[2] = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[l][2];
-		listtype = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[l][0];
-		listindex = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[l][1];
-		poly_index = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[l][2];
-		if (listtype == 0) {
-			element_index = ilist[listindex];
-			element_index &= NEIGHMASK;
-
-		}
-		else if (listtype == 1) {
-			element_index = jlist[listindex];
-			element_index &= NEIGHMASK;
-		}
-		else {
-			error->one(FLERR, "neighbor listing bug in Pair_CAC.cpp");
-		}
+		//listtype = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[l][0];
+		listindex = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[l][0];
+		poly_index = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[l][1];
+		
+		element_index = listindex;
+		element_index &= NEIGHMASK;
 		outer_neighbor_types[l] = node_types[element_index][poly_index];
 		neigh_list_cord(outer_neighbor_coords[l][0], outer_neighbor_coords[l][1], outer_neighbor_coords[l][2],
 			element_index, poly_index, scanning_unit_cell[0], scanning_unit_cell[1], scanning_unit_cell[2]);
