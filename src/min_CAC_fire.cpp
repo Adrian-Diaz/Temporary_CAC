@@ -87,6 +87,7 @@ int CACMinFire::iterate(int maxiter)
 
   int *element_type = atom->element_type;
   int *poly_count = atom->poly_count;
+  int *nodes_count_list = atom->nodes_per_element_list;
   int nodes_per_element;
   double ****nodal_positions=atom->nodal_positions;
 
@@ -232,13 +233,7 @@ int CACMinFire::iterate(int maxiter)
     // update x for elements and atoms using nodal variables
     for (int i = 0; i < atom->nlocal; i++){
       //determine element type
-      if(element_type[i] == 0) {
-        nodes_per_element = 1;
-      }
-      if(element_type[i] == 1) {
-        nodes_per_element = 8;
-      }
-    
+      nodes_per_element = nodes_count_list[element_type[i]];    
       xx[i][0] = 0;
       xx[i][1] = 0;
       xx[i][2] = 0;
