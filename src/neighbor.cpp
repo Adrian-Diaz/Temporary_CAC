@@ -1614,6 +1614,10 @@ int Neighbor::choose_bin(NeighRequest *rq)
     if (!rq->kokkos_device != !(mask & NB_KOKKOS_DEVICE)) continue;
     if (!rq->kokkos_host != !(mask & NB_KOKKOS_HOST)) continue;
 
+    if (rq->CAC) {
+		  if (!(mask & NB_CAC)) continue;
+	  }
+
     return i+1;
   }
 
@@ -1782,9 +1786,9 @@ int Neighbor::choose_pair(NeighRequest *rq)
       if (!(mask & NP_FULL)) continue;
     }
 
-	if (rq->CAC) {
-		if (!(mask & NP_CAC)) continue;
-	}
+	  if (rq->CAC) {
+		  if (!(mask & NP_CAC)) continue;
+	  }
 
 
     // newtflag is on or off and must match
@@ -2387,9 +2391,11 @@ bigint Neighbor::memory_usage()
 {
   bigint bytes = 0;
   bytes += memory->usage(xhold,maxhold,3);
-
+  
   for (int i = 0; i < nlist; i++)
     if (lists[i]) bytes += lists[i]->memory_usage();
+  for (int i = 0; i < npair_perpetual; i++)
+    bytes += neigh_pair[i]->memory_usage(); 
   for (int i = 0; i < nstencil; i++)
     bytes += neigh_stencil[i]->memory_usage();
   for (int i = 0; i < nbin; i++)

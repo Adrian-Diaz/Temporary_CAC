@@ -33,8 +33,8 @@
 #include <stdint.h>
 
 //#include "math_extra.h"
-#define MAXNEIGH1  50
-#define MAXNEIGH2  10
+#define MAXNEIGH1  500
+#define MAXNEIGH2  100
 #define MAXLINE 1024
 #define DELTA 4
 using namespace LAMMPS_NS;
@@ -1076,6 +1076,7 @@ int distanceflag=0;
   		quadrature_energy += phi;
 	}
 	
+
 	//compute derivative of the embedding energy for all atoms in the inner neighborlist
 	for (int l = 0; l < neigh_max_inner; l++) {
 

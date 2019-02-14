@@ -31,23 +31,57 @@ class NPairCAC : public NPair {
  public:
 
   NPairCAC(class LAMMPS *);
-  ~NPairCAC() {}
+  ~NPairCAC();
   void build(class NeighList *);
   double shape_function(double, double, double, int, int);
   void compute_surface_depths(double &x, double &y, double &z,
 	  int &xb, int &yb, int &zb, int flag);
-  int CAC_decide_element2atom(int index_one, int index_two);
-  int CAC_decide_element2element(int index_one, int index_two);
-  int CAC_decide_atom2element(int index_one, int index_two);
+
+  int CAC_decide_quad2element(int);
+
   double ***current_nodal_positions;
   double CAC_cut;
   int   quadrature_node_count;
+  int   quadrature_point_count;
   int **element_scale;
   int current_element_scale[3];
   int current_poly_counter;
   double *quadrature_weights;
   double *quadrature_abcissae;
   void quadrature_init(int degree);
+  virtual bigint memory_usage();
+  
+
+protected:
+	int old_atom_count, old_quad_count;
+  int expansion_count, max_expansion_count;
+	int *old_atom_etype;
+  int quad_allocated;
+  int maxneigh_quad;
+  int nmax;
+  double **current_element_quad_points;
+  double current_quad_point[3];
+  int **surface_counts;
+  int surface_counts_max[3];
+  double **interior_scales;
+	int surface_counts_max_old[3];
+	int *neighbor_copy_index;
+  int quadrature_counter;
+  
+  typedef struct neighbor_data { 
+	int *cell_indexes;
+	} neighbor_data;
+
+	typedef struct neighbor_collection {
+		neighbor_data *list2ucell;
+		int *quadrature_neighbor_count;
+	} neighbor_collection;
+  
+  neighbor_collection *quad_list_container;
+  void allocate_quad_neigh_list(int,int,int,int);
+  int compute_quad_points(int);
+  void allocate_surface_counts();
+
 };
 
 }

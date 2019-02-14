@@ -33,7 +33,7 @@ class NPair : protected Pointers {
   virtual void copy_neighbor_info();
   void build_setup();
   virtual void build(class NeighList *) = 0;
-
+  virtual bigint memory_usage() {return 0;}
  protected:
   double **mycutneighsq;         // per-type cutoffs when user specified
 

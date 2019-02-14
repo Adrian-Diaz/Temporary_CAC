@@ -144,6 +144,7 @@ class PairCAC : public Pair {
 	int poly_min;
 	int interior_flag;
 	int neigh_quad_counter;
+  int quad_list_counter;
 	virtual void allocate();
 	virtual void read_file(char *) {}
   virtual void array2spline(){}

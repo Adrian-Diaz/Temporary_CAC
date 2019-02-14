@@ -38,7 +38,7 @@ class NBin : protected Pointers {
   double cutoff_custom;        // cutoff set by requestor
 
   NBin(class LAMMPS *);
-  ~NBin();
+  virtual ~NBin();
   void post_constructor(class NeighRequest *);
   virtual void copy_neighbor_info();
   virtual void bin_atoms_setup(int);
@@ -68,7 +68,7 @@ class NBin : protected Pointers {
 
   // methods
 
-  int coord2bin(double *);
+  virtual int coord2bin(double *);
 };
 
 }

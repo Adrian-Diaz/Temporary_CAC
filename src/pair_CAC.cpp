@@ -74,8 +74,11 @@ PairCAC::PairCAC(LAMMPS *lmp) : Pair(lmp)
   surface_counts_max_old[1] = 0;
   surface_counts_max_old[2] = 0;
   one_layer_flag = 0;
-   old_quad_minima= NULL;
-   old_minima_neighbors= NULL;
+  old_quad_minima= NULL;
+  old_minima_neighbors= NULL;
+	cgParm=NULL;
+  asaParm=NULL;
+  Objective=NULL;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -95,6 +98,17 @@ PairCAC::~PairCAC() {
 
 		memory->destroy(surface_counts);
 		memory->destroy(interior_scales);
+		memory->destroy(quadrature_abcissae);
+		memory->destroy(quadrature_weights);
+
+	 memory->destroy(force_column);
+   memory->destroy(current_force_column);
+   memory->destroy(current_nodal_forces);
+   memory->destroy(pivot);
+   memory->destroy(surf_set);
+   memory->destroy(dof_set);
+   memory->destroy(sort_surf_set);
+   memory->destroy(sort_dof_set);
 	}
 
 	if (quad_allocated) {
@@ -132,18 +146,24 @@ PairCAC::~PairCAC() {
 					memory->destroy(quad_list_container[init].outer_quadrature_neighbor_count);
 				}
 			}
+	
 		}
 
-		memory->destroy(quad_list_container);
+		
+    memory->destroy(quad_list_container);
 		memory->destroy(neighbor_copy_ucell);
 		memory->destroy(neighbor_copy_index);
-
 		memory->destroy(old_quad_minima);
 		memory->destroy(old_minima_neighbors);
-
+    
 
 	}
+   
+	 memory->destroy(cgParm);
 
+   memory->destroy(asaParm);
+
+   memory->destroy(Objective);
 
 
 
@@ -228,8 +248,8 @@ void PairCAC::compute(int eflag, int vflag) {
 			//count number of pure atoms in the local domain
 			natomic = 0;
 			
-			memory->grow(atomic_counter_map, list->inum, "Pair CAC:atomic_counter_mapd");
-			for (i = 0; i < list->inum; i++) {
+			//memory->grow(atomic_counter_map, list->inum, "Pair CAC:atomic_counter_mapd");
+			for (i = 0; i < atom->nlocal; i++) {
 				//i = ilist[ii];
 				//atomic_counter_map[i] = natomic;
 				current_element_type = element_type[i];
@@ -239,44 +259,61 @@ void PairCAC::compute(int eflag, int vflag) {
 
 			// initialize or grow surface counts array for quadrature scheme
 			// along with interior scaling for the quadrature domain
-			if (list->inum  > nmax) {
+			if (atom->nlocal  > nmax) {
 				allocate_surface_counts();
 			}
 			surface_counts_max_old[0] = surface_counts_max[0];
 			surface_counts_max_old[1] = surface_counts_max[1];
 			surface_counts_max_old[2] = surface_counts_max[2];
-			atomic_counter = 0;
-			for (ii = 0; ii < list->inum; ii++) {
-				i = ilist[ii];
+			//atomic_counter = 0;
+			quad_list_counter=0;
+			for (i = 0; i < atom->nlocal; i++) {
+				
 				current_element_scale = element_scale[i];
 				current_nodal_positions = nodal_positions[i];
 				current_element_type = element_type[i];
 				current_poly_count = poly_count[i];
+				int poly_surface_count[3];
 				if (current_element_type == 0) atomic_counter += 1;
 				if (current_element_type != 0) {
-					int ri = i ;
-					for (poly_counter = 0; poly_counter < current_poly_count; poly_counter++) {
-						
-						compute_surface_depths(interior_scales[ri][0], interior_scales[ri][1], interior_scales[ri][2],
-							surface_counts[ri][0], surface_counts[ri][1], surface_counts[ri][2], 1);
-
-						if (surface_counts[ri][0] > surface_counts_max[0]) surface_counts_max[0] = surface_counts[ri][0];
-						if (surface_counts[ri][1] > surface_counts_max[1]) surface_counts_max[1] = surface_counts[ri][1];
-						if (surface_counts[ri][2] > surface_counts_max[2]) surface_counts_max[2] = surface_counts[ri][2];
+					for (poly_counter = 0; poly_counter < poly_count[i]; poly_counter++) {
+						int poly_surface_count[3];
+						compute_surface_depths(interior_scale[0], interior_scale[1], interior_scale[2],
+							poly_surface_count[0], poly_surface_count[1], poly_surface_count[2], 1);
+						if(poly_counter==0){
+								surface_counts[i][0]=poly_surface_count[0];
+								surface_counts[i][1]=poly_surface_count[1];
+								surface_counts[i][2]=poly_surface_count[2];
+								interior_scales[i][0]=interior_scale[0];
+								interior_scales[i][1]=interior_scale[1];
+								interior_scales[i][2]=interior_scale[2];
+						}
+						else{
+						if (poly_surface_count[0] > surface_counts[i][0]){ surface_counts[i][0] = poly_surface_count[0];
+																		      interior_scales[i][0]=interior_scale[0]; }
+						if (poly_surface_count[1] > surface_counts[i][1]){ surface_counts[i][1] = poly_surface_count[1];
+																			  interior_scales[i][1]=interior_scale[1]; }
+						if (poly_surface_count[2] > surface_counts[i][2]){ surface_counts[i][2] = poly_surface_count[2];
+						 													  interior_scales[i][2]=interior_scale[2]; }
+						}
+					
 					}
+						if (surface_counts[i][0] > surface_counts_max[0]) surface_counts_max[0] = surface_counts[i][0];
+						if (surface_counts[i][1] > surface_counts_max[1]) surface_counts_max[1] = surface_counts[i][1];
+						if (surface_counts[i][2] > surface_counts_max[2]) surface_counts_max[2] = surface_counts[i][2];
 				}
 			}
 
 			// initialize or grow memory for the neighbor list of virtual atoms at quadrature points
 
-			if (list->inum)
+			if (atom->nlocal)
 			allocate_quad_neigh_list(surface_counts_max[0], surface_counts_max[1], surface_counts_max[2], quadrature_node_count);
 		}
 		atomic_counter = 0;
-		for (ii = 0; ii < inum; ii++) {
+		for (i = 0; i < atom->nlocal; i++) {
 			
 			atomic_flag = 0;
-			i = ilist[ii];
+			
 			current_list_index = i;
 			xtmp = x[i][0];
 			ytmp = x[i][1];
@@ -304,7 +341,7 @@ void PairCAC::compute(int eflag, int vflag) {
 					atomic_flag = 1;
 				}
 				neigh_quad_counter = 0;
-				//might have to change matrices so they dont have zeros due to maximum node count; ill condition.
+				//NOTE:might have to change matrices so they dont have zeros due to maximum node count; ill condition.
 				if(atomic_flag){
 					poly_counter = 0;
 					compute_forcev(i);
@@ -383,7 +420,7 @@ void PairCAC::settings(int narg, char **arg) {
   }
   else if (narg == 2) {
 	  cutoff_skin = force->numeric(FLERR, arg[0]);
-	  if (strcmp(arg[1], "one") == 0) one_layer_flag = 1;
+	  if (strcmp(arg[1], "one") == 0) atom->one_layer_flag=one_layer_flag = 1;
 	  else error->all(FLERR, "Unexpected argument in PairCAC invocation");
 
   }
@@ -703,7 +740,7 @@ void PairCAC::compute_forcev(int iii){
 					force_densities(iii, s, t, w, coefficients,
 						force_density[0], force_density[1], force_density[2]);
 					neigh_quad_counter = neigh_quad_counter + 1;
-
+          			quad_list_counter+=1;
 					for (int js = 0; js < nodes_per_element; js++) {
 						for (int jj = 0; jj < 3; jj++) {
 
@@ -765,7 +802,7 @@ void PairCAC::compute_forcev(int iii){
 						force_densities(iii, s, t, w, coefficients,
 							force_density[0], force_density[1], force_density[2]);
 						neigh_quad_counter = neigh_quad_counter + 1;
-
+           				 quad_list_counter+=1;       
 						for (int js = 0; js < nodes_per_element; js++) {
 							for (int jj = 0; jj < 3; jj++) {
 
@@ -822,7 +859,7 @@ void PairCAC::compute_forcev(int iii){
 						force_densities(iii, s, t, w, coefficients,
 							force_density[0], force_density[1], force_density[2]);
 						neigh_quad_counter = neigh_quad_counter + 1;
-
+            			quad_list_counter+=1;
 						for (int js = 0; js < nodes_per_element; js++) {
 							for (int jj = 0; jj < 3; jj++) {
 
@@ -876,7 +913,7 @@ void PairCAC::compute_forcev(int iii){
 						force_densities(iii, s, t, w, coefficients,
 							force_density[0], force_density[1], force_density[2]);
 						neigh_quad_counter = neigh_quad_counter + 1;
-
+            			quad_list_counter+=1;
 						for (int js = 0; js < nodes_per_element; js++) {
 							for (int jj = 0; jj < 3; jj++) {
 
@@ -1061,7 +1098,7 @@ void PairCAC::compute_forcev(int iii){
 						force_densities(iii, s, t, w, coefficients,
 							force_density[0], force_density[1], force_density[2]);
 						neigh_quad_counter = neigh_quad_counter + 1;
-
+						quad_list_counter+=1;
 						for (int js = 0; js < nodes_per_element; js++) {
 							for (int jj = 0; jj < 3; jj++) {
 
@@ -1146,7 +1183,7 @@ void PairCAC::compute_forcev(int iii){
 						force_densities(iii, s, t, w, coefficients,
 							force_density[0], force_density[1], force_density[2]);
 						neigh_quad_counter = neigh_quad_counter + 1;
-
+						quad_list_counter+=1;
 						for (int js = 0; js < nodes_per_element; js++) {
 							for (int jj = 0; jj < 3; jj++) {
 
@@ -1177,6 +1214,7 @@ void PairCAC::compute_forcev(int iii){
 		quadrature_energy = 0;
 		force_densities(iii, current_x[0], current_x[1], current_x[2], coefficients,
 			force_density[0], force_density[1], force_density[2]);
+			quad_list_counter+=1;
 		for (int jj = 0; jj < 3; jj++) {
 			force_column[0][jj] = force_density[jj];
 		}
@@ -1702,8 +1740,8 @@ void PairCAC::neighbor_accumulate(double x,double y,double z,int iii,int inner_n
 
 
     itype = type[iii];
-    jlist = firstneigh[iii];
-    jnum = numneigh[iii];
+    jlist = firstneigh[quad_list_counter];
+    jnum = numneigh[quad_list_counter];
 
 	
 	for (jj = 0; jj < jnum; jj++) {
@@ -3454,9 +3492,9 @@ void PairCAC::allocate_quad_neigh_list(int n1,int n2,int n3,int quad) {
 }
 
 void PairCAC::allocate_surface_counts() {
-	memory->grow(surface_counts, list->inum , 3, "Pair CAC:surface_counts");
-	memory->grow(interior_scales, list->inum , 3, "Pair CAC:interior_scales");
-	nmax = list->inum -natomic;
+	memory->grow(surface_counts, atom->nlocal , 3, "Pair CAC:surface_counts");
+	memory->grow(interior_scales, atom->nlocal , 3, "Pair CAC:interior_scales");
+	nmax = atom->nlocal;
 }
 
 /*double PairSPHLJ::LJEOS2(double rho, double e, double cv) {
