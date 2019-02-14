@@ -126,6 +126,7 @@ Atom::Atom(LAMMPS *lmp) : Pointers(lmp)
   CAC_cut=0;
   max_search_range=0;
   initial_size=0;
+  one_layer_flag=0;
   // USER-MESO
 
   cc = cc_flux = NULL;

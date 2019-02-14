@@ -156,7 +156,7 @@ void PairCACPb::settings(int narg, char **arg) {
 	}
 	else if (narg == 5) {
 		cutoff_skin = force->numeric(FLERR, arg[3]);
-		if (strcmp(arg[4], "one") == 0) one_layer_flag = 1;
+		if (strcmp(arg[4], "one") == 0) atom->one_layer_flag=one_layer_flag = 1;
 		else error->all(FLERR, "Unexpected argument in PairCAC invocation");
 
 	}

@@ -33,8 +33,8 @@
 #include <stdint.h>
 
 //#include "math_extra.h"
-#define MAXNEIGH1  50
-#define MAXNEIGH2  10
+#define MAXNEIGH1  500
+#define MAXNEIGH2  100
 #define MAXLINE 1024
 #define DELTA 4
 using namespace LAMMPS_NS;
@@ -1068,6 +1068,19 @@ int distanceflag=0;
 	p = MIN(p, 1.0);
 	coeff = frho_spline[type2frho[origin_type]][m];
 	fp[0] = (coeff[0] * p + coeff[1])*p + coeff[2];
+
+	if (quad_eflag){
+
+		phi = ((coeff[3]*p + coeff[4])*p + coeff[5])*p + coeff[6];
+
+		if (rho[0] > rhomax) phi += fp[0] * (rho[0]-rhomax);
+
+ 		phi *= scale[origin_type][scan_type];
+
+  		quadrature_energy += phi;
+
+	}
+
 	//compute derivative of the embedding energy for all atoms in the inner neighborlist
 	for (int l = 0; l < neigh_max_inner; l++) {
 
