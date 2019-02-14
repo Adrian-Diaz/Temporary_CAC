@@ -198,7 +198,8 @@ void FixCAC_Set_DOF::init()
 
 	double ****nodal_positions = atom->nodal_positions;
 	double ****nodal_velocities = atom->nodal_velocities;
-	int nodes_per_element = atom->nodes_per_element;
+	int nodes_per_element;
+  int *nodes_count_list = atom->nodes_per_element_list;	
 	double ****initial_nodal_positions = atom->initial_nodal_positions;
 	int *element_type = atom->element_type;
 	int *poly_count = atom->poly_count;
@@ -226,6 +227,7 @@ void FixCAC_Set_DOF::init()
 	
 	for (int i = 0; i < nlocal; i++) {
 		if (mask[i] & groupbit) {
+      nodes_per_element = nodes_count_list[element_type[i]];
 			for (int j = 0; j < nodes_per_element; j++) {
 				for (int l = 0; l < poly_count[i]; l++) {
 
@@ -288,6 +290,7 @@ void FixCAC_Set_DOF::post_force(int vflag)
   double **f = atom->f;
   double ****nodal_forces = atom->nodal_forces;
   int nodes_per_element;
+  int *nodes_count_list = atom->nodes_per_element_list;	
   int *mask = atom->mask;
   int nlocal = atom->nlocal;
 
@@ -399,10 +402,7 @@ void FixCAC_Set_DOF::post_force(int vflag)
   
   if (varflag == CONSTANT) {
 	  for (int i = 0; i < nlocal; i++) {
-		  if (element_type[i] == 1) {
-			  nodes_per_element = 8;
-		  }
-		  else { nodes_per_element = 1; }
+		  nodes_per_element = nodes_count_list[element_type[i]];
 		  if (mask[i] & groupbit) {
 			  for (int j = 0; j < nodes_per_element; j++) {
 				  for (int l = 0; l < poly_count[i]; l++) {

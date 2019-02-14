@@ -96,7 +96,7 @@ void CommCAC::init_buffers()
   // atomvec, fix reset these 2 maxexchange values if needed
   // only necessary if their size > BUFEXTRA
   
-  maxexchange = maxexchange_atom + maxexchange_fix;
+  maxexchange = 0;
   bufextra = maxexchange + BUFEXTRA;
 
   maxsend = BUFMIN;

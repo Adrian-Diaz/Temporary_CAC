@@ -1011,6 +1011,7 @@ double ****nodal_positions=atom->nodal_positions;
  double **x = atom->x;
  int *element_type = atom->element_type;
   int *poly_count = atom->poly_count;
+  int *nodes_count_list = atom->nodes_per_element_list;
   int nodes_per_element;
   // reset to starting point
 
@@ -1044,12 +1045,8 @@ double ****nodal_positions=atom->nodal_positions;
   // update x for elements and atoms using nodal variables
   for (int i = 0; i < atom->nlocal; i++){
 		//determine element type
-		if(element_type[i] == 0) {
-			nodes_per_element = 1;
-		}
-		if(element_type[i] == 1) {
-			nodes_per_element = 8;
-		}
+
+    nodes_per_element = nodes_count_list[element_type[i]];
 	
 		x[i][0] = 0;
 		x[i][1] = 0;

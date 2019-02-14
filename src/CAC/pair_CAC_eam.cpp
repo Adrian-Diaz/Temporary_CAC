@@ -794,7 +794,8 @@ double current_position[3];
 double scan_position[3];
 double rcut;
 
-int nodes_per_element = 1;
+int nodes_per_element;
+int *nodes_count_list = atom->nodes_per_element_list;	
 double cbox_positions[3];
 
 int flagm;
@@ -842,7 +843,7 @@ int distanceflag=0;
     current_position[1]=0;
     current_position[2]=0;
 	if (!atomic_flag) {
-		if (current_element_type == 1) { nodes_per_element = 8; }
+		nodes_per_element = nodes_count_list[current_element_type];
 		for (int kkk = 0; kkk < nodes_per_element; kkk++) {
 			shape_func = shape_function(unit_cell[0], unit_cell[1], unit_cell[2], 2, kkk + 1);
 			current_position[0] += current_nodal_positions[kkk][poly_counter][0] * shape_func;
@@ -866,6 +867,8 @@ int distanceflag=0;
 	int scan_type, scan_type2;
 	int listindex;
 	int poly_index;
+	int poly_grad_scan;
+	double force_contribution[3];
 	int element_index;
 	int *ilist, *jlist, *numneigh, **firstneigh;
 	int neigh_max_inner = quad_list_container[iii].inner_quadrature_neighbor_count[neigh_quad_counter];
@@ -1149,6 +1152,45 @@ int distanceflag=0;
 		force_densityx += delx*fpair;
 		force_densityy += dely*fpair;
 		force_densityz += delz*fpair;
+		force_contribution[0] = delx*fpair;
+		force_contribution[1] = dely*fpair;
+		force_contribution[2] = delz*fpair;
+		if (quad_eflag) {
+
+			scanning_unit_cell[0] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][0];
+			scanning_unit_cell[1] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][1];
+			scanning_unit_cell[2] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][2];
+			poly_grad_scan = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][2];
+			listtype = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][0];
+
+			quadrature_energy += 0.5*scale[origin_type][scan_type]*phi;
+
+			//compute gradients of the potential with respect to nodes
+			//the calculation is the chain rule derivative evaluation of the integral of the energy density
+			//added for every internal degree of freedom i.e. u=u1+u2+u3..upoly defines the total unit cell energy density to integrate
+			//differentiating with nodal positions leaves terms of force contributions times shape function at the particle locations
+			//corresponding to the force contributions at that quadrature point
+            if (!atomic_flag){
+    			for (int js = 0; js < nodes_per_element; js++) {
+    				for (int jj = 0; jj < 3; jj++) {
+    					current_nodal_gradients[js][poly_counter][jj] += coefficients*force_contribution[jj] *
+    						shape_function(s, t, w, 2, js + 1)/2;
+    					//listtype determines if the neighbor virtual atom belongs to the current element or a neighboring element
+    					//derivative contributions are zero for jth virtual atoms in other elements that depend on other nodal variables
+    					if (listtype == 0) {
+    						current_nodal_gradients[js][poly_grad_scan][jj] -= coefficients*force_contribution[jj] *
+    							shape_function(scanning_unit_cell[0], scanning_unit_cell[1], scanning_unit_cell[2], 2, js + 1)/2;
+    					}
+
+    				}
+    			}
+            }
+            else{
+                for (int jj = 0; jj < 3; jj++){
+                    current_nodal_gradients[0][poly_counter][jj] += coefficients*force_contribution[jj];
+                }
+            }
+        }
 	}
 
 
