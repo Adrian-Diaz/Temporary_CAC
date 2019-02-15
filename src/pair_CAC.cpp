@@ -3034,8 +3034,8 @@ void PairCAC::compute_surface_depths(double &scalex, double &scaley, double &sca
 	int poly = poly_counter;
 double unit_cell_mapped[3];
 double rcut;
-if (outer_neighflag) { rcut = 2 * cut_global_s; }
-else{ rcut =  cut_global_s; }
+if (outer_neighflag) { rcut = 2 * cut_global_s+cutoff_skin; }
+else{ rcut =  cut_global_s+cutoff_skin; }
 //flag determines the current element type and corresponding procedure to calculate parameters for 
 //surface penetration depth to be used when computing force density with influences from neighboring
 //elements

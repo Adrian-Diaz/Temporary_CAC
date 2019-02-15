@@ -270,7 +270,8 @@ if (setflag[i][j] == 0) {
 	}
 	
 
-	
+	MPI_Allreduce(&atom->scale_count,&atom->scale_count,1,MPI_INT,MPI_MAX,world);
+	MPI_Allreduce(&atom->max_search_range,&atom->max_search_range,1,MPI_DOUBLE,MPI_MAX,world);
 	return atom->max_search_range;
 }
 

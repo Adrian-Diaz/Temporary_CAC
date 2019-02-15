@@ -223,8 +223,9 @@ double PairCACSW::init_one(int i, int j) {
 		if(atom->scale_search_range[i]>atom->max_search_range) atom->max_search_range=atom->scale_search_range[i];
 	}
 	
-
-	
+    
+	MPI_Allreduce(&atom->scale_count,&atom->scale_count,1,MPI_INT,MPI_MAX,world);
+	MPI_Allreduce(&atom->max_search_range,&atom->max_search_range,1,MPI_DOUBLE,MPI_MAX,world);
 	return atom->max_search_range;
 	//return cutmax;
 }
