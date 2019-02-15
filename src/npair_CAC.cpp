@@ -21,6 +21,7 @@
 #include "my_page.h"
 #include "error.h"
 #include "memory.h"
+#include <math.h> 
 #define MAXNEIGH  1
 #define EXPAND 10
 using namespace LAMMPS_NS;
