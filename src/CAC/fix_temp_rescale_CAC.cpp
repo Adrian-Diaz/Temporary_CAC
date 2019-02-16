@@ -173,8 +173,8 @@ void FixTempRescale_CAC::end_of_step()
     double efactor = 0.5 * force->boltz * temperature->dof;
 
     double ****nodal_velocities = atom->nodal_velocities;
-	int nodes_per_element = atom->nodes_per_element;
-	
+	int nodes_per_element;
+	int *nodes_count_list = atom->nodes_per_element_list;	
 	int *element_type = atom->element_type;
 	int *poly_count = atom->poly_count;
 	int **node_types = atom->node_types;
@@ -186,6 +186,7 @@ void FixTempRescale_CAC::end_of_step()
     if (which == NOBIAS) {
       for (int i = 0; i < nlocal; i++) {
         if (mask[i] & groupbit) {
+        nodes_per_element = nodes_count_list[element_type[i]];
 			for (int j = 0; j < nodes_per_element; j++) {
 				for (int l = 0; l < poly_count[i]; l++) {
 					//temperature->remove_bias(i,v[i]);
@@ -200,6 +201,7 @@ void FixTempRescale_CAC::end_of_step()
     } else {
       for (int i = 0; i < nlocal; i++) {
         if (mask[i] & groupbit) {
+        nodes_per_element = nodes_count_list[element_type[i]];  
 			for (int j = 0; j < nodes_per_element; j++) {
 				for (int l = 0; l < poly_count[i]; l++) {
 					//temperature->remove_bias(i,v[i]);

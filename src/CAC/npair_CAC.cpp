@@ -116,25 +116,10 @@ void NPairCAC::build(NeighList *list)
 			delz = ztmp - x[j][2];
 			rsq = delx*delx + dely*dely + delz*delz;
 			if (neighbor_element_type != 0&&current_element_type!=0) {
-				if (rsq <= cutneighsq[itype][jtype]) {
-					if (molecular) {
-						if (!moltemplate)
-							which = find_special(special[i], nspecial[i], tag[j]);
-						else if (imol >= 0)
-							which = find_special(onemols[imol]->special[iatom],
-								onemols[imol]->nspecial[iatom],
-								tag[j] - tagprev);
-						else which = 0;
-						if (which == 0) neighptr[n++] = j;
-						else if (domain->minimum_image_check(delx, dely, delz))
-							neighptr[n++] = j;
-						else if (which > 0) neighptr[n++] = j ^ (which << SBBITS);
-					}
-					else neighptr[n++] = j;
-				}
+			if(CAC_decide_element2element(i,j)) neighptr[n++] = j;
 			}
 			else if(neighbor_element_type == 0 && current_element_type != 0){
-				if(CAC_decide(i,j)) neighptr[n++] = j;
+				if(CAC_decide_element2atom(i,j)) neighptr[n++] = j;
 			}
 			else if (neighbor_element_type != 0 && current_element_type == 0) {
 				if (CAC_decide_atom2element(j, i))  neighptr[n++] = j;
@@ -329,9 +314,9 @@ void NPairCAC::quadrature_init(int quadrature_rank) {
 
 }
 
+//decide if an element is close enough to an atom to consider for nonlocal quadrature calculation
 
-
-int NPairCAC::CAC_decide(int element_index, int atom_index){
+int NPairCAC::CAC_decide_element2atom(int element_index, int atom_index){
 
 	double unit_cell_mapped[3];
 	double interior_scale[3];
@@ -832,11 +817,9 @@ int NPairCAC::CAC_decide(int element_index, int atom_index){
 
 	return found_flag;
 
-
-	//
-
-
 }
+
+//decide if an atom is close enough to an element to consider for nonlocal quadrature calculation
 
 int NPairCAC::CAC_decide_atom2element(int element_index, int atom_index) {
 	double unit_cell_mapped[3];
@@ -900,6 +883,534 @@ int NPairCAC::CAC_decide_atom2element(int element_index, int atom_index) {
 	else {
 		return found_flag;
 	}
+	
+
+}
+
+//decide if an element is close enough to another element to consider for nonlocal quadrature calculation
+
+int NPairCAC::CAC_decide_element2element(int element_index, int neighbor_element_index) {
+
+
+    double unit_cell_mapped[3];
+	double interior_scale[3];
+	int surface_counts[3];
+	
+	int found_flag=0;
+	double s, t, w;
+	double **x = atom->x;
+	s = t = w = 0;
+	double sq, tq, wq;
+	double quad_position[3];
+	double ****nodal_positions = atom->nodal_positions;
+	double shape_func;
+	int *element_type = atom->element_type;
+	int *poly_count = atom->poly_count;
+	double xtmp, ytmp, ztmp, delx, dely, delz, rsq;
+	int *nodes_per_element_list = atom->nodes_per_element_list;
+	int nodes_per_element = nodes_per_element_list[element_type[element_index]];
+	unit_cell_mapped[0] = 2 / double(element_scale[element_index][0]);
+	unit_cell_mapped[1] = 2 / double(element_scale[element_index][1]);
+	unit_cell_mapped[2] = 2 / double(element_scale[element_index][2]);
+	current_nodal_positions = nodal_positions[element_index];
+	double ***neighbor_nodal_positions=nodal_positions[neighbor_element_index];
+	int current_poly_count = poly_count[element_index];
+    int neighbor_poly_count = poly_count[neighbor_element_index];
+	int neighbor_nodes_per_element = nodes_per_element_list[element_type[neighbor_element_index]];
+ 
+
+
+	double bounding_boxlo[3];
+	double bounding_boxhi[3];
+
+	//initialize bounding box values
+	bounding_boxlo[0] = neighbor_nodal_positions[0][0][0];
+	bounding_boxlo[1] = neighbor_nodal_positions[0][0][1];
+	bounding_boxlo[2] = neighbor_nodal_positions[0][0][2];
+	bounding_boxhi[0] = neighbor_nodal_positions[0][0][0];
+	bounding_boxhi[1] = neighbor_nodal_positions[0][0][1];
+	bounding_boxhi[2] = neighbor_nodal_positions[0][0][2];
+     //define the bounding box for the element being considered as a neighbor
+	
+	for (int poly_counter = 0; poly_counter < neighbor_poly_count; poly_counter++) {
+		for (int kkk = 0; kkk < neighbor_nodes_per_element; kkk++) {
+			for (int dim = 0; dim < 3; dim++) {
+				if (neighbor_nodal_positions[kkk][poly_counter][dim] < bounding_boxlo[dim]) {
+					bounding_boxlo[dim] = neighbor_nodal_positions[kkk][poly_counter][dim];
+				}
+				if (neighbor_nodal_positions[kkk][poly_counter][dim] > bounding_boxhi[dim]) {
+					bounding_boxhi[dim] = neighbor_nodal_positions[kkk][poly_counter][dim];
+				}
+			}
+		}
+	}
+
+	bounding_boxlo[0] -= CAC_cut;
+	bounding_boxlo[1] -= CAC_cut;
+	bounding_boxlo[2] -= CAC_cut;
+	bounding_boxhi[0] += CAC_cut;
+	bounding_boxhi[1] += CAC_cut;
+	bounding_boxhi[2] += CAC_cut;
+
+	//compute quadrature point positions to test for neighboring
+	//if any quadrature point is inside the box 
+
+	int sign[2];
+	sign[0] = -1;
+	sign[1] = 1;
+	
+
+	
+	for (int poly_counter = 0; poly_counter < current_poly_count; poly_counter++) {
+		current_poly_counter = poly_counter;
+		compute_surface_depths(interior_scale[0], interior_scale[1], interior_scale[2],
+			surface_counts[0], surface_counts[1], surface_counts[2], 1);
+
+		//interior contributions
+
+
+		for (int i = 0; i < quadrature_node_count; i++) {
+			for (int j = 0; j < quadrature_node_count; j++) {
+				for (int k = 0; k < quadrature_node_count; k++) {
+
+					sq = s = interior_scale[0] * quadrature_abcissae[i];
+					tq = t = interior_scale[1] * quadrature_abcissae[j];
+					wq = w = interior_scale[2] * quadrature_abcissae[k];
+					s = unit_cell_mapped[0] * (int(s / unit_cell_mapped[0]));
+					t = unit_cell_mapped[1] * (int(t / unit_cell_mapped[1]));
+					w = unit_cell_mapped[2] * (int(w / unit_cell_mapped[2]));
+
+
+					quad_position[0] = 0;
+					quad_position[1] = 0;
+					quad_position[2] = 0;
+					for (int kkk = 0; kkk < nodes_per_element; kkk++) {
+						shape_func = shape_function(s, t, w, 2, kkk + 1);
+						quad_position[0] += current_nodal_positions[kkk][poly_counter][0] * shape_func;
+						quad_position[1] += current_nodal_positions[kkk][poly_counter][1] * shape_func;
+						quad_position[2] += current_nodal_positions[kkk][poly_counter][2] * shape_func;
+					}
+
+					if(quad_position[0]>bounding_boxlo[0]&&quad_position[0]<bounding_boxhi[0]&&
+					quad_position[1]>bounding_boxlo[1]&&quad_position[1]<bounding_boxhi[1]&&
+					quad_position[2]>bounding_boxlo[2]&&quad_position[2]<bounding_boxhi[2]) {
+						found_flag = 1;
+						return found_flag;
+					}
+
+
+
+				}
+			}
+		}
+
+		// s axis surface contributions
+	for (int sc = 0; sc < 2; sc++) {
+		for (int i = 0; i < surface_counts[0]; i++) {
+			for (int j = 0; j < quadrature_node_count; j++) {
+				for (int k = 0; k < quadrature_node_count; k++) {
+					
+						s = sign[sc] - i*unit_cell_mapped[0] * sign[sc];
+
+						s = s - 0.5*unit_cell_mapped[0] * sign[sc];
+						tq = t = interior_scale[1] * quadrature_abcissae[j];
+						wq = w = interior_scale[2] * quadrature_abcissae[k];
+						t = unit_cell_mapped[1] * (int(t / unit_cell_mapped[1]));
+						w = unit_cell_mapped[2] * (int(w / unit_cell_mapped[2]));
+
+						if (quadrature_abcissae[k] < 0)
+							w = w - 0.5*unit_cell_mapped[2];
+						else
+							w = w + 0.5*unit_cell_mapped[2];
+
+						if (quadrature_abcissae[j] < 0)
+							t = t - 0.5*unit_cell_mapped[1];
+						else
+							t = t + 0.5*unit_cell_mapped[1];
+
+						quad_position[0] = 0;
+						quad_position[1] = 0;
+						quad_position[2] = 0;
+						for (int kkk = 0; kkk < nodes_per_element; kkk++) {
+							shape_func = shape_function(s, t, w, 2, kkk + 1);
+							quad_position[0] += current_nodal_positions[kkk][poly_counter][0] * shape_func;
+							quad_position[1] += current_nodal_positions[kkk][poly_counter][1] * shape_func;
+							quad_position[2] += current_nodal_positions[kkk][poly_counter][2] * shape_func;
+						}
+
+				if(quad_position[0]>bounding_boxlo[0]&&quad_position[0]<bounding_boxhi[0]&&
+					quad_position[1]>bounding_boxlo[1]&&quad_position[1]<bounding_boxhi[1]&&
+					quad_position[2]>bounding_boxlo[2]&&quad_position[2]<bounding_boxhi[2]) {
+						found_flag = 1;
+						return found_flag;
+					}
+					}
+				}
+			}
+		}
+	
+
+	// t axis contributions
+	
+	for (int sc = 0; sc < 2; sc++) {
+		for (int i = 0; i < surface_counts[1]; i++) {
+			for (int j = 0; j < quadrature_node_count; j++) {
+				for (int k = 0; k < quadrature_node_count; k++) {
+					
+
+						sq = s = interior_scale[0] * quadrature_abcissae[j];
+						s = unit_cell_mapped[0] * (int(s / unit_cell_mapped[0]));
+						t = sign[sc] - i*unit_cell_mapped[1] * sign[sc];
+
+						t = t - 0.5*unit_cell_mapped[1] * sign[sc];
+						wq = w = interior_scale[2] * quadrature_abcissae[k];
+						w = unit_cell_mapped[2] * (int(w / unit_cell_mapped[2]));
+
+						if (quadrature_abcissae[j] < 0)
+							s = s - 0.5*unit_cell_mapped[0];
+						else
+							s = s + 0.5*unit_cell_mapped[0];
+
+						if (quadrature_abcissae[k] < 0)
+							w = w - 0.5*unit_cell_mapped[2];
+						else
+							w = w + 0.5*unit_cell_mapped[2];
+
+						quad_position[0] = 0;
+						quad_position[1] = 0;
+						quad_position[2] = 0;
+						for (int kkk = 0; kkk < nodes_per_element; kkk++) {
+							shape_func = shape_function(s, t, w, 2, kkk + 1);
+							quad_position[0] += current_nodal_positions[kkk][poly_counter][0] * shape_func;
+							quad_position[1] += current_nodal_positions[kkk][poly_counter][1] * shape_func;
+							quad_position[2] += current_nodal_positions[kkk][poly_counter][2] * shape_func;
+						}
+
+					if(quad_position[0]>bounding_boxlo[0]&&quad_position[0]<bounding_boxhi[0]&&
+					quad_position[1]>bounding_boxlo[1]&&quad_position[1]<bounding_boxhi[1]&&
+					quad_position[2]>bounding_boxlo[2]&&quad_position[2]<bounding_boxhi[2]) {
+						found_flag = 1;
+						return found_flag;
+					}
+
+					}
+				}
+			}
+		}
+	
+
+	//w axis surface contributions
+	
+	for (int sc = 0; sc < 2; sc++) {
+		for (int i = 0; i < surface_counts[2]; i++) {
+			for (int j = 0; j < quadrature_node_count; j++) {
+				for (int k = 0; k < quadrature_node_count; k++) {
+					
+
+						sq = s = interior_scale[0] * quadrature_abcissae[j];
+						s = unit_cell_mapped[0] * (int(s / unit_cell_mapped[0]));
+						tq = t = interior_scale[1] * quadrature_abcissae[k];
+						t = unit_cell_mapped[1] * (int(t / unit_cell_mapped[1]));
+						w = sign[sc] - i*unit_cell_mapped[2] * sign[sc];
+
+						w = w - 0.5*unit_cell_mapped[2] * sign[sc];
+
+						if (quadrature_abcissae[j] < 0)
+							s = s - 0.5*unit_cell_mapped[0];
+						else
+							s = s + 0.5*unit_cell_mapped[0];
+
+						if (quadrature_abcissae[k] < 0)
+							t = t - 0.5*unit_cell_mapped[1];
+						else
+							t = t + 0.5*unit_cell_mapped[1];
+
+
+						quad_position[0] = 0;
+						quad_position[1] = 0;
+						quad_position[2] = 0;
+						for (int kkk = 0; kkk < nodes_per_element; kkk++) {
+							shape_func = shape_function(s, t, w, 2, kkk + 1);
+							quad_position[0] += current_nodal_positions[kkk][poly_counter][0] * shape_func;
+							quad_position[1] += current_nodal_positions[kkk][poly_counter][1] * shape_func;
+							quad_position[2] += current_nodal_positions[kkk][poly_counter][2] * shape_func;
+						}
+
+						if(quad_position[0]>bounding_boxlo[0]&&quad_position[0]<bounding_boxhi[0]&&
+					quad_position[1]>bounding_boxlo[1]&&quad_position[1]<bounding_boxhi[1]&&
+					quad_position[2]>bounding_boxlo[2]&&quad_position[2]<bounding_boxhi[2]) {
+						found_flag = 1;
+						return found_flag;
+					}
+
+					}
+				}
+			}
+		}
+	
+
+
+	int surface_countsx;
+	int surface_countsy;
+
+	//compute edge contributions
+
+	for (int sc = 0; sc < 12; sc++) {
+		if (sc == 0 || sc == 1 || sc == 2 || sc == 3) {
+
+			surface_countsx = surface_counts[0];
+			surface_countsy = surface_counts[1];
+		}
+		else if (sc == 4 || sc == 5 || sc == 6 || sc == 7) {
+
+			surface_countsx = surface_counts[1];
+			surface_countsy = surface_counts[2];
+		}
+		else if (sc == 8 || sc == 9 || sc == 10 || sc == 11) {
+
+			surface_countsx = surface_counts[0];
+			surface_countsy = surface_counts[2];
+		}
+
+
+		
+		for (int i = 0; i < surface_countsx; i++) {//alter surface counts for specific corner
+			for (int j = 0; j < surface_countsy; j++) {
+				
+				for (int k = 0; k < quadrature_node_count; k++) {
+					
+						if (sc == 0) {
+
+							sq = s = -1 + (i + 0.5)*unit_cell_mapped[0];
+							tq = t = -1 + (j + 0.5)*unit_cell_mapped[1];
+							wq = w = interior_scale[2] * quadrature_abcissae[k];
+							w = unit_cell_mapped[2] * (int(w / unit_cell_mapped[2]));
+							if (quadrature_abcissae[k] < 0)
+								w = w - 0.5*unit_cell_mapped[2];
+							else
+								w = w + 0.5*unit_cell_mapped[2];
+						}
+						else if (sc == 1) {
+							sq = s = 1 - (i + 0.5)*unit_cell_mapped[0];
+							tq = t = -1 + (j + 0.5)*unit_cell_mapped[1];
+							wq = w = interior_scale[2] * quadrature_abcissae[k];
+							w = unit_cell_mapped[2] * (int(w / unit_cell_mapped[2]));
+							if (quadrature_abcissae[k] < 0)
+								w = w - 0.5*unit_cell_mapped[2];
+							else
+								w = w + 0.5*unit_cell_mapped[2];
+						}
+						else if (sc == 2) {
+							sq = s = -1 + (i + 0.5)*unit_cell_mapped[0];
+							tq = t = 1 - (j + 0.5)*unit_cell_mapped[1];
+							wq = w = interior_scale[2] * quadrature_abcissae[k];
+							w = unit_cell_mapped[2] * (int(w / unit_cell_mapped[2]));
+							if (quadrature_abcissae[k] < 0)
+								w = w - 0.5*unit_cell_mapped[2];
+							else
+								w = w + 0.5*unit_cell_mapped[2];
+						}
+						else if (sc == 3) {
+							sq = s = 1 - (i + 0.5)*unit_cell_mapped[0];
+							tq = t = 1 - (j + 0.5)*unit_cell_mapped[1];
+							wq = w = interior_scale[2] * quadrature_abcissae[k];
+							w = unit_cell_mapped[2] * (int(w / unit_cell_mapped[2]));
+							if (quadrature_abcissae[k] < 0)
+								w = w - 0.5*unit_cell_mapped[2];
+							else
+								w = w + 0.5*unit_cell_mapped[2];
+						}
+						else if (sc == 4) {
+							sq = s = interior_scale[0] * quadrature_abcissae[k];
+							s = unit_cell_mapped[0] * (int(s / unit_cell_mapped[0]));
+							tq = t = -1 + (i + 0.5)*unit_cell_mapped[1];
+							wq = w = -1 + (j + 0.5)*unit_cell_mapped[2];
+							if (quadrature_abcissae[k] < 0)
+								s = s - 0.5*unit_cell_mapped[0];
+							else
+								s = s + 0.5*unit_cell_mapped[0];
+
+						}
+						else if (sc == 5) {
+							sq = s = interior_scale[0] * quadrature_abcissae[k];
+							s = unit_cell_mapped[0] * (int(s / unit_cell_mapped[0]));
+							tq = t = 1 - (i + 0.5)*unit_cell_mapped[1];
+							wq = w = -1 + (j + 0.5)*unit_cell_mapped[2];
+							if (quadrature_abcissae[k] < 0)
+								s = s - 0.5*unit_cell_mapped[0];
+							else
+								s = s + 0.5*unit_cell_mapped[0];
+						}
+						else if (sc == 6) {
+							sq = s = interior_scale[0] * quadrature_abcissae[k];
+							s = unit_cell_mapped[0] * (int(s / unit_cell_mapped[0]));
+							tq = t = -1 + (i + 0.5)*unit_cell_mapped[1];
+							wq = w = 1 - (j + 0.5)*unit_cell_mapped[2];
+							if (quadrature_abcissae[k] < 0)
+								s = s - 0.5*unit_cell_mapped[0];
+							else
+								s = s + 0.5*unit_cell_mapped[0];
+						}
+						else if (sc == 7) {
+							sq = s = interior_scale[0] * quadrature_abcissae[k];
+							s = unit_cell_mapped[0] * (int(s / unit_cell_mapped[0]));
+							tq = t = 1 - (i + 0.5)*unit_cell_mapped[1];
+							wq = w = 1 - (j + 0.5)*unit_cell_mapped[2];
+							if (quadrature_abcissae[k] < 0)
+								s = s - 0.5*unit_cell_mapped[0];
+							else
+								s = s + 0.5*unit_cell_mapped[0];
+						}
+						else if (sc == 8) {
+							sq = s = -1 + (i + 0.5)*unit_cell_mapped[0];
+							tq = t = interior_scale[1] * quadrature_abcissae[k];
+							t = unit_cell_mapped[1] * (int(t / unit_cell_mapped[1]));
+							wq = w = -1 + (j + 0.5)*unit_cell_mapped[2];
+							if (quadrature_abcissae[k] < 0)
+								t = t - 0.5*unit_cell_mapped[1];
+							else
+								t = t + 0.5*unit_cell_mapped[1];
+
+						}
+						else if (sc == 9) {
+							sq = s = 1 - (i + 0.5)*unit_cell_mapped[0];
+							tq = t = interior_scale[1] * quadrature_abcissae[k];
+							t = unit_cell_mapped[1] * (int(t / unit_cell_mapped[1]));
+							wq = w = -1 + (j + 0.5)*unit_cell_mapped[2];
+							if (quadrature_abcissae[k] < 0)
+								t = t - 0.5*unit_cell_mapped[1];
+							else
+								t = t + 0.5*unit_cell_mapped[1];
+						}
+						else if (sc == 10) {
+							sq = s = -1 + (i + 0.5)*unit_cell_mapped[0];
+							tq = t = interior_scale[1] * quadrature_abcissae[k];
+							t = unit_cell_mapped[1] * (int(t / unit_cell_mapped[1]));
+							wq = w = 1 - (j + 0.5)*unit_cell_mapped[2];
+							if (quadrature_abcissae[k] < 0)
+								t = t - 0.5*unit_cell_mapped[1];
+							else
+								t = t + 0.5*unit_cell_mapped[1];
+						}
+						else if (sc == 11) {
+							sq = s = 1 - (i + 0.5)*unit_cell_mapped[0];
+							tq = t = interior_scale[1] * quadrature_abcissae[k];
+							t = unit_cell_mapped[1] * (int(t / unit_cell_mapped[1]));
+							wq = w = 1 - (j + 0.5)*unit_cell_mapped[2];
+							if (quadrature_abcissae[k] < 0)
+								t = t - 0.5*unit_cell_mapped[1];
+							else
+								t = t + 0.5*unit_cell_mapped[1];
+						}
+
+
+
+						quad_position[0] = 0;
+						quad_position[1] = 0;
+						quad_position[2] = 0;
+						for (int kkk = 0; kkk < nodes_per_element; kkk++) {
+							shape_func = shape_function(s, t, w, 2, kkk + 1);
+							quad_position[0] += current_nodal_positions[kkk][poly_counter][0] * shape_func;
+							quad_position[1] += current_nodal_positions[kkk][poly_counter][1] * shape_func;
+							quad_position[2] += current_nodal_positions[kkk][poly_counter][2] * shape_func;
+						}
+
+						if(quad_position[0]>bounding_boxlo[0]&&quad_position[0]<bounding_boxhi[0]&&
+					quad_position[1]>bounding_boxlo[1]&&quad_position[1]<bounding_boxhi[1]&&
+					quad_position[2]>bounding_boxlo[2]&&quad_position[2]<bounding_boxhi[2]) {
+						found_flag = 1;
+						return found_flag;
+					}
+					}
+
+				}
+
+			}
+		}
+	
+
+
+	//compute corner contributions
+
+	for (int sc = 0; sc < 8; sc++) {
+		for (int i = 0; i < surface_counts[0]; i++) {//alter surface counts for specific corner
+			for (int j = 0; j < surface_counts[1]; j++) {
+				for (int k = 0; k < surface_counts[2]; k++) {
+					
+					
+						if (sc == 0) {
+
+							s = -1 + (i + 0.5)*unit_cell_mapped[0];
+							t = -1 + (j + 0.5)*unit_cell_mapped[1];
+							w = -1 + (k + 0.5)*unit_cell_mapped[2];
+
+						}
+						else if (sc == 1) {
+							s = 1 - (i + 0.5)*unit_cell_mapped[0];
+							t = -1 + (j + 0.5)*unit_cell_mapped[1];
+							w = -1 + (k + 0.5)*unit_cell_mapped[2];
+						}
+						else if (sc == 2) {
+							s = 1 - (i + 0.5)*unit_cell_mapped[0];
+							t = 1 - (j + 0.5)*unit_cell_mapped[1];
+							w = -1 + (k + 0.5)*unit_cell_mapped[2];
+						}
+						else if (sc == 3) {
+							s = -1 + (i + 0.5)*unit_cell_mapped[0];
+							t = 1 - (j + 0.5)*unit_cell_mapped[1];
+							w = -1 + (k + 0.5)*unit_cell_mapped[2];
+						}
+						else if (sc == 4) {
+							s = -1 + (i + 0.5)*unit_cell_mapped[0];
+							t = -1 + (j + 0.5)*unit_cell_mapped[1];
+							w = 1 - (k + 0.5)*unit_cell_mapped[2];
+
+						}
+						else if (sc == 5) {
+							s = 1 - (i + 0.5)*unit_cell_mapped[0];
+							t = -1 + (j + 0.5)*unit_cell_mapped[1];
+							w = 1 - (k + 0.5)*unit_cell_mapped[2];
+						}
+						else if (sc == 6) {
+							s = 1 - (i + 0.5)*unit_cell_mapped[0];
+							t = 1 - (j + 0.5)*unit_cell_mapped[1];
+							w = 1 - (k + 0.5)*unit_cell_mapped[2];
+						}
+						else if (sc == 7) {
+							s = -1 + (i + 0.5)*unit_cell_mapped[0];
+							t = 1 - (j + 0.5)*unit_cell_mapped[1];
+							w = 1 - (k + 0.5)*unit_cell_mapped[2];
+						}
+
+						quad_position[0] = 0;
+						quad_position[1] = 0;
+						quad_position[2] = 0;
+						for (int kkk = 0; kkk < nodes_per_element; kkk++) {
+							shape_func = shape_function(s, t, w, 2, kkk + 1);
+							quad_position[0] += current_nodal_positions[kkk][poly_counter][0] * shape_func;
+							quad_position[1] += current_nodal_positions[kkk][poly_counter][1] * shape_func;
+							quad_position[2] += current_nodal_positions[kkk][poly_counter][2] * shape_func;
+						}
+
+					if(quad_position[0]>bounding_boxlo[0]&&quad_position[0]<bounding_boxhi[0]&&
+					quad_position[1]>bounding_boxlo[1]&&quad_position[1]<bounding_boxhi[1]&&
+					quad_position[2]>bounding_boxlo[2]&&quad_position[2]<bounding_boxhi[2]) {
+						found_flag = 1;
+						return found_flag;
+					}
+
+					}
+				}
+
+			}
+		}
+	}
+
+
+	
+
+		return found_flag;
+	
 	
 
 }
