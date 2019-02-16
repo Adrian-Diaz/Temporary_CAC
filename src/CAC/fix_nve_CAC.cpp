@@ -77,7 +77,7 @@ void FixNVECAC::initial_integrate(int vflag)
   int *element_type = atom->element_type;
   int *poly_count = atom->poly_count;
   int **node_types = atom->node_types;
-
+  int *nodes_count_list = atom->nodes_per_element_list;	
 
   int nodes_per_element;
 
@@ -90,15 +90,7 @@ void FixNVECAC::initial_integrate(int vflag)
 
   if (rmass) {
     for (int i = 0; i < nlocal; i++){
-		//determine element type
-		if(element_type[i] == 0) {
-			nodes_per_element = 1;
-		}
-		if(element_type[i] == 1) {
-			nodes_per_element = 8;
-		}
-	
-
+	nodes_per_element = nodes_count_list[element_type[i]];
 
 	if (mask[i] & groupbit) {
 		x[i][0] = 0;
@@ -141,13 +133,8 @@ void FixNVECAC::initial_integrate(int vflag)
 
   } else {
     for (int i = 0; i < nlocal; i++){
-		//determine element type
-		if(element_type[i] == 0) {
-			nodes_per_element = 1;
-		}
-		if(element_type[i] == 1) {
-			nodes_per_element = 8;
-		}
+		
+	  nodes_per_element = nodes_count_list[element_type[i]];
 
 			if (mask[i] & groupbit) {
 				x[i][0] = 0;
@@ -208,7 +195,7 @@ void FixNVECAC::final_integrate()
   int *element_type = atom->element_type;
   int *poly_count = atom->poly_count;
   int **node_types = atom->node_types;
-
+  int *nodes_count_list = atom->nodes_per_element_list;	
 
   int nodes_per_element;
 
@@ -219,13 +206,7 @@ void FixNVECAC::final_integrate()
 
   if (rmass) {
     for (int i = 0; i < nlocal; i++){
-		//determine element type
-		if(element_type[i] == 0) {
-			nodes_per_element = 1;
-		}
-		if(element_type[i] == 1) {
-			nodes_per_element = 8;
-		}
+	  nodes_per_element = nodes_count_list[element_type[i]];
          
 			if (mask[i] & groupbit) {
 				v[i][0] = 0;
@@ -259,13 +240,7 @@ void FixNVECAC::final_integrate()
 
   } else {
     for (int i = 0; i < nlocal; i++){
-		//determine element type
-		if(element_type[i] == 0) {
-			nodes_per_element = 1;
-		}
-		if(element_type[i] == 1) {
-			nodes_per_element = 8;
-		}
+		nodes_per_element = nodes_count_list[element_type[i]];
 
 			if (mask[i] & groupbit) {
 				v[i][0] = 0;

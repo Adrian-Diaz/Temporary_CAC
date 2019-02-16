@@ -33,6 +33,7 @@ class DumpCACtecplot : public Dump {
   int ntypes;
   char **typenames;
   bigint ptimestep;
+  int total_node_count;
   void init_style();
   void write_header(bigint);
   void pack(tagint *);

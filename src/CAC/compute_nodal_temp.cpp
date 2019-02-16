@@ -83,6 +83,8 @@ double ComputeNodalTemp::compute_scalar()
   int *poly_count = atom->poly_count;
   int **node_types = atom->node_types;
   int **element_scale = atom->element_scale;
+  int *nodes_count_list = atom->nodes_per_element_list;	
+  int nodes_per_element;
   int *type = atom->type;
   double *mass = atom->mass;
   double *rmass = atom->rmass;
@@ -95,47 +97,31 @@ double ComputeNodalTemp::compute_scalar()
   if (rmass) {
 
 	  for (int i = 0; i < nlocal; i++) {
-		  if (element_type[i] == 0) {//atom
+		  
 			  if (mask[i] & groupbit)
-				  for (int n = 0; n < 1; n++)
-					  t += (nodal_velocities[i][n][0][0] * nodal_velocities[i][n][0][0]
-						  + nodal_velocities[i][n][0][1] * nodal_velocities[i][n][0][1]
-						  + nodal_velocities[i][n][0][2] * nodal_velocities[i][n][0][2])
-					  * rmass[i];
-		  }
-		  if (element_type[i] == 1) {//8 node element
-			  if (mask[i] & groupbit)
+           nodes_per_element = nodes_count_list[element_type[i]];
 				  for (int ipoly = 0; ipoly < poly_count[i]; ipoly++)
-					  for (int n = 0; n < 8; n++)
+					  for (int n = 0; n < nodes_per_element; n++)
 						  t += (nodal_velocities[i][n][ipoly][0] * nodal_velocities[i][n][ipoly][0]
 							  + nodal_velocities[i][n][ipoly][1] * nodal_velocities[i][n][ipoly][1]
 							  + nodal_velocities[i][n][ipoly][2] * nodal_velocities[i][n][ipoly][2])
-						  * rmass[i] / 8 / poly_count[i];
-		  }
+						  * rmass[i] / nodes_per_element / poly_count[i];
+		  
 	  }
   }
   else {
 	  
 	  for (int i = 0; i < nlocal; i++) {
-		  if (element_type[i] == 0) {//atom
-			  if (mask[i] & groupbit)
-					  for (int n = 0; n < 1; n++)
-						  t += (nodal_velocities[i][n][0][0] * nodal_velocities[i][n][0][0]
-							  + nodal_velocities[i][n][0][1] * nodal_velocities[i][n][0][1]
-							  + nodal_velocities[i][n][0][2] * nodal_velocities[i][n][0][2])*
-						  mass[node_types[i][0]];
-		  }
-
-		  if (element_type[i] == 1) {//8 node element
 
 			  if (mask[i] & groupbit)
+         nodes_per_element = nodes_count_list[element_type[i]];
 				  for (int ipoly = 0; ipoly < poly_count[i]; ipoly++)
-					  for (int n = 0; n < 8; n++)
+					  for (int n = 0; n < nodes_per_element; n++)
 						  t += (nodal_velocities[i][n][ipoly][0] * nodal_velocities[i][n][ipoly][0]
 							  + nodal_velocities[i][n][ipoly][1] * nodal_velocities[i][n][ipoly][1]
 							  + nodal_velocities[i][n][ipoly][2] * nodal_velocities[i][n][ipoly][2])*
-						  mass[node_types[i][ipoly]] / 8 / poly_count[i];
-		  }
+						  mass[node_types[i][ipoly]] / nodes_per_element / poly_count[i];
+		  
 	  }
   }
 
