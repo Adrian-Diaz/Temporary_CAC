@@ -33,8 +33,8 @@
 #include <stdint.h>
 
 //#include "math_extra.h"
-#define MAXNEIGH1  500
-#define MAXNEIGH2  100
+#define MAXNEIGH1  50
+#define MAXNEIGH2  10
 #define MAXLINE 1024
 #define DELTA 4
 using namespace LAMMPS_NS;
@@ -298,6 +298,7 @@ double PairCACEAM::init_one(int i, int j) {
 		if(atom->scale_search_range[i]>atom->max_search_range) atom->max_search_range=atom->scale_search_range[i];
 	}
 	
+    atom->CAC_skin=cutoff_skin;
 
 	MPI_Allreduce(&atom->scale_count,&atom->scale_count,1,MPI_INT,MPI_MAX,world);
 	MPI_Allreduce(&atom->max_search_range,&atom->max_search_range,1,MPI_DOUBLE,MPI_MAX,world);
@@ -872,8 +873,8 @@ int distanceflag=0;
 	double force_contribution[3];
 	int element_index;
 	int *ilist, *jlist, *numneigh, **firstneigh;
-	int neigh_max_inner = quad_list_container[iii].inner_quadrature_neighbor_count[neigh_quad_counter];
-	int neigh_max_outer = quad_list_container[iii].outer_quadrature_neighbor_count[neigh_quad_counter];
+	int neigh_max_inner = inner_quad_lists_counts[iii][neigh_quad_counter];
+	int neigh_max_outer = outer_quad_lists_counts[iii][neigh_quad_counter];
 	int itype, jtype, ktype;
 	double rsq, r, p, rhoip, rhojp, z2, z2p, recip, phip, psip, phi;
 	double *coeff;
@@ -905,40 +906,31 @@ int distanceflag=0;
 	double inner_scan_position[3];
 	//precompute virtual neighbor atom locations
 	for (int l = 0; l < neigh_max_inner; l++) {
-		scanning_unit_cell[0] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][0];
-		scanning_unit_cell[1] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][1];
-		scanning_unit_cell[2] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][2];
+		scanning_unit_cell[0] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][0];
+		scanning_unit_cell[1] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][1];
+		scanning_unit_cell[2] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][2];
 		//listtype = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][0];
-		listindex = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][0];
-		poly_index = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][1];
-		
+		listindex = inner_quad_lists_index[iii][neigh_quad_counter][l][0];
+		poly_index = inner_quad_lists_index[iii][neigh_quad_counter][l][1];
 		element_index = listindex;
 		element_index &= NEIGHMASK;
 		inner_neighbor_types[l] = node_types[element_index][poly_index];
 		neigh_list_cord(inner_neighbor_coords[l][0], inner_neighbor_coords[l][1], inner_neighbor_coords[l][2],
 			element_index, poly_index, scanning_unit_cell[0], scanning_unit_cell[1], scanning_unit_cell[2]);
-	
-
 
 	}
 	for (int l = 0; l < neigh_max_outer; l++) {
-
-		scanning_unit_cell[0] = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[l][0];
-		scanning_unit_cell[1] = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[l][1];
-		scanning_unit_cell[2] = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_coords[l][2];
-		//listtype = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[l][0];
-		listindex = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[l][0];
-		poly_index = quad_list_container[iii].outer_list2ucell[neigh_quad_counter].cell_indexes[l][1];
-		
+		scanning_unit_cell[0] = outer_quad_lists_ucell[iii][neigh_quad_counter][l][0];
+		scanning_unit_cell[1] = outer_quad_lists_ucell[iii][neigh_quad_counter][l][1];
+		scanning_unit_cell[2] = outer_quad_lists_ucell[iii][neigh_quad_counter][l][2];
+		//listtype = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][0];
+		listindex = outer_quad_lists_index[iii][neigh_quad_counter][l][0];
+		poly_index = outer_quad_lists_index[iii][neigh_quad_counter][l][1];
 		element_index = listindex;
 		element_index &= NEIGHMASK;
 		outer_neighbor_types[l] = node_types[element_index][poly_index];
 		neigh_list_cord(outer_neighbor_coords[l][0], outer_neighbor_coords[l][1], outer_neighbor_coords[l][2],
 			element_index, poly_index, scanning_unit_cell[0], scanning_unit_cell[1], scanning_unit_cell[2]);
-
-
-
-
 
 	}
 	//two body accumulation of electron densities to quadrature site
@@ -1150,11 +1142,15 @@ int distanceflag=0;
 		force_contribution[2] = delz*fpair;
 		if (quad_eflag) {
 
-			scanning_unit_cell[0] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][0];
-			scanning_unit_cell[1] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][1];
-			scanning_unit_cell[2] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][2];
-			poly_grad_scan = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][2];
-			listtype = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][0];
+			
+			
+			
+			scanning_unit_cell[0] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][0];
+			scanning_unit_cell[1] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][1];
+			scanning_unit_cell[2] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][2];
+			listindex = inner_quad_lists_index[iii][neigh_quad_counter][l][0];
+			poly_grad_scan = inner_quad_lists_index[iii][neigh_quad_counter][l][1];
+			
 
 			quadrature_energy += 0.5*scale[origin_type][scan_type]*phi;
 
@@ -1168,9 +1164,9 @@ int distanceflag=0;
     				for (int jj = 0; jj < 3; jj++) {
     					current_nodal_gradients[js][poly_counter][jj] += coefficients*force_contribution[jj] *
     						shape_function(s, t, w, 2, js + 1)/2;
-    					//listtype determines if the neighbor virtual atom belongs to the current element or a neighboring element
+    					//listindex determines if the neighbor virtual atom belongs to the current element or a neighboring element
     					//derivative contributions are zero for jth virtual atoms in other elements that depend on other nodal variables
-    					if (listtype == 0) {
+    					if (listindex == iii) {
     						current_nodal_gradients[js][poly_grad_scan][jj] -= coefficients*force_contribution[jj] *
     							shape_function(scanning_unit_cell[0], scanning_unit_cell[1], scanning_unit_cell[2], 2, js + 1)/2;
     					}
