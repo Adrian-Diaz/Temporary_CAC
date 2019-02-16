@@ -108,20 +108,12 @@ class PairCAC : public Pair {
 	int *atomic_counter_map;
 	int old_atom_count, old_quad_count;
 	int *old_atom_etype;
-	typedef struct neighbor_data { 
-	double **cell_coords; 
-	int **cell_indexes;
-	} neighbor_data;
-
-	typedef struct neighbor_collection {
-		neighbor_data *inner_list2ucell;
-		neighbor_data *outer_list2ucell;
-		int *inner_quadrature_neighbor_count;
-		int *outer_quadrature_neighbor_count;
-	} neighbor_collection;
-
-
-	neighbor_collection *quad_list_container;
+  int ****inner_quad_lists_index;
+  double ****inner_quad_lists_ucell;
+  int **inner_quad_lists_counts;
+  int ****outer_quad_lists_index;
+  double ****outer_quad_lists_ucell;
+  int **outer_quad_lists_counts;
 	double **old_quad_minima;
 	double *old_minima_neighbors;
 	

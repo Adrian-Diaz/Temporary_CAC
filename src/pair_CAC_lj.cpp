@@ -269,6 +269,7 @@ if (setflag[i][j] == 0) {
 		if(atom->scale_search_range[i]>atom->max_search_range) atom->max_search_range=atom->scale_search_range[i];
 	}
 	
+  atom->CAC_skin=cutoff_skin;
 
 	MPI_Allreduce(&atom->scale_count,&atom->scale_count,1,MPI_INT,MPI_MAX,world);
 	MPI_Allreduce(&atom->max_search_range,&atom->max_search_range,1,MPI_DOUBLE,MPI_MAX,world);
@@ -488,7 +489,7 @@ int distanceflag=0;
 			int poly_grad_scan;
 			int element_index;
 			int *ilist, *jlist, *numneigh, **firstneigh;
-			int neigh_max = quad_list_container[iii].inner_quadrature_neighbor_count[neigh_quad_counter];
+			int neigh_max = inner_quad_lists_counts[iii][neigh_quad_counter];
 			int **node_types = atom->node_types;
 			ilist = list->ilist;
 			numneigh = list->numneigh;
@@ -499,19 +500,17 @@ int distanceflag=0;
 
 			memory->grow(inner_neighbor_types, neigh_max, "Pair_CAC_lj:inner_neighbor_types");
 			for (int l = 0; l < neigh_max; l++) {
-				scanning_unit_cell[0] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][0];
-				scanning_unit_cell[1] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][1];
-				scanning_unit_cell[2] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][2];
-				//listtype = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][0];
-				listindex = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][0];
-				poly_index = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][1];
-				element_index = listindex;
+				scanning_unit_cell[0] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][0];
+		    scanning_unit_cell[1] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][1];
+		    scanning_unit_cell[2] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][2];
+		     //listtype = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][0];
+		     listindex = inner_quad_lists_index[iii][neigh_quad_counter][l][0];
+		    poly_index = inner_quad_lists_index[iii][neigh_quad_counter][l][1];
+		    element_index = listindex;
 		    element_index &= NEIGHMASK;
-				inner_neighbor_types[l] = node_types[element_index][poly_index];
-				neigh_list_cord(inner_neighbor_coords[l][0], inner_neighbor_coords[l][1], inner_neighbor_coords[l][2],
-					element_index, poly_index, scanning_unit_cell[0], scanning_unit_cell[1], scanning_unit_cell[2]);
-
-
+		    inner_neighbor_types[l] = node_types[element_index][poly_index];
+		    neigh_list_cord(inner_neighbor_coords[l][0], inner_neighbor_coords[l][1], inner_neighbor_coords[l][2],
+			  element_index, poly_index, scanning_unit_cell[0], scanning_unit_cell[1], scanning_unit_cell[2]);
 
 			}
 			
@@ -544,11 +543,11 @@ int distanceflag=0;
 				//portion that computes the energy and gradients of energy
 				if (quad_eflag) {
 
-					scanning_unit_cell[0] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][0];
-					scanning_unit_cell[1] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][1];
-					scanning_unit_cell[2] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][2];
-					poly_grad_scan = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][2];
-					listtype = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][0];
+				scanning_unit_cell[0] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][0];
+			  scanning_unit_cell[1] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][1];
+			  scanning_unit_cell[2] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][2];
+			  listindex = inner_quad_lists_index[iii][neigh_quad_counter][l][0];
+			  poly_grad_scan = inner_quad_lists_index[iii][neigh_quad_counter][l][1];
 
 
 					quadrature_energy += r6inv*(lj3[origin_type][scan_type] * r6inv - lj4[origin_type][scan_type])/2 -
@@ -567,7 +566,7 @@ int distanceflag=0;
 								shape_function(s, t, w, 2, js + 1)/2;
 							//listtype determines if the neighbor virtual atom belongs to the current element or a neighboring element
 							//derivative contributions are zero for jth virtual atoms in other elements that depend on other nodal variables
-							if (listtype == 0) {
+							if (listindex == iii) {
 								current_nodal_gradients[js][poly_grad_scan][jj] -= coefficients*force_contribution[jj] *
 									shape_function(scanning_unit_cell[0], scanning_unit_cell[1], scanning_unit_cell[2], 2, js + 1)/2;
 							}

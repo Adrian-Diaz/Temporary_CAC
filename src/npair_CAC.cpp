@@ -58,22 +58,22 @@ if (quad_allocated) {
 		for (int init = 0; init < old_atom_count; init++) {
 
 			if (old_atom_etype[init] == 0) {
-				memory->destroy(quad_list_container[init].list2ucell[0].cell_indexes);
-				memory->destroy(quad_list_container[init].list2ucell);
+				memory->destroy(quad_list_container[init][0]);
+				memory->sfree(quad_list_container[init]);
 				
 			}
 			else {
 
 				for (int neigh_loop = 0; neigh_loop < old_quad_count; neigh_loop++) {
-					memory->destroy(quad_list_container[init].list2ucell[neigh_loop].cell_indexes);
+					memory->destroy(quad_list_container[init][neigh_loop]);
 				}
-				memory->destroy(quad_list_container[init].list2ucell);
+				memory->sfree(quad_list_container[init]);
 				
 			
 			}
 		}
 
-		memory->destroy(quad_list_container);
+		memory->sfree(quad_list_container);
 		memory->destroy(neighbor_copy_index);
 
 	
@@ -255,16 +255,16 @@ for (int iquad = 0; iquad < quadrature_count; iquad++) {
 					expansion_count += 1;
 						for (int copy_count = 0; copy_count < neigh_index; copy_count++) {
 								
-							neighbor_copy_index[copy_count] = quad_list_container[i].list2ucell[iquad].cell_indexes[copy_count];
+							neighbor_copy_index[copy_count] = quad_list_container[i][iquad][copy_count];
 											
 						}
 
-						memory->destroy(quad_list_container[i].list2ucell[iquad].cell_indexes);
-						memory->create(quad_list_container[i].list2ucell[iquad].cell_indexes, 
+						memory->destroy(quad_list_container[i][iquad]);
+						memory->create(quad_list_container[i][iquad], 
 						maxneigh_quad + expansion_count*EXPAND, "NPair CAC:cell indexes expand");
 
 						for (int copy_count = 0; copy_count < neigh_index; copy_count++) {
-							quad_list_container[i].list2ucell[iquad].cell_indexes[copy_count] = neighbor_copy_index[copy_count];
+							quad_list_container[i][iquad][copy_count] = neighbor_copy_index[copy_count];
 						}
 
 						if (expansion_count > max_expansion_count) {
@@ -278,7 +278,7 @@ for (int iquad = 0; iquad < quadrature_count; iquad++) {
 	    current_quad_point[0]=current_element_quad_points[iquad][0];
 			current_quad_point[1]=current_element_quad_points[iquad][1];
 			current_quad_point[2]=current_element_quad_points[iquad][2];
-      neighptr = quad_list_container[i].list2ucell[iquad].cell_indexes;
+      neighptr = quad_list_container[i][iquad];
 			
 			if (neighbor_element_type != 0) {
 			if(CAC_decide_quad2element(j)) neighptr[n++] = j;;
@@ -362,7 +362,7 @@ void NPairCAC::compute_surface_depths(double &scalex, double &scaley, double &sc
 	int poly = current_poly_counter;
 	double unit_cell_mapped[3];
 	double rcut;
-	rcut = CAC_cut; 
+	rcut = CAC_cut - atom->CAC_skin; 
 	//flag determines the current element type and corresponding procedure to calculate parameters for 
 	//surface penetration depth to be used when computing force density with influences from neighboring
 	//elements
@@ -1061,37 +1061,37 @@ void NPairCAC::allocate_quad_neigh_list(int n1,int n2,int n3,int quad) {
 		for (int init = 0; init < old_atom_count; init++) {
 
 			if (old_atom_etype[init] == 0) {
-				memory->destroy(quad_list_container[init].list2ucell[0].cell_indexes);
-				memory->destroy(quad_list_container[init].list2ucell);
+				memory->destroy(quad_list_container[init][0]);
+				memory->sfree(quad_list_container[init]); 
 			
 				
 			}
 			else {
 				
 				for (int neigh_loop = 0; neigh_loop < old_quad_count; neigh_loop++) {
-					memory->destroy(quad_list_container[init].list2ucell[neigh_loop].cell_indexes);
+					memory->destroy(quad_list_container[init][neigh_loop]);
 				}
-				memory->destroy(quad_list_container[init].list2ucell);
+				memory->sfree(quad_list_container[init]);
 				
 			
 			}
 		}
 
-		memory->destroy(quad_list_container);
-		memory->destroy(neighbor_copy_index);
+		memory->sfree(quad_list_container);
+		memory->sfree(neighbor_copy_index);
 		
 	
 	}
 	//memory->create(quadrature_neighbor_list, atom->nlocal, quad_count*atom->maxpoly, MAXNEIGH2, "Pair CAC/LJ: quadrature_neighbor_lists");
 	
 	
-		memory->create(quad_list_container, atom->nlocal, "NPair CAC:quad_list_container");
+		quad_list_container= (int ***) memory->smalloc(atom->nlocal*sizeof(int **), "NPair CAC:quad_list_container");
 		for (int init = 0; init < atom->nlocal; init++) {
 			
 			if (element_type[init] == 0) {
 				quadrature_point_count+=1;
-				memory->create(quad_list_container[init].list2ucell, 1, "NPair CAC:list2ucell");
-				memory->create(quad_list_container[init].list2ucell[0].cell_indexes, maxneigh_quad, "NPair CAC:cell_indexes");
+				quad_list_container[init]= (int **) memory->smalloc(sizeof(int *), "NPair CAC:list2ucell");
+				quad_list_container[init][0]=memory->create(quad_list_container[init][0], maxneigh_quad, "NPair CAC:cell_indexes");
 				
 			}
 			else {
@@ -1102,10 +1102,10 @@ void NPairCAC::allocate_quad_neigh_list(int n1,int n2,int n3,int quad) {
 		    +2 * c3*quad*quad + 4 * c1*c2*quad + 4 * c3*c2*quad + 4 * c1*c3*quad
 		     + 8 * c1*c2*c3;
 				quadrature_point_count+=current_quad_count*poly_count[init];
-				memory->create(quad_list_container[init].list2ucell, max_quad_count*atom->maxpoly, "NPair CAC:list2ucell");
-			
+				
+			  quad_list_container[init]= (int **) memory->smalloc(max_quad_count*atom->maxpoly*sizeof(int *), "NPair CAC:list2ucell");
 				for (int neigh_loop = 0; neigh_loop < max_quad_count*atom->maxpoly; neigh_loop++) {
-					memory->create(quad_list_container[init].list2ucell[neigh_loop].cell_indexes, maxneigh_quad, "NPair CAC:cell_indexes");
+					quad_list_container[init][neigh_loop]=memory->create(quad_list_container[init][neigh_loop], maxneigh_quad, "NPair CAC:cell_indexes");
 				}
 			}
 		}
@@ -1149,23 +1149,23 @@ bigint NPairCAC::memory_usage()
 		for (int init = 0; init < old_atom_count; init++) {
 
 			if (old_atom_etype[init] == 0) {
-				bytes_used +=memory->usage(quad_list_container[init].list2ucell[0].cell_indexes, maxneigh_quad);
-				bytes_used +=memory->usage(quad_list_container[init].list2ucell,1);
+				bytes_used +=memory->usage(quad_list_container[init][0], maxneigh_quad);
+				//bytes_used +=memory->usage(quad_list_container[init],1);
 				
 			}
 			else {
 
 				for (int neigh_loop = 0; neigh_loop < old_quad_count; neigh_loop++) {
-					bytes_used +=memory->usage(quad_list_container[init].list2ucell[neigh_loop].cell_indexes, maxneigh_quad);
+					bytes_used +=memory->usage(quad_list_container[init][neigh_loop], maxneigh_quad);
 				}
-				bytes_used +=memory->usage(quad_list_container[init].list2ucell,1);
+				//bytes_used +=memory->usage(quad_list_container[init].list2ucell,1);
 				
 			
 			}
 		}
 
-		bytes_used +=memory->usage(quad_list_container,old_atom_count);
-		bytes_used +=memory->usage(neighbor_copy_index,maxneigh_quad);
+		//bytes_used +=memory->usage(quad_list_container,old_atom_count);
+		//bytes_used +=memory->usage(neighbor_copy_index,maxneigh_quad);
 
 	
     bytes_used +=memory->usage(current_element_quad_points,max_quad_count);

@@ -261,6 +261,7 @@ double PairCACBuck::init_one(int i, int j) {
 		if(atom->scale_search_range[i]>atom->max_search_range) atom->max_search_range=atom->scale_search_range[i];
 	}
 	
+	atom->CAC_skin=cutoff_skin;
 
 	MPI_Allreduce(&atom->scale_count,&atom->scale_count,1,MPI_INT,MPI_MAX,world);
 	MPI_Allreduce(&atom->max_search_range,&atom->max_search_range,1,MPI_DOUBLE,MPI_MAX,world);
@@ -472,7 +473,7 @@ int distanceflag=0;
 			int scan_type;
 			int element_index;
 			int *ilist, *jlist, *numneigh, **firstneigh;
-			int neigh_max = quad_list_container[iii].inner_quadrature_neighbor_count[neigh_quad_counter];
+			int neigh_max = inner_quad_lists_counts[iii][neigh_quad_counter];
 			int **node_types = atom->node_types;
 			ilist = list->ilist;
 			numneigh = list->numneigh;
@@ -484,19 +485,17 @@ int distanceflag=0;
 
 			memory->grow(inner_neighbor_types, neigh_max, "Pair_CAC_eam:inner_neighbor_types");
 			for (int l = 0; l < neigh_max; l++) {
-				scanning_unit_cell[0] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][0];
-				scanning_unit_cell[1] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][1];
-				scanning_unit_cell[2] = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_coords[l][2];
-				//listtype = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][0];
-				listindex = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][0];
-				poly_index = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][1];
-				element_index = listindex;
-		        element_index &= NEIGHMASK;
-				inner_neighbor_types[l] = node_types[element_index][poly_index];
-				neigh_list_cord(inner_neighbor_coords[l][0], inner_neighbor_coords[l][1], inner_neighbor_coords[l][2],
-					element_index, poly_index, scanning_unit_cell[0], scanning_unit_cell[1], scanning_unit_cell[2]);
-
-
+			scanning_unit_cell[0] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][0];
+		    scanning_unit_cell[1] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][1];
+		    scanning_unit_cell[2] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][2];
+		     //listtype = quad_list_container[iii].inner_list2ucell[neigh_quad_counter].cell_indexes[l][0];
+		     listindex = inner_quad_lists_index[iii][neigh_quad_counter][l][0];
+		    poly_index = inner_quad_lists_index[iii][neigh_quad_counter][l][1];
+		    element_index = listindex;
+		    element_index &= NEIGHMASK;
+		    inner_neighbor_types[l] = node_types[element_index][poly_index];
+		    neigh_list_cord(inner_neighbor_coords[l][0], inner_neighbor_coords[l][1], inner_neighbor_coords[l][2],
+			  element_index, poly_index, scanning_unit_cell[0], scanning_unit_cell[1], scanning_unit_cell[2]);
 
 			}
 			

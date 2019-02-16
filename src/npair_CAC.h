@@ -65,17 +65,9 @@ protected:
 	int surface_counts_max_old[3];
 	int *neighbor_copy_index;
   int quadrature_counter;
-  
-  typedef struct neighbor_data { 
-	int *cell_indexes;
-	} neighbor_data;
 
-	typedef struct neighbor_collection {
-		neighbor_data *list2ucell;
-		int *quadrature_neighbor_count;
-	} neighbor_collection;
+  int ***quad_list_container;
   
-  neighbor_collection *quad_list_container;
   void allocate_quad_neigh_list(int,int,int,int);
   int compute_quad_points(int);
   void allocate_surface_counts();
