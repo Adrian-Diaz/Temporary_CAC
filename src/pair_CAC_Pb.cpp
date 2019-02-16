@@ -31,8 +31,8 @@
 #include "domain.h"
 #include "asa_user.h"
 
-#define MAXNEIGH1  50
-#define MAXNEIGH2  460
+#define MAXNEIGH1  500
+#define MAXNEIGH2  400
 //#include "math_extra.h"
 
 
@@ -509,6 +509,7 @@ int distanceflag=0;
 
 			memory->grow(inner_neighbor_types, neigh_max, "Pair_CAC_pb:inner_neighbor_types");
 			memory->grow(inner_neighbor_charges, neigh_max, "Pair_CAC_pb:inner_neighbor_types");
+
 			for (int l = 0; l < neigh_max; l++) {
             scanning_unit_cell[0] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][0];
 		    scanning_unit_cell[1] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][1];
@@ -519,6 +520,7 @@ int distanceflag=0;
 		    element_index = listindex;
 		    element_index &= NEIGHMASK;
 		    inner_neighbor_types[l] = node_types[element_index][poly_index];
+			inner_neighbor_charges[l] = node_charges[element_index][poly_index];
 		    neigh_list_cord(inner_neighbor_coords[l][0], inner_neighbor_coords[l][1], inner_neighbor_coords[l][2],
 			element_index, poly_index, scanning_unit_cell[0], scanning_unit_cell[1], scanning_unit_cell[2]);
 			}

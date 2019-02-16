@@ -253,26 +253,8 @@ for (int iquad = 0; iquad < quadrature_count; iquad++) {
 			neigh_index=n;
       if (neigh_index == maxneigh_quad + expansion_count*EXPAND) {
 					expansion_count += 1;
-						for (int copy_count = 0; copy_count < neigh_index; copy_count++) {
-								
-							neighbor_copy_index[copy_count] = quad_list_container[i][iquad][copy_count];
-											
-						}
-
-						memory->destroy(quad_list_container[i][iquad]);
-						memory->create(quad_list_container[i][iquad], 
+						memory->grow(quad_list_container[i][iquad], 
 						maxneigh_quad + expansion_count*EXPAND, "NPair CAC:cell indexes expand");
-
-						for (int copy_count = 0; copy_count < neigh_index; copy_count++) {
-							quad_list_container[i][iquad][copy_count] = neighbor_copy_index[copy_count];
-						}
-
-
-						if (expansion_count > max_expansion_count) {
-							max_expansion_count = expansion_count;
-							memory->destroy(neighbor_copy_index);
-							memory->create(neighbor_copy_index, maxneigh_quad + max_expansion_count*EXPAND, "Pair CAC:copy_index");						
-						}
 
 			}
 			
