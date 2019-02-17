@@ -13,21 +13,21 @@
 
 #ifdef DUMP_CLASS
 
-DumpStyle(CAC_kinetic,DumpCAC_Kinetic)
+DumpStyle(CACinitialnodes,DumpCACInitialNodes)
 
 #else
 
-#ifndef LMP_DUMP_CACKINETIC_H
-#define LMP_DUMP_CACKINETIC_H
+#ifndef LMP_DUMP_CACINITIALNODES_H
+#define LMP_DUMP_CACINITIALNODES_H
 
 #include "dump.h"
 
 namespace LAMMPS_NS {
 
-class DumpCAC_Kinetic : public Dump {
+class DumpCACInitialNodes : public Dump {
  public:
-	 DumpCAC_Kinetic(class LAMMPS *, int, char**);
-  virtual ~DumpCAC_Kinetic();
+  DumpCACInitialNodes(class LAMMPS *, int, char**);
+  virtual ~DumpCACInitialNodes();
 
  protected:
   int ntypes;
@@ -43,7 +43,7 @@ class DumpCAC_Kinetic : public Dump {
   int count();
   int modify_param(int, char **);
 
-  typedef void (DumpCAC_Kinetic::*FnPtrWrite)(int, double *);
+  typedef void (DumpCACInitialNodes::*FnPtrWrite)(int, double *);
   FnPtrWrite write_choice;              // ptr to write data functions
   void write_string(int, double *);
   void write_lines(int, double *);
