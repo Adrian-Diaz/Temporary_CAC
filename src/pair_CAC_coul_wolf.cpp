@@ -435,6 +435,7 @@ int distanceflag=0;
 		    element_index = listindex;
 		    element_index &= NEIGHMASK;
 		    inner_neighbor_types[l] = node_types[element_index][poly_index];
+			inner_neighbor_charges[l] = node_charges[element_index][poly_index];
 		    neigh_list_cord(inner_neighbor_coords[l][0], inner_neighbor_coords[l][1], inner_neighbor_coords[l][2],
 			  element_index, poly_index, scanning_unit_cell[0], scanning_unit_cell[1], scanning_unit_cell[2]);
 

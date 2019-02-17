@@ -749,7 +749,7 @@ int distanceflag=0;
 		poly_index = inner_quad_lists_index[iii][neigh_quad_counter][l][1];
 		element_index = listindex;
 		element_index &= NEIGHMASK;
-		inner_neighbor_types[l] = node_types[element_index][poly_index];
+		inner_neighbor_types[l] = map[node_types[element_index][poly_index]];
 		neigh_list_cord(inner_neighbor_coords[l][0], inner_neighbor_coords[l][1], inner_neighbor_coords[l][2],
 			element_index, poly_index, scanning_unit_cell[0], scanning_unit_cell[1], scanning_unit_cell[2]);
 	}
@@ -762,7 +762,7 @@ int distanceflag=0;
 		poly_index = outer_quad_lists_index[iii][neigh_quad_counter][l][1];
 		element_index = listindex;
 		element_index &= NEIGHMASK;
-		outer_neighbor_types[l] = node_types[element_index][poly_index];
+		outer_neighbor_types[l] = map[node_types[element_index][poly_index]];
 		neigh_list_cord(outer_neighbor_coords[l][0], outer_neighbor_coords[l][1], outer_neighbor_coords[l][2],
 			element_index, poly_index, scanning_unit_cell[0], scanning_unit_cell[1], scanning_unit_cell[2]);
 	}
