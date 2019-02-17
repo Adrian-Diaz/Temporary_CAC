@@ -1262,7 +1262,7 @@ int AtomVecCAC::pack_restart(int i, double *buf)
   buf[m++] = ubuf(poly_count[i]).d;
   current_node_count=nodes_count_list[element_type[i]];
   for (int type_map = 0; type_map < poly_count[i]; type_map++) {
-	  buf[m++] = node_types[i][type_map];
+	  buf[m++] = ubuf(node_types[i][type_map]).d;
   }
 
   for (int nodecount = 0; nodecount< current_node_count; nodecount++) {
@@ -1330,7 +1330,7 @@ int AtomVecCAC::unpack_restart(double *buf)
   current_node_count=nodes_count_list[element_type[nlocal]];
 
   for (int type_map = 0; type_map < poly_count[nlocal]; type_map++) {
-	  node_types[nlocal][type_map] = buf[m++];
+	  node_types[nlocal][type_map] = (int) ubuf(buf[m++]).i;
   }
   for (int nodecount = 0; nodecount < current_node_count; nodecount++) {
 	  for (int poly_index = 0; poly_index < poly_count[nlocal]; poly_index++)
