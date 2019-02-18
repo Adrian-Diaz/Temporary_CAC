@@ -93,6 +93,20 @@ if(narg==3){
 		atom->nodes_per_element_list[1] = 8;
 	}	
 
+
+    //place search range initialization here now for convenience
+
+		atom->initial_size=10;
+		 memory->grow(atom->scale_search_range, atom->initial_size, "atom:scale_search_range");
+		memory->grow(atom->scale_list, atom->initial_size, "atom:scale_search_range");
+		atom->scale_search_range[0]=0;
+		atom->scale_list[0]=1;
+		for(int i=1; i<atom->initial_size; i++){ 
+			atom->scale_search_range[i]=0;
+			atom->scale_list[i]=0;
+			}
+		atom->scale_count=1;
+
 }
 
 void AtomVecCAC_Charge::init()
@@ -104,6 +118,7 @@ void AtomVecCAC_Charge::init()
 
   if (lmp->kokkos != NULL && !kokkosable)
     error->all(FLERR,"KOKKOS package requires a kokkos enabled atom_style");
+
 
 }
 
