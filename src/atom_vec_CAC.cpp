@@ -90,6 +90,19 @@ void AtomVecCAC::process_args(int narg, char **arg)
 		atom->nodes_per_element_list[0] = 1;
 		atom->nodes_per_element_list[1] = 8;
 	}	
+
+	//place search range initialization here now for convenience
+
+	atom->initial_size=10;
+		 memory->grow(atom->scale_search_range, atom->initial_size, "atom:scale_search_range");
+		memory->grow(atom->scale_list, atom->initial_size, "atom:scale_search_range");
+		atom->scale_search_range[0]=0;
+		atom->scale_list[0]=1;
+		for(int i=1; i<atom->initial_size; i++){ 
+			atom->scale_search_range[i]=0;
+			atom->scale_list[i]=0;
+			}
+		atom->scale_count=1;
 }
 
 /* ----------------------------------------------------------------------
