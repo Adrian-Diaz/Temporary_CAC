@@ -84,6 +84,8 @@ if(narg==3){
 
 	comm->maxexchange_atom=size_border;	
 
+  
+	//initialize node counts associated with each element type
 
 	if(element_type_count==0){
 		element_type_count = 2; //increase if new types added
