@@ -83,7 +83,8 @@ if(narg==3){
   xcol_data = 4;
 
 	comm->maxexchange_atom=size_border;	
-
+  
+	//initialize node counts associated with each element type
 	if(element_type_count==0){
 		element_type_count = 2; //increase if new types added
 		memory->grow(atom->nodes_per_element_list, element_type_count, "atom:nodes_per_element_list");
@@ -104,6 +105,7 @@ if(narg==3){
 			atom->scale_list[i]=0;
 			}
 		atom->scale_count=1;
+
 }
 
 void AtomVecCAC_Charge::init()
