@@ -8,6 +8,7 @@
 #include "displace_atoms.h"
 #include "info.h"
 #include "minimize.h"
+#include "neb_CAC.h"
 #include "read_data.h"
 #include "read_dump.h"
 #include "read_restart.h"

@@ -31,6 +31,7 @@
 #include "fix_minimize.h"
 #include "fix_momentum.h"
 #include "fix_move.h"
+#include "fix_neb_CAC.h"
 #include "fix_neigh_history.h"
 #include "fix_nph.h"
 #include "fix_nph_sphere.h"
