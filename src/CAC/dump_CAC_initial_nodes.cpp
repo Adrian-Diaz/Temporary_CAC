@@ -143,6 +143,17 @@ int DumpCACInitialNodes::count()
 	int *poly_count = atom->poly_count;
   int *nodes_per_element_list = atom->nodes_per_element_list;
 	int m = 0;
+
+  //compute number of nodes in total system
+  int local_node_count=0;
+   total_node_count=0;
+    
+    for (int i=0; i<atom->nlocal; i++){
+       local_node_count+=nodes_per_element_list[element_type[i]];
+    }
+    MPI_Allreduce(&local_node_count,&total_node_count,1,MPI_INT,MPI_SUM,world);
+
+
 	for (int i = 0; i < nlocal; i++)
 	{
 		if (update->ntimestep - ptimestep == 0) {
@@ -168,7 +179,7 @@ zone t="load step 0",n=    3200 e=     400 datapacking=point,zonetype=febric*/
 	//update->ntimestep, nodes_per_element*atom->nlocal, atom->nlocal);
 	fprintf(fp, " t= " BIGINT_FORMAT " n= " BIGINT_FORMAT
 	" e= " BIGINT_FORMAT " Q4 " "\n",
-	update->ntimestep, nodes_per_element*atom->natoms, atom->natoms);
+	update->ntimestep, (bigint)total_node_count, atom->natoms);
     
   }
 }
@@ -183,6 +194,7 @@ void DumpCACInitialNodes::pack(tagint *ids)
   int *type = atom->type;
   int *mask = atom->mask;
   double ****initial_nodal_positions = atom->initial_nodal_positions;
+  int *nodes_per_element_list = atom->nodes_per_element_list;
   //double ****initial_nodal_positions = atom->initial_nodal_positions;
   int nlocal = atom->nlocal;
   int *poly_count = atom->poly_count;
@@ -199,7 +211,7 @@ void DumpCACInitialNodes::pack(tagint *ids)
 		  buf[m++] = double(element_scale[i][1]);
 		  buf[m++] = double(element_scale[i][2]);
 
-	  for (int j = 0; j < nodes_per_element; j++) {
+	  for (int j = 0; j < nodes_per_element_list[element_type[i]]; j++) {
 		  for (int k = 0; k < poly_count[i]; k++) {
 			  buf[m++] = double(j + 1);
 			  buf[m++] = double(k + 1);
