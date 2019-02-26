@@ -178,6 +178,12 @@ void ComputeCACQuadCount::compute_surface_depths(double &scalex, double &scaley,
 		dw_surf = 1;
 
 	}
+    if (atom->one_layer_flag) {
+		ds_surf = unit_cell_mapped[0];
+		dt_surf = unit_cell_mapped[1];
+		dw_surf = unit_cell_mapped[2];
+	}
+
 	scalex = 1 - ds_surf;
 	scaley = 1 - dt_surf;
 	scalez = 1 - dw_surf;
