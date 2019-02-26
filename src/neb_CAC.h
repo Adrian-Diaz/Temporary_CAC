@@ -49,7 +49,7 @@ class NEBCAC : protected Pointers {
   int nevery;                  // output interval
   char *infile;                // name of file containing final state
 
-  class FixNEB *fneb;
+  class FixNEBCAC *fneb;
   int numall;                  // per-replica dimension of array all
   double **all;                // PE,plen,nlen,gradvnorm from each replica
   double *rdist;               // normalize reaction distance, 0 to 1

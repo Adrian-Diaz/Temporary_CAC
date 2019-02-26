@@ -57,7 +57,6 @@ FixNEBCAC::FixNEBCAC(LAMMPS *lmp, int narg, char **arg) :
   xsendallnode(NULL), xrecvallnode(NULL), fsendallnode(NULL), frecvallnode(NULL),
   tagsendallnode(NULL), tagrecvallnode(NULL)
 {
-
   if (narg < 4) error->all(FLERR,"Illegal fix neb command");
 
   kspring = force->numeric(FLERR,arg[3]);
@@ -150,6 +149,11 @@ FixNEBCAC::FixNEBCAC(LAMMPS *lmp, int narg, char **arg) :
   }
   delete [] iroots;
 
+  // Debug block
+  // volatile int i = 0;
+  // printf("PID %d on %i ready for attach\n", comm->me, uworld);
+  // while (i == 0){}
+
   // create a new compute pe style
   // id = fix-ID + pe, compute group = all
 
@@ -166,7 +170,6 @@ FixNEBCAC::FixNEBCAC(LAMMPS *lmp, int narg, char **arg) :
   delete [] newarg;
 
   // initialize local storage
-
   maxlocal = -1;
   ntotal = -1;
 }
@@ -239,6 +242,7 @@ int FixNEBCAC::setmask()
 
 void FixNEBCAC::init()
 {
+
   int icompute = modify->find_compute(id_pe);
   if (icompute < 0)
     error->all(FLERR,"Potential energy ID for fix neb does not exist");
@@ -262,24 +266,30 @@ void FixNEBCAC::init()
   else if (nreplica == nprocs_universe) cmode = SINGLE_PROC_MAP;
   else cmode = MULTI_PROC;
 
+  printf("Mode = %i\n", cmode);
+
   // ntotal = total # of atoms in system, NEB atoms or not
 
   if (atom->natoms > MAXSMALLINT) error->all(FLERR,"Too many atoms for NEB");
   ntotal = atom->natoms;
-  ntotalnode = atom->maxpoly*atom->nodes_per_element * atom->natoms;
 
   if (atom->nmax > maxlocal) reallocate();
 
   //TODO: MULTI_PROC mode requires changes here.
   if (MULTI_PROC && counts == NULL) {
-    memory->create(xsendall,ntotal,3,"neb:xsendall");
-    memory->create(xrecvall,ntotal,3,"neb:xrecvall");
-    memory->create(fsendall,ntotal,3,"neb:fsendall");
-    memory->create(frecvall,ntotal,3,"neb:frecvall");
-    memory->create(tagsendall,ntotal,"neb:tagsendall");
-    memory->create(tagrecvall,ntotal,"neb:tagrecvall");
-    memory->create(counts,nprocs,"neb:counts");
-    memory->create(displacements,nprocs,"neb:displacements");
+    memory->create(xsendall,ntotal,3,"neb_CAC:xsendall");
+    memory->create(xrecvall,ntotal,3,"neb_CAC:xrecvall");
+    memory->create(fsendall,ntotal,3,"neb_CAC:fsendall");
+    memory->create(frecvall,ntotal,3,"neb_CAC:frecvall"); 
+    memory->create(tagsendall,ntotal,"neb_CAC:tagsendall");
+    memory->create(tagrecvall,ntotal,"neb_CAC:tagrecvall");
+    memory->create(counts,nprocs,"neb_CAC:counts");
+    memory->create(displacements,nprocs,"neb_CAC:displacements");
+    memory->create(xsendallnode, ntotal, atom-> nodes_per_element, atom->maxpoly,3, "neb_CAC:xsendallnode");
+    memory->create(xrecvallnode, ntotal, atom-> nodes_per_element, atom->maxpoly,3, "neb_CAC:xrecvallnode");
+    memory->create(fsendallnode, ntotal, atom-> nodes_per_element, atom->maxpoly,3, "neb_CAC:fsendallnode");
+    memory->create(frecvallnode, ntotal, atom-> nodes_per_element, atom->maxpoly,3, "neb_CAC:frecvallnode");
+
   }
 }
 
@@ -677,7 +687,7 @@ void FixNEBCAC::min_post_force(int vflag)
 void FixNEBCAC::inter_replica_comm()
 {
   int i,m;
-  MPI_Request request;
+  MPI_Request request, requestn;
   MPI_Request requests[2];
   MPI_Status statuses[2];
 
@@ -687,8 +697,8 @@ void FixNEBCAC::inter_replica_comm()
 
   double **x = atom->x;
   double **f = atom->f;
-  double **x_node = atom->nodal_positions[0][0];
-  double **f_node = atom->nodal_forces[0][0];
+  double **xnode = atom->nodal_positions[0][0];
+  double **fnode = atom->nodal_forces[0][0];
   tagint *tag = atom->tag;
   int *mask = atom->mask;
   int nlocal = atom->nlocal;
@@ -707,23 +717,42 @@ void FixNEBCAC::inter_replica_comm()
   if (cmode == SINGLE_PROC_DIRECT) {
     if (ireplica > 0)
       MPI_Irecv(xprev[0],3*nlocal,MPI_DOUBLE,procprev,0,uworld,&request);
+      MPI_Irecv(xprevnode[0], 3*nlocalnode, MPI_DOUBLE, procprev, 0, uworld, &requestn);
     if (ireplica < nreplica-1)
       MPI_Send(x[0],3*nlocal,MPI_DOUBLE,procnext,0,uworld);
+      MPI_Send(xnode[0], 3*nlocalnode, MPI_DOUBLE, procnext, 0, uworld);
+
     if (ireplica > 0) MPI_Wait(&request,MPI_STATUS_IGNORE);
+    if (ireplica > 0) MPI_Wait(&requestn,MPI_STATUS_IGNORE);
+
     if (ireplica < nreplica-1)
       MPI_Irecv(xnext[0],3*nlocal,MPI_DOUBLE,procnext,0,uworld,&request);
+      MPI_Irecv(xnextnode[0],3*nlocalnode,MPI_DOUBLE,procnext,0,uworld,&requestn);
+
     if (ireplica > 0)
       MPI_Send(x[0],3*nlocal,MPI_DOUBLE,procprev,0,uworld);
-    if (ireplica < nreplica-1) MPI_Wait(&request,MPI_STATUS_IGNORE);
+      MPI_Send(xnode[0],3*nlocalnode,MPI_DOUBLE,procprev,0,uworld);
+
+    if (ireplica < nreplica-1) { 
+       MPI_Wait(&request,MPI_STATUS_IGNORE);
+       MPI_Wait(&requestn,MPI_STATUS_IGNORE);
+    }
 
     if (ireplica < nreplica-1)
       MPI_Irecv(fnext[0],3*nlocal,MPI_DOUBLE,procnext,0,uworld,&request);
+      MPI_Irecv(fnextnode[0],3*nlocalnode,MPI_DOUBLE,procnext,0,uworld,&requestn);
+      
     if (ireplica > 0)
       MPI_Send(f[0],3*nlocal,MPI_DOUBLE,procprev,0,uworld);
-    if (ireplica < nreplica-1) MPI_Wait(&request,MPI_STATUS_IGNORE);
-
+      MPI_Send(fnode[0],3*nlocalnode,MPI_DOUBLE,procprev,0,uworld);
+      
+    if (ireplica < nreplica-1) {
+      MPI_Wait(&request,MPI_STATUS_IGNORE);
+      MPI_Wait(&requestn,MPI_STATUS_IGNORE);
+    }
     return;
   }
+
 
   // single proc per replica
   // but only some atoms are NEB atoms or atom sorting is enabled
@@ -907,6 +936,20 @@ void FixNEBCAC::reallocate()
   memory->create(fnext,maxlocal,3,"neb:fnext");
   memory->create(springF,maxlocal,3,"neb:springF");
 
+  //Allocate extra arrays for CAC data structures
+  memory->destroy(xprevnode);
+  memory->destroy(xnextnode);
+  memory->destroy(tangentnode);
+  memory->destroy(fnextnode);
+  memory->destroy(springFnode);
+
+  memory->create(xprevnode, maxlocal, atom->nodes_per_element, atom->maxpoly,3, "neb_CAC:xprevnode");
+  memory->create(xnextnode, maxlocal, atom->nodes_per_element, atom->maxpoly,3, "neb_CAC:xnextvnode");
+  memory->create(fnextnode, maxlocal, atom->nodes_per_element, atom->maxpoly,3, "neb_CAC:fnextvnode");
+  memory->create(tangentnode, maxlocal, atom->nodes_per_element, atom->maxpoly,3, "neb_CAC:tangentnode");
+  memory->create(springFnode, maxlocal, atom->nodes_per_element, atom->maxpoly,3, "neb_CAC:springFnode");
+
+
   if (cmode != SINGLE_PROC_DIRECT) {
     memory->destroy(xsend);
     memory->destroy(fsend);
@@ -920,6 +963,7 @@ void FixNEBCAC::reallocate()
     memory->create(frecv,maxlocal,3,"neb:frecv");
     memory->create(tagsend,maxlocal,"neb:tagsend");
     memory->create(tagrecv,maxlocal,"neb:tagrecv");
+    // TODO: add more arrays for non-single proc mode
   }
 
   if (NEBLongRange) {

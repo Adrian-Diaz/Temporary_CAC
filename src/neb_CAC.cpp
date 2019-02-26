@@ -29,7 +29,7 @@
 #include "min.h"
 #include "modify.h"
 #include "fix.h"
-#include "fix_neb.h"
+#include "fix_neb_CAC.h"
 #include "output.h"
 #include "thermo.h"
 #include "finish.h"
@@ -162,6 +162,8 @@ void NEBCAC::command(int narg, char **arg)
   verbose=false;
   if (strcmp(arg[narg-1],"verbose") == 0) verbose=true;
   // run the NEB calculation
+  
+  printf("Iniitalizing NEB run\n");
 
   run();
 }
@@ -181,10 +183,10 @@ void NEBCAC::run()
 
   int ineb;
   for (ineb = 0; ineb < modify->nfix; ineb++)
-    if (strcmp(modify->fix[ineb]->style,"neb") == 0) break;
+    if (strcmp(modify->fix[ineb]->style,"neb_CAC") == 0) break;
   if (ineb == modify->nfix) error->all(FLERR,"NEB requires use of fix neb");
 
-  fneb = (FixNEB *) modify->fix[ineb];
+  fneb = (FixNEBCAC *) modify->fix[ineb];
   if (verbose) numall =7;
   else  numall = 4;
   memory->create(all,nreplica,numall,"neb:all");
@@ -198,6 +200,8 @@ void NEBCAC::run()
   update->multireplica = 1;
 
   lmp->init();
+
+  printf("Lmp initialized\n");
 
   if (update->minimize->searchflag)
     error->all(FLERR,"NEB requires damped dynamics minimizer");
@@ -256,6 +260,8 @@ void NEBCAC::run()
 
   timer->init();
   timer->barrier_start();
+
+  printf("Begin min\n");
 
   while (update->minimize->niter < n1steps) {
     update->minimize->run(nevery);
