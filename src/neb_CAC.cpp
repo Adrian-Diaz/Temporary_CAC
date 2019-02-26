@@ -163,7 +163,6 @@ void NEBCAC::command(int narg, char **arg)
   if (strcmp(arg[narg-1],"verbose") == 0) verbose=true;
   // run the NEB calculation
   
-  printf("Iniitalizing NEB run\n");
 
   run();
 }
@@ -200,8 +199,6 @@ void NEBCAC::run()
   update->multireplica = 1;
 
   lmp->init();
-
-  printf("Lmp initialized\n");
 
   if (update->minimize->searchflag)
     error->all(FLERR,"NEB requires damped dynamics minimizer");
