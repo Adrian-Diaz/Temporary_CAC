@@ -312,6 +312,7 @@ void FixNEBCAC::min_post_force(int vflag)
   double delxp,delyp,delzp,delxn,delyn,delzn;
   double vIni=0.0;
 
+
   vprev = vnext = veng = pe->compute_scalar();
 
   if (ireplica < nreplica-1 && me == 0)
@@ -687,7 +688,8 @@ void FixNEBCAC::min_post_force(int vflag)
 void FixNEBCAC::inter_replica_comm()
 {
   int i,m;
-  MPI_Request request, requestn;
+  MPI_Request request;
+  MPI_Request requestn;
   MPI_Request requests[2];
   MPI_Status statuses[2];
 
@@ -717,7 +719,7 @@ void FixNEBCAC::inter_replica_comm()
   if (cmode == SINGLE_PROC_DIRECT) {
     if (ireplica > 0)
       MPI_Irecv(xprev[0],3*nlocal,MPI_DOUBLE,procprev,0,uworld,&request);
-      MPI_Irecv(xprevnode[0], 3*nlocalnode, MPI_DOUBLE, procprev, 0, uworld, &requestn);
+      MPI_Irecv(**xprevnode[0], 3*nlocalnode, MPI_DOUBLE, procprev, 0, uworld, &requestn);
     if (ireplica < nreplica-1)
       MPI_Send(x[0],3*nlocal,MPI_DOUBLE,procnext,0,uworld);
       MPI_Send(xnode[0], 3*nlocalnode, MPI_DOUBLE, procnext, 0, uworld);
@@ -727,7 +729,7 @@ void FixNEBCAC::inter_replica_comm()
 
     if (ireplica < nreplica-1)
       MPI_Irecv(xnext[0],3*nlocal,MPI_DOUBLE,procnext,0,uworld,&request);
-      MPI_Irecv(xnextnode[0],3*nlocalnode,MPI_DOUBLE,procnext,0,uworld,&requestn);
+      MPI_Irecv(**xnextnode[0],3*nlocalnode,MPI_DOUBLE,procnext,0,uworld,&requestn);
 
     if (ireplica > 0)
       MPI_Send(x[0],3*nlocal,MPI_DOUBLE,procprev,0,uworld);
@@ -740,7 +742,7 @@ void FixNEBCAC::inter_replica_comm()
 
     if (ireplica < nreplica-1)
       MPI_Irecv(fnext[0],3*nlocal,MPI_DOUBLE,procnext,0,uworld,&request);
-      MPI_Irecv(fnextnode[0],3*nlocalnode,MPI_DOUBLE,procnext,0,uworld,&requestn);
+      MPI_Irecv(**fnextnode[0],3*nlocalnode,MPI_DOUBLE,procnext,0,uworld,&requestn);
       
     if (ireplica > 0)
       MPI_Send(f[0],3*nlocal,MPI_DOUBLE,procprev,0,uworld);
@@ -930,11 +932,11 @@ void FixNEBCAC::reallocate()
   memory->destroy(fnext);
   memory->destroy(springF);
 
-  memory->create(xprev,maxlocal,3,"neb:xprev");
-  memory->create(xnext,maxlocal,3,"neb:xnext");
-  memory->create(tangent,maxlocal,3,"neb:tangent");
-  memory->create(fnext,maxlocal,3,"neb:fnext");
-  memory->create(springF,maxlocal,3,"neb:springF");
+  memory->create(xprev,maxlocal,3,"neb_CAC:xprev");
+  memory->create(xnext,maxlocal,3,"neb_CAC:xnext");
+  memory->create(tangent,maxlocal,3,"neb_CAC:tangent");
+  memory->create(fnext,maxlocal,3,"neb_CAC:fnext");
+  memory->create(springF,maxlocal,3,"neb_CAC:springF");
 
   //Allocate extra arrays for CAC data structures
   memory->destroy(xprevnode);

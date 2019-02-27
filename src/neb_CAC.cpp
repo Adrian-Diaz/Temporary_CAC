@@ -183,7 +183,7 @@ void NEBCAC::run()
   int ineb;
   for (ineb = 0; ineb < modify->nfix; ineb++)
     if (strcmp(modify->fix[ineb]->style,"neb_CAC") == 0) break;
-  if (ineb == modify->nfix) error->all(FLERR,"NEB requires use of fix neb");
+  if (ineb == modify->nfix) error->all(FLERR,"CAC-NEB requires use of fix neb_CAC");
 
   fneb = (FixNEBCAC *) modify->fix[ineb];
   if (verbose) numall =7;
@@ -257,8 +257,6 @@ void NEBCAC::run()
 
   timer->init();
   timer->barrier_start();
-
-  printf("Begin min\n");
 
   while (update->minimize->niter < n1steps) {
     update->minimize->run(nevery);
@@ -594,6 +592,7 @@ void NEBCAC::print_status()
     MPI_Allgather(&fnorminf,1,MPI_DOUBLE,&fmaxatomInRepl[0],1,MPI_DOUBLE,roots);
   }
 
+
   double one[numall];
   one[0] = fneb->veng;
   one[1] = fneb->plen;
@@ -647,6 +646,8 @@ void NEBCAC::print_status()
     ebf = all[irep][0]-all[0][0];
     ebr = all[irep][0]-all[nreplica-1][0];
   }
+
+  printf("I am proc: %d\n", me_universe);
 
   if (me_universe == 0) {
     const double todeg=180.0/MY_PI;
