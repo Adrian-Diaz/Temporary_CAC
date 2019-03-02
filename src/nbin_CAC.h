@@ -57,6 +57,7 @@ class NBinCAC : public NBin {
   double *quadrature_weights;
   double *quadrature_abcissae;
   int quad_rule_initialized;
+  int setup_called;
   
   virtual int quad2bins(double *quad_position);
   virtual int element2bins(int element_index);

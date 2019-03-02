@@ -53,6 +53,7 @@ NBinCAC::NBinCAC(LAMMPS *lmp) : NBin(lmp) {
   surface_counts_max_old[0] = 0;
   surface_counts_max_old[1] = 0;
   surface_counts_max_old[2] = 0;
+	setup_called=0;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -76,6 +77,8 @@ NBinCAC::~NBinCAC() {
 
 void NBinCAC::bin_atoms_setup(int nall)
 {
+	if(!setup_called)
+	setup_bins(1);
   int *element_type = atom->element_type;
 	int *poly_count = atom->poly_count;
   int **element_scale = atom->element_scale;
@@ -89,34 +92,40 @@ void NBinCAC::bin_atoms_setup(int nall)
   // binhead = per-bin vector, mbins in length
   // add 1 bin for USER-INTEL package
   
-  if (mbins > maxbin) {
+ if (mbins > maxbin) {
     //compute maximum expansion count used in previous allocations
-    for (int init = 0; init < maxbin; init++){
-      if(bin_expansion_counts[init]>max_bin_expansion_count) max_bin_expansion_count=bin_expansion_counts[init];
-    }
     
-    if(first_alloc){
+    
+    if(!first_alloc){
+		first_alloc=1;
+		memory->grow(bin_expansion_counts,mbins,"neigh:bin_ncontent");
+		  for (int init = 0; init < mbins; init++){
+      bin_expansion_counts[init]=max_bin_expansion_count;
+    }
     bin_content= (int **) memory->smalloc(mbins*sizeof(int *), "bin_CAC:bin_content");
     for (int init = 0; init < mbins; init++) 
     memory->create(bin_content[init],MAXBINCONTENT,"neigh:bin_content");
     }
     else{
-    first_alloc=1;
+		for (int init = 0; init < maxbin; init++){
+      if(bin_expansion_counts[init]>max_bin_expansion_count) max_bin_expansion_count=bin_expansion_counts[init];
+    }
     bin_content= (int **) memory->srealloc(bin_content,mbins*sizeof(int *), "bin_CAC:bin_content");
     for (int init = 0; init < mbins; init++){
     if(init>=maxbin) bin_content[init]=NULL;  
     memory->grow(bin_content[init],MAXBINCONTENT+max_bin_expansion_count*EXPAND,"neigh:bin_content");
     }
+    memory->grow(bin_expansion_counts,mbins,"neigh:bin_ncontent");
+		for (int init = 0; init < mbins; init++)
+      bin_expansion_counts[init]=max_bin_expansion_count;
+     
     }
     maxbin = mbins;
     memory->grow(bin_ncontent,maxbin,"neigh:bin_ncontent");
-    memory->grow(bin_expansion_counts,maxbin,"neigh:bin_ncontent");
+   
     //initialize number of times bin memory sizes have been expanded
     
   }
-  for (int init = 0; init < maxbin; init++){
-      bin_expansion_counts[init]=max_bin_expansion_count;
-    }
 
   // bins and atom2bin = per-atom vectors
   // for both local and ghost atoms
@@ -207,6 +216,7 @@ void NBinCAC::bin_atoms_setup(int nall)
 			}
 		}
     memory->grow(quad2bin,quadrature_point_count,"NBinCAC:quad2bin");
+		setup_called=0;
 }
 
 /* ----------------------------------------------------------------------
@@ -255,7 +265,9 @@ void NBinCAC::setup_bins(int style)
   double CAC_skin= atom->CAC_skin;
   CAC_cut=CAC_cut+CAC_skin;
 	int *nodes_per_element_list = atom->nodes_per_element_list;
-
+	double max_search_range=atom->max_search_range;
+	double cut_max=neighbor->cutneighmax;
+  setup_called=1;
   //expand sub-box sizes to contain all element bounding boxes
 	//in general initial box wont since only x, element centroid, must lie 
 	//inside box for lammps comms
@@ -310,12 +322,12 @@ void NBinCAC::setup_bins(int style)
 	}
 	}
 		
-    bsubboxlo[0] -= cutghost[0];
-    bsubboxlo[1] -= cutghost[1];
-    bsubboxlo[2] -= cutghost[2];
-    bsubboxhi[0] += cutghost[0];
-    bsubboxhi[1] += cutghost[1];
-    bsubboxhi[2] += cutghost[2];
+    bsubboxlo[0] -= max_search_range+cutghost[0];
+    bsubboxlo[1] -= max_search_range+cutghost[1];
+    bsubboxlo[2] -= max_search_range+cutghost[2];
+    bsubboxhi[0] += max_search_range+cutghost[0];
+    bsubboxhi[1] += max_search_range+cutghost[1];
+    bsubboxhi[2] += max_search_range+cutghost[2];
 		
   } else {
 	double lo[3],hi[3];
@@ -366,12 +378,12 @@ void NBinCAC::setup_bins(int style)
 	}
 	}
 		
-    lo[0] -= cutghost[0];
-    lo[1] -= cutghost[1];
-    lo[2] -= cutghost[2];
-    hi[0] += cutghost[0];
-    hi[1] += cutghost[1];
-    hi[2] += cutghost[2];
+    lo[0] -= cutghost[0]*(max_search_range/cut_max+1);
+    lo[1] -= cutghost[1]*(max_search_range/cut_max+1);
+    lo[2] -= cutghost[2]*(max_search_range/cut_max+1);
+    hi[0] += cutghost[0]*(max_search_range/cut_max+1);
+    hi[1] += cutghost[1]*(max_search_range/cut_max+1);
+    hi[2] += cutghost[2]*(max_search_range/cut_max+1);
     domain->bbox(lo,hi,bsubboxlo,bsubboxhi);
   }
   
@@ -390,6 +402,7 @@ void NBinCAC::setup_bins(int style)
   else if (style == BIN) binsize_optimal = 0.5*cutneighmax;
   else binsize_optimal = 0.5*cutneighmin;
   if (binsize_optimal == 0.0) binsize_optimal = bbox[0];
+	binsize_optimal=0.5*max_search_range;
   double binsizeinv = 1.0/binsize_optimal;
 
   // test for too many global bins in any dimension due to huge global domain
