@@ -1,0 +1,48 @@
+echo both
+units       metal
+dimension    3
+boundary     p p p 
+
+#two CAC element styles currently available
+#one has charge and the other does not
+#the first number specified is the maximum number
+#of nodes an element can have in your input model
+#the second is the maximum number of internal 
+#degrees of freedom an element can have in the model
+atom_style     atomic
+atom_modify	map array sort 0 0
+#region	    box block 0 35 0 35 0 35 units box
+
+
+lattice fcc 3.615
+region	    box block 0 5 0 5 0 5 units lattice 
+create_box  1 box
+create_atoms 1 box
+
+pair_style eam
+pair_coeff * * Cu_u3.eam
+
+fix			1 all box/relax iso 0.0 vmax 0.0001
+minimize 1e-14 0.0 1000 10000
+reset_timestep 0
+write_data	2.data
+
+# Create vacancy
+group		vac id 252
+delete_atoms	group vac
+
+write_data	0.data
+
+# Move atom to vacancy
+group		single id 271
+displace_atoms	single move -1.8075 -1.8075 0 units box
+
+min_style 	cg
+minimize 1e-14 0.0 1000 10000
+reset_timestep	0
+
+write_data	1.data
+
+dump		2 all custom 100 *.last id x y z
+
+run			1
