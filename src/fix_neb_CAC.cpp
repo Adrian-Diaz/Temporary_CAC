@@ -149,10 +149,6 @@ FixNEBCAC::FixNEBCAC(LAMMPS *lmp, int narg, char **arg) :
   }
   delete [] iroots;
 
-  // Debug block
-  // volatile int i = 0;
-  // printf("PID %d on %i ready for attach\n", comm->me, uworld);
-  // while (i == 0){}
 
   // create a new compute pe style
   // id = fix-ID + pe, compute group = all
@@ -357,7 +353,7 @@ void FixNEBCAC::min_post_force(int vflag)
       }
       }*/
 
-  // communicate atoms to/from adjacent replicas to fill xprev,xnext
+  // communicate atoms to/from adjacent replicas to fill xprev,xnext, xprevnode, xnextnode
 
   inter_replica_comm();
 
@@ -366,13 +362,18 @@ void FixNEBCAC::min_post_force(int vflag)
   pe->addstep(update->ntimestep+1);
 
   double **x = atom->x;
+  double **xnode = atom->nodal_positions[0][0];
   int *mask = atom->mask;
   double dot = 0.0;
   double prefactor = 0.0;
 
-  double **f = atom->f;
-  int nlocal = atom->nlocal;
-
+  //double **f = atom->f;
+  //int nlocal = atom->nlocal;
+  double **f = atom->nodal_forces[0][0];
+  double **xprevn = xprevnode[0][0];
+  double **xnextn = xnextnode[0][0];
+  double **fnextn = fnextnode[0][0];
+  int nlocal = atom->maxpoly*atom->nodes_per_element * atom->nlocal;
   //calculating separation between images
 
   plen = 0.0;
@@ -386,9 +387,9 @@ void FixNEBCAC::min_post_force(int vflag)
 
     for (int i = 0; i < nlocal; i++)
       if (mask[i] & groupbit) {
-        delxp = x[i][0] - xprev[i][0];
-        delyp = x[i][1] - xprev[i][1];
-        delzp = x[i][2] - xprev[i][2];
+        delxp = xnode[i][0] - xprevn[i][0];
+        delyp = xnode[i][1] - xprevn[i][1];
+        delzp = xnode[i][2] - xprevn[i][2];
         domain->minimum_image(delxp,delyp,delzp);
         plen += delxp*delxp + delyp*delyp + delzp*delzp;
         dottangrad += delxp* f[i][0]+ delyp*f[i][1]+delzp*f[i][2];
@@ -407,15 +408,15 @@ void FixNEBCAC::min_post_force(int vflag)
   } else if (ireplica == 0) {
     for (int i = 0; i < nlocal; i++)
       if (mask[i] & groupbit) {
-        delxn = xnext[i][0] - x[i][0];
-        delyn = xnext[i][1] - x[i][1];
-        delzn = xnext[i][2] - x[i][2];
+        delxn = xnextn[i][0] - xnode[i][0];
+        delyn = xnextn[i][1] - xnode[i][1];
+        delzn = xnextn[i][2] - xnode[i][2];
         domain->minimum_image(delxn,delyn,delzn);
         nlen += delxn*delxn + delyn*delyn + delzn*delzn;
-        gradnextlen += fnext[i][0]*fnext[i][0]
-          + fnext[i][1]*fnext[i][1] +fnext[i][2] * fnext[i][2];
-        dotgrad += f[i][0]*fnext[i][0]
-          + f[i][1]*fnext[i][1] + f[i][2]*fnext[i][2];
+        gradnextlen += fnextn[i][0]*fnextn[i][0]
+          + fnextn[i][1]*fnextn[i][1] +fnextn[i][2] * fnextn[i][2];
+        dotgrad += f[i][0]*fnextn[i][0]
+          + f[i][1]*fnextn[i][1] + f[i][2]*fnextn[i][2];
         dottangrad += delxn*f[i][0]+ delyn*f[i][1] + delzn*f[i][2];
         gradlen += f[i][0]*f[i][0] + f[i][1]*f[i][1] + f[i][2]*f[i][2];
         if (FreeEndIni) {
@@ -438,15 +439,15 @@ void FixNEBCAC::min_post_force(int vflag)
 
     for (int i = 0; i < nlocal; i++)
       if (mask[i] & groupbit) {
-        delxp = x[i][0] - xprev[i][0];
-        delyp = x[i][1] - xprev[i][1];
-        delzp = x[i][2] - xprev[i][2];
+        delxp = xnode[i][0] - xprevn[i][0];
+        delyp = xnode[i][1] - xprevn[i][1];
+        delzp = xnode[i][2] - xprevn[i][2];
         domain->minimum_image(delxp,delyp,delzp);
         plen += delxp*delxp + delyp*delyp + delzp*delzp;
 
-        delxn = xnext[i][0] - x[i][0];
-        delyn = xnext[i][1] - x[i][1];
-        delzn = xnext[i][2] - x[i][2];
+        delxn = xnextn[i][0] - xnode[i][0];
+        delyn = xnextn[i][1] - xnode[i][1];
+        delzn = xnextn[i][2] - xnode[i][2];
         domain->minimum_image(delxn,delyn,delzn);
 
         if (vnext > veng && veng > vprev) {
@@ -480,10 +481,10 @@ void FixNEBCAC::min_post_force(int vflag)
         dotpath += delxp*delxn + delyp*delyn + delzp*delzn;
         dottangrad += tangent[i][0]*f[i][0] +
           tangent[i][1]*f[i][1] + tangent[i][2]*f[i][2];
-        gradnextlen += fnext[i][0]*fnext[i][0] +
-          fnext[i][1]*fnext[i][1] +fnext[i][2] * fnext[i][2];
-        dotgrad += f[i][0]*fnext[i][0] + f[i][1]*fnext[i][1] +
-          f[i][2]*fnext[i][2];
+        gradnextlen += fnextn[i][0]*fnextn[i][0] +
+          fnextn[i][1]*fnextn[i][1] +fnextn[i][2] * fnextn[i][2];
+        dotgrad += f[i][0]*fnextn[i][0] + f[i][1]*fnextn[i][1] +
+          f[i][2]*fnextn[i][2];
 
         springF[i][0] = kspringPerp*(delxn-delxp);
         springF[i][1] = kspringPerp*(delyn-delyp);
@@ -669,12 +670,14 @@ void FixNEBCAC::min_post_force(int vflag)
 
   for (int i = 0; i < nlocal; i++)
     if (mask[i] & groupbit) {
+      //printf("pre-Force components of %d: %f, %f, %f\n", i, f[i][0],f[i][1],f[i][2]);
       f[i][0] += prefactor*tangent[i][0] +
         AngularContr*(springF[i][0] - dotSpringTangent*tangent[i][0]);
       f[i][1] += prefactor*tangent[i][1] +
         AngularContr*(springF[i][1] - dotSpringTangent*tangent[i][1]);
       f[i][2] += prefactor*tangent[i][2] +
         AngularContr*(springF[i][2] - dotSpringTangent*tangent[i][2]);
+      //printf("post-Force components of %d: %f, %f, %f\n", i, f[i][0],f[i][1],f[i][2]);
     }
 }
 

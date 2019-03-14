@@ -2,7 +2,7 @@ echo		both
 units       metal
 
 dimension    3
-boundary     s s s 
+boundary     p p p
 
 #two CAC element styles currently available
 #one has charge and the other does not
@@ -16,24 +16,36 @@ atom_modify	map array sort 0 0
 #create_box  1 box
 
 newton off
-read_data test.txt
+read_data cacinit.data
 
- #create_atoms 1 single 0.1 0.1 0.1 
- #create_atoms 1 single 0.2 0 0 
+dump			1 all CACtecplot 20000 CACmesh0.txt
 
 thermo_style custom step pe
 thermo 10
 
 pair_style CAC/eam 
 pair_coeff * * Cu_u3.eam
-dump          2 all CAC/xyz 50 cac.xyz
+
+fix			1 all box/relax iso 0.0 vmax 0.0001
+min_style 	CAC_cg
+minimize 1e-14 0.0 1000 10000
+
+group		vac id 252
+delete_atoms	group vac
+
+dump			2 all CACtecplot 20000 CACmesh1.txt
+
+# Move atom to vacancy
+group		single id 271
+displace_atoms	single move -1.8075 -1.8075 0 units box
+
+dump			3 all CACtecplot 20000 CACmesh2.txt
 
 #neigh_modify every 50 delay 0 check no
 #fix 1 all nve_CAC 
 #run 10
 
-min_style	CAC_fire
-fix		1 all neb_CAC 10
-neb_CAC 	0.0 0.001 1000 500 50 none verbose
+min_style 	CAC_cg
+minimize 1e-14 0.0 1000 10000
+reset_timestep	0
 
-#minimize	1e-14 0.0 1000 10000

@@ -44,7 +44,9 @@ using namespace MathConst;
 
 #define MAXLINE 256
 #define CHUNK 1024
-#define ATTRIBUTE_PERLINE 4
+#define ATTRIBUTE_PERLINE 12
+#define MAXELEMENT 100      // max # of lines in one element
+
 
 /* ---------------------------------------------------------------------- */
 
@@ -381,7 +383,7 @@ void NEBCAC::run()
 
 void NEBCAC::readfile(char *file, int flag)
 {
-  int i,j,m,nchunk,eofflag,nlines;
+  int i,j,m,nchunk,eofflag,nlines, nodes_per_element;
   tagint tag;
   char *eof,*start,*next,*buf;
   char line[MAXLINE];
@@ -423,13 +425,19 @@ void NEBCAC::readfile(char *file, int flag)
     MPI_Bcast(&nlines,1,MPI_INT,0,world);
   }
 
-  char *buffer = new char[CHUNK*MAXLINE];
+// //    Debug block
+//   volatile int qq = 0;
+//   printf("PID %d on %i ready for attach\n", comm->me, uworld);
+//   while (qq == 0){}
+
+  char *buffer = new char[CHUNK*MAXLINE*MAXELEMENT];
   char **values = new char*[ATTRIBUTE_PERLINE];
 
   double fraction = ireplica/(nreplica-1.0);
 
   double **x = atom->x;
-  int nlocal = atom->nlocal;
+  double **xnodes = atom->nodal_positions[0][0];
+  int nlocal = atom->maxpoly * atom->nodes_per_element * atom->nlocal;
 
   // loop over chunks of lines read from file
   // two versions of read_lines_from_file() for world vs universe bcast
@@ -480,22 +488,22 @@ void NEBCAC::readfile(char *file, int flag)
       m = atom->map(tag);
       if (m >= 0 && m < nlocal) {
         ncount++;
-        xx = atof(values[1]);
-        yy = atof(values[2]);
-        zz = atof(values[3]);
+        xx = atof(values[9]);
+        yy = atof(values[10]);
+        zz = atof(values[11]);
 
         if (flag == 0) {
-          delx = xx - x[m][0];
-          dely = yy - x[m][1];
-          delz = zz - x[m][2];
+          delx = xx - xnodes[m][0];
+          dely = yy - xnodes[m][1];
+          delz = zz - xnodes[m][2];
           domain->minimum_image(delx,dely,delz);
-          x[m][0] += fraction*delx;
-          x[m][1] += fraction*dely;
-          x[m][2] += fraction*delz;
+          xnodes[m][0] += fraction*delx;
+          xnodes[m][1] += fraction*dely;
+          xnodes[m][2] += fraction*delz;
         } else {
-          x[m][0] = xx;
-          x[m][1] = yy;
-          x[m][2] = zz;
+          xnodes[m][0] = xx;
+          xnodes[m][1] = yy;
+          xnodes[m][2] = zz;
         }
       }
 
@@ -504,6 +512,33 @@ void NEBCAC::readfile(char *file, int flag)
 
     nread += nchunk;
   }
+
+  int *element_type = atom->element_type;
+  int *poly_count = atom->poly_count;
+  int *nodes_count_list = atom->nodes_per_element_list;
+  double ****nodal_positions=atom->nodal_positions;
+
+  // update x for elements and atoms using nodal variables
+    for (int i = 0; i < atom->nlocal; i++){
+      //determine element type
+      nodes_per_element = nodes_count_list[element_type[i]];    
+      x[i][0] = 0;
+      x[i][1] = 0;
+      x[i][2] = 0;
+
+      for(int k=0; k<nodes_per_element; k++){
+        for (int poly_counter = 0; poly_counter < poly_count[i];poly_counter++) {
+          
+            x[i][0] += nodal_positions[i][k][poly_counter][0];
+            x[i][1] += nodal_positions[i][k][poly_counter][1];
+            x[i][2] += nodal_positions[i][k][poly_counter][2];
+          }
+      }
+
+      x[i][0] = x[i][0] / nodes_per_element / poly_count[i];
+      x[i][1] = x[i][1] / nodes_per_element / poly_count[i];
+      x[i][2] = x[i][2] / nodes_per_element / poly_count[i];
+    }
 
   // check that all atom IDs in file were found by a proc
 
@@ -647,7 +682,6 @@ void NEBCAC::print_status()
     ebr = all[irep][0]-all[nreplica-1][0];
   }
 
-  printf("I am proc: %d\n", me_universe);
 
   if (me_universe == 0) {
     const double todeg=180.0/MY_PI;

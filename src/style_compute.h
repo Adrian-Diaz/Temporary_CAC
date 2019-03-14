@@ -19,7 +19,6 @@
 #include "compute_displace_atom.h"
 #include "compute_erotate_sphere.h"
 #include "compute_erotate_sphere_atom.h"
-#include "compute_event_displace.h"
 #include "compute_fragment_atom.h"
 #include "compute_global_atom.h"
 #include "compute_group_group.h"
