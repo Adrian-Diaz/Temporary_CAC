@@ -792,3 +792,102 @@ int Comm::read_lines_from_file_universe(FILE *fp, int nlines, int maxline,
   MPI_Bcast(buf,m,MPI_CHAR,0,uworld);
   return 0;
 }
+
+int Comm::read_lines_from_CAC(FILE *fp, int nlines, int maxline, 
+                                  int maxelement,   char *buf)
+{
+  int m, nlineinner, nodecount, npoly, tmp;
+  char* element_type = (char*)malloc(sizeof(char) * 20);
+  if (me == 0) {
+    m = 0;
+    for (int i = 0; i < nlines; i++) {
+      if (!fgets(&buf[m], maxline, fp)) {
+        m = 0;
+        break;
+      }
+
+      sscanf(&buf[m], "%d %s %d", &tmp, element_type, &npoly);
+      m += strlen(&buf[m]);
+
+      if (strcmp(element_type, "Eight_Node") == 0) nodecount = 8;
+      else if (strcmp(element_type, "Atom") == 0) {
+        nodecount = 1;
+        npoly = 1;
+      }
+      else {
+        error->one(FLERR, "Unexpected element type in data file");
+      }
+      // read lines one at a time into buffer and count words
+      // count to ninteger and ndouble until have enough lines
+      //comm->size_forward = 9 * nodecount*npoly + 8 + npoly;
+
+      for (nlineinner = 0; nlineinner < nodecount*npoly; nlineinner++) {
+        if (!fgets(&buf[m], maxline, fp)){
+          m = 0;
+          break;
+        }
+        m += strlen(&buf[m]);
+        if (nlineinner + 1 > maxelement) {
+          error->one(FLERR,
+            "Too many lines in one element in data file - increase MAXELEMENT in read_data.cpp");
+        }
+      }
+    }
+  }
+
+  MPI_Bcast(&m, 1, MPI_INT, 0, world);
+  if (m == 0) return 1;
+  MPI_Bcast(buf, m, MPI_CHAR, 0, world);
+  return 0;
+}
+
+int Comm::read_lines_from_CAC_universe(FILE *fp, int nlines, int maxline, 
+                                           int maxelement, char *buf)
+{
+  int m, nlineinner, nodecount, npoly, tmp;
+  char* element_type = (char*)malloc(sizeof(char)*20);
+
+  int me_universe = universe->me;
+  MPI_Comm uworld = universe->uworld;
+
+  if (me_universe == 0) {
+    m = 0;
+    for (int i = 0; i < nlines; i++) {
+      if (!fgets(&buf[m], maxline, fp)) {
+        m = 0;
+        break;
+      }
+      sscanf(&buf[m], "%d %s %d", &tmp, element_type, &npoly);
+      m += strlen(&buf[m]);
+      element_type = strtok(element_type, " \t\n\r\f");
+      if (strcmp(element_type, "Eight_Node") == 0) nodecount = 8;
+      else if (strcmp(element_type, "Atom") == 0) {
+        nodecount = 1;
+        npoly = 1;
+      }
+      else {
+        error->one(FLERR, "Unexpected element type in data file");
+      }
+      // read lines one at a time into buffer and count words
+      // count to ninteger and ndouble until have enough lines
+      //comm->size_forward = 9 * nodecount*npoly + 8 + npoly;
+
+      for (nlineinner = 0; nlineinner < nodecount*npoly; nlineinner++) {
+        if (!fgets(&buf[m], maxline, fp)){
+          m = 0;
+          break;
+        }
+        m += strlen(&buf[m]);
+        if (nlineinner + 1 > maxelement) {
+          error->one(FLERR,
+            "Too many lines in one element in data file - increase MAXELEMENT in read_data.cpp");
+        }
+      }
+    }
+  }
+  
+  MPI_Bcast(&m, 1, MPI_INT, 0, uworld);
+  if (m == 0) return 1;
+  MPI_Bcast(buf, m, MPI_CHAR, 0, uworld);
+  return 0;
+}

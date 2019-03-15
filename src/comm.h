@@ -111,6 +111,8 @@ class Comm : protected Pointers {
             void *, void *, int self = 1);
   int read_lines_from_file(FILE *, int, int, char *);
   int read_lines_from_file_universe(FILE *, int, int, char *);
+  int read_lines_from_CAC(FILE *, int, int, int, char *);
+  int read_lines_from_CAC_universe(FILE *, int, int, int, char *);
 
   // extract data useful to other classes
   virtual void *extract(const char *, int &) {return NULL;}
