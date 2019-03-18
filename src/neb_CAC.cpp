@@ -44,7 +44,7 @@ using namespace MathConst;
 
 #define MAXLINE 256
 #define CHUNK 1024
-#define ATTRIBUTE_PERLINE 12
+#define ATTRIBUTE_PERLINE 6
 #define MAXELEMENT 100      // max # of lines in one element
 
 
@@ -426,14 +426,15 @@ void NEBCAC::readfile(char *file, int flag)
   }
 
 
-  int npoly, nodecount, xptr;
+  int npoly, nodecount;
+  int decline = 6;
   char *buffer = new char[CHUNK*MAXLINE*MAXELEMENT];
   char **values = new char*[2 * MAXELEMENT*atom->words_per_node];
   char *read_element_type;
 
   double fraction = ireplica/(nreplica-1.0);
   double **x = atom->x;
-  double **xnodes = atom->nodal_positions[0][0];
+  double ****xnodes=atom->nodal_positions;
   int nlocal = atom->maxpoly * atom->nodes_per_element * atom->nlocal;
 
   // loop over chunks of lines read from file
@@ -442,7 +443,7 @@ void NEBCAC::readfile(char *file, int flag)
 
   int ncount = 0;
   int nread = 0;
-  int decline = 6;
+  int index = 0;
   while (nread < nlines) {
     nchunk = MIN(nlines-nread,CHUNK);
 
@@ -453,30 +454,17 @@ void NEBCAC::readfile(char *file, int flag)
     if (eofflag) error->all(FLERR,"Unexpected end of neb file");
 
     buf = buffer;
-    // next = strchr(buf,'\n');
-    // *next = '\0';
-    // int nwords = atom->count_words(buf);
-    // *next = '\n';
-    /* these checks are invalid for a CAC data format (Element/sublines)
-    next = strchr(buf,'\n');
-    *next = '\0';
-    int nwords = atom->count_words(buf);
-    *next = '\n';
-    if (nwords != ATTRIBUTE_PERLINE)
-      error->all(FLERR,"Incorrect element format in neb file");
-    */
-
-    // loop over lines of element/nodal coords
-    // tokenize the line into values
-//    Debug block
+    
+//   Debug block
     // volatile int qq = 0;
     // printf("set var qq = 1");
     // while (qq == 0){}
 
+    // loop over lines of element/nodal coords
+    // tokenize the line into values
     for (i = 0; i < nchunk; i++) {
-      next = strchr(buf,'\n');
       if (i == 0) {
-      values[0] = strtok(buf, " \t\n\r\f");
+        values[0] = strtok(buf, " \t\n\r\f");
       }
       else {
         values[0] = strtok(NULL, " \t\n\r\f");
@@ -490,12 +478,11 @@ void NEBCAC::readfile(char *file, int flag)
       read_element_type = values[1];
 
       values[2] = strtok(NULL, " \t\n\r\f");
-
       if (values[2] == NULL)
         error->one(FLERR, "Incorrect atom format in data file");
       npoly = atoi(values[2]);
       if (strcmp(read_element_type, "Eight_Node") == 0) {
-        nodecount = 8;
+        nodecount = 8;  
       }
       else if (strcmp(read_element_type, "Atom") == 0) {
         nodecount = 1;
@@ -517,71 +504,46 @@ void NEBCAC::readfile(char *file, int flag)
       //     new x may be outside box
       //     will be remapped back into box when simulation starts
       //     its image flags will then be adjusted
-      for (j = 0; j < nodecount; j++)
-      {
-        printf("Proc: %d | tag: %s |", me_universe, values[0]);
-        tag = ATOTAGINT(values[0]);
-        m = atom->map(tag);
-        if (m >= 0 && m < nlocal) {
-          ncount++;
-          xx = atof(values[9]);
-          yy = atof(values[10]);
-          zz = atof(values[11]);
-          if (flag == 0) {
-            delx = xx - xnodes[m][0];
-            dely = yy - xnodes[m][1];
-            delz = zz - xnodes[m][2];
-            printf("delta: %f, %f, %f\n", fraction*delx, fraction*dely, fraction*delz);
-            domain->minimum_image(delx,dely,delz);
-            xnodes[m][0] += fraction*delx;
-            xnodes[m][1] += fraction*dely;
-            xnodes[m][2] += fraction*delz;
-          } else {
-            xnodes[m][0] = xx;
-            xnodes[m][1] = yy;
-            xnodes[m][2] = zz;
+      tag = ATOTAGINT(values[0]);
+      m = atom->map(tag);
+      if (m >= 0 && m < nlocal) {
+        for (int p = 0; p < nodecount; p++) {
+          for (int k = 0; k < npoly; k++){
+            ncount++;
+            index = 9 + p*npoly + k*decline;
+            xx = atof(values[index]);
+            yy = atof(values[index+1]);
+            zz = atof(values[index+2]);
+            
+            if (flag == 0) {
+              delx = xx - xnodes[m][p][k][0];
+              dely = yy - xnodes[m][p][k][1];
+              delz = zz - xnodes[m][p][k][2];
+              domain->minimum_image(delx,dely,delz);
+              xnodes[m][p][k][0] += fraction*delx;
+              xnodes[m][p][k][1] += fraction*dely;
+              xnodes[m][p][k][2] += fraction*delz;
+            }
+            else {
+              xnodes[m][p][k][0] = xx;
+              xnodes[m][p][k][1] = yy;
+              xnodes[m][p][k][2] = zz;
+            }
           }
         }
       }
-
-      buf = next + 2;
     }
 
     nread += nchunk;
   }
 
-  int *element_type = atom->element_type;
-  int *poly_count = atom->poly_count;
-  int *nodes_count_list = atom->nodes_per_element_list;
-  double ****nodal_positions=atom->nodal_positions;
 
-  // update x for elements and atoms using nodal variables
-    // for (int i = 0; i < atom->nlocal; i++){
-    //   //determine element type
-    //   nodes_per_element = nodes_count_list[element_type[i]];    
-    //   x[i][0] = 0;
-    //   x[i][1] = 0;
-    //   x[i][2] = 0;
-
-    //   for(int k=0; k<nodes_per_element; k++){
-    //     for (int poly_counter = 0; poly_counter < poly_count[i];poly_counter++) {
-          
-    //         x[i][0] += nodal_positions[i][k][poly_counter][0];
-    //         x[i][1] += nodal_positions[i][k][poly_counter][1];
-    //         x[i][2] += nodal_positions[i][k][poly_counter][2];
-    //       }
-    //   }
-
-    //   x[i][0] = x[i][0] / nodes_per_element / poly_count[i];
-    //   x[i][1] = x[i][1] / nodes_per_element / poly_count[i];
-    //   x[i][2] = x[i][2] / nodes_per_element / poly_count[i];
-    // }
-
-  // check that all atom IDs in file were found by a proc
+  // check that all IDs in file were found by a proc
 
   if (flag == 0) {
     int ntotal;
     MPI_Allreduce(&ncount,&ntotal,1,MPI_INT,MPI_SUM,uworld);
+    printf("Total %d, expected: %d", ntotal, nreplica*nlines);
     if (ntotal != nreplica*nlines)
       error->universe_all(FLERR,"Invalid atom IDs in neb file");
   } else {
@@ -591,6 +553,30 @@ void NEBCAC::readfile(char *file, int flag)
       error->all(FLERR,"Invalid atom IDs in neb file");
   }
 
+  // update x for elements and atoms using nodal variables
+  int *element_type = atom->element_type;
+  int *poly_count = atom->poly_count;
+  int *nodes_count_list = atom->nodes_per_element_list;
+  for (int i = 0; i < atom->nlocal; i++){
+    //determine element type
+    nodes_per_element = nodes_count_list[element_type[i]];    
+    x[i][0] = 0;
+    x[i][1] = 0;
+    x[i][2] = 0;
+
+    for(int k=0; k<nodes_per_element; k++){
+      for (int poly_counter = 0; poly_counter < poly_count[i];poly_counter++) {
+        
+          x[i][0] += xnodes[i][k][poly_counter][0];
+          x[i][1] += xnodes[i][k][poly_counter][1];
+          x[i][2] += xnodes[i][k][poly_counter][2];
+        }
+    }
+
+    x[i][0] = x[i][0] / nodes_per_element / poly_count[i];
+    x[i][1] = x[i][1] / nodes_per_element / poly_count[i];
+    x[i][2] = x[i][2] / nodes_per_element / poly_count[i];
+  }
   // clean up
 
   delete [] buffer;
