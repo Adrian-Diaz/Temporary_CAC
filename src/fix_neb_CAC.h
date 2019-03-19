@@ -27,6 +27,7 @@ namespace LAMMPS_NS {
 class FixNEBCAC : public Fix {
  public:
   double veng,plen,nlen,dotpath,dottangrad,gradlen,dotgrad;
+  double plennode, nlennode, dotpathnode, dottangradnode, gradlennode, dotgradnode;
   int rclimber;
 
   FixNEBCAC(class LAMMPS *, int, char **);

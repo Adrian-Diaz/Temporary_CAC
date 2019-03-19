@@ -222,6 +222,7 @@ FixNEBCAC::~FixNEBCAC()
   if (NEBLongRange) {
     if (rootworld != MPI_COMM_NULL) MPI_Comm_free(&rootworld);
     memory->destroy(nlenall);
+    memory->destroy(nlenallnode);
   }
 }
 
@@ -362,34 +363,70 @@ void FixNEBCAC::min_post_force(int vflag)
   pe->addstep(update->ntimestep+1);
 
   double **x = atom->x;
-  double **xnode = atom->nodal_positions[0][0];
+  double **f = atom->f;
   int *mask = atom->mask;
   double dot = 0.0;
+  double dotnode = 0.0;
   double prefactor = 0.0;
+  double prefactornode = 0.0;
 
-  //double **f = atom->f;
-  //int nlocal = atom->nlocal;
-  double **f = atom->nodal_forces[0][0];
-  double **xprevn = xprevnode[0][0];
-  double **xnextn = xnextnode[0][0];
-  double **fnextn = fnextnode[0][0];
-  int nlocal = atom->maxpoly*atom->nodes_per_element * atom->nlocal;
+  double ****xnode = atom->nodal_positions;
+  double ****fnode = atom->nodal_forces;
+  double ****xprevn = xprevnode;
+  double ****xnextn = xnextnode;
+  double ****fnextn = fnextnode;
+  int *element_type = atom->element_type;
+  int *poly_count = atom->poly_count;
+  int **node_types = atom->node_types;
+  int *nodes_count_list = atom->nodes_per_element_list; 
+
+  int nodes_per_element;
+  int nlocal = atom->nlocal;
   //calculating separation between images
 
   plen = 0.0;
   nlen = 0.0;
+  plennode = 0.0;
+  nlennode = 0.0;
   double tlen = 0.0;
+  double tlennode = 0.0;
   double gradnextlen = 0.0;
+  double gradnextlennode = 0.0;
 
   dotgrad = gradlen = dotpath = dottangrad = 0.0;
-
+  dotgradnode = gradlennode = dotpathnode = dottangradnode = 0.0;
+  // volatile int qq = 0;
+  // printf("set var qq = 1");
+  // while (qq == 0){}
   if (ireplica == nreplica-1) {
-
-    for (int i = 0; i < nlocal; i++)
+    for (int i = 0; i < nlocal; i++) {
       if (mask[i] & groupbit) {
-        delxp = xnode[i][0] - xprevn[i][0];
-        delyp = xnode[i][1] - xprevn[i][1];
-        delzp = xnode[i][2] - xprevn[i][2];
+        nodes_per_element = nodes_count_list[element_type[i]];
+        // nodal coordinates
+        for (int p = 0; p < nodes_per_element; p++) {
+          for (int k = 0; k < poly_count[i]; k++){
+            delxp = xnode[i][p][k][0] - xprevn[i][p][k][0];
+            delyp = xnode[i][p][k][1] - xprevn[i][p][k][1];
+            delzp = xnode[i][p][k][2] - xprevn[i][p][k][2];
+            domain->minimum_image(delxp,delyp,delzp);
+            plennode += delxp*delxp + delyp*delyp + delzp*delzp;
+            dottangradnode += delxp* fnode[i][p][k][0]+ delyp*fnode[i][p][k][1]+delzp*fnode[i][p][k][2];
+            gradlennode += fnode[i][p][k][0]*fnode[i][p][k][0] + fnode[i][p][k][1]*fnode[i][p][k][1] + fnode[i][p][k][2]*fnode[i][p][k][2];
+            if (FreeEndFinal||FreeEndFinalWithRespToEIni) {
+              tangentnode[i][p][k][0]=delxp;
+              tangentnode[i][p][k][1]=delyp;
+              tangentnode[i][p][k][2]=delzp;
+              tlennode += tangentnode[i][p][k][0]*tangentnode[i][p][k][0] +
+                tangentnode[i][p][k][1]*tangentnode[i][p][k][1] + tangentnode[i][p][k][2]*tangentnode[i][p][k][2];
+              dotnode += fnode[i][p][k][0]*tangentnode[i][p][k][0] + fnode[i][p][k][1]*tangentnode[i][p][k][1] +
+                fnode[i][p][k][2]*tangentnode[i][p][k][2];
+            }
+          }
+        }
+        // atomic coordinates
+        delxp = x[i][0] - xprev[i][0];
+        delyp = x[i][1] - xprev[i][1];
+        delzp = x[i][2] - xprev[i][2];
         domain->minimum_image(delxp,delyp,delzp);
         plen += delxp*delxp + delyp*delyp + delzp*delzp;
         dottangrad += delxp* f[i][0]+ delyp*f[i][1]+delzp*f[i][2];
@@ -403,20 +440,47 @@ void FixNEBCAC::min_post_force(int vflag)
           dot += f[i][0]*tangent[i][0] + f[i][1]*tangent[i][1] +
             f[i][2]*tangent[i][2];
         }
-      }
 
-  } else if (ireplica == 0) {
-    for (int i = 0; i < nlocal; i++)
+      }
+    }
+  }
+
+  else if (ireplica == 0) {
+    for (int i = 0; i < nlocal; i++) {
       if (mask[i] & groupbit) {
-        delxn = xnextn[i][0] - xnode[i][0];
-        delyn = xnextn[i][1] - xnode[i][1];
-        delzn = xnextn[i][2] - xnode[i][2];
+        nodes_per_element = nodes_count_list[element_type[i]];
+        // nodal coordinates
+        for (int p = 0; p < nodes_per_element; p++) {
+          for (int k = 0; k < poly_count[i]; k++){
+            delxn = xnextn[i][p][k][0] - xnode[i][p][k][0];
+            delyn = xnextn[i][p][k][1] - xnode[i][p][k][1];
+            delzn = xnextn[i][p][k][2] - xnode[i][p][k][2];
+            domain->minimum_image(delxn,delyn,delzn);
+            domain->minimum_image(delxp,delyp,delzp);
+            plennode += delxp*delxp + delyp*delyp + delzp*delzp;
+            dottangradnode += delxp* fnode[i][p][k][0]+ delyp*fnode[i][p][k][1]+delzp*fnode[i][p][k][2];
+            gradlennode += fnode[i][p][k][0]*fnode[i][p][k][0] + fnode[i][p][k][1]*fnode[i][p][k][1] + fnode[i][p][k][2]*fnode[i][p][k][2];
+            if (FreeEndFinal||FreeEndFinalWithRespToEIni) {
+              tangentnode[i][p][k][0]=delxp;
+              tangentnode[i][p][k][1]=delyp;
+              tangentnode[i][p][k][2]=delzp;
+              tlennode += tangentnode[i][p][k][0]*tangentnode[i][p][k][0] +
+                tangentnode[i][p][k][1]*tangentnode[i][p][k][1] + tangentnode[i][p][k][2]*tangentnode[i][p][k][2];
+              dotnode += fnode[i][p][k][0]*tangentnode[i][p][k][0] + fnode[i][p][k][1]*tangentnode[i][p][k][1] +
+                fnode[i][p][k][2]*tangentnode[i][p][k][2];
+            }
+          }
+        }
+        // atomic coordinates
+        delxn = xnext[i][0] - x[i][0];
+        delyn = xnext[i][1] - x[i][1];
+        delzn = xnext[i][2] - x[i][2];
         domain->minimum_image(delxn,delyn,delzn);
         nlen += delxn*delxn + delyn*delyn + delzn*delzn;
-        gradnextlen += fnextn[i][0]*fnextn[i][0]
-          + fnextn[i][1]*fnextn[i][1] +fnextn[i][2] * fnextn[i][2];
-        dotgrad += f[i][0]*fnextn[i][0]
-          + f[i][1]*fnextn[i][1] + f[i][2]*fnextn[i][2];
+        gradnextlen += fnext[i][0]*fnext[i][0]
+          + fnext[i][1]*fnext[i][1] +fnext[i][2] * fnext[i][2];
+        dotgrad += f[i][0]*fnext[i][0]
+          + f[i][1]*fnext[i][1] + f[i][2]*fnext[i][2];
         dottangrad += delxn*f[i][0]+ delyn*f[i][1] + delzn*f[i][2];
         gradlen += f[i][0]*f[i][0] + f[i][1]*f[i][1] + f[i][2]*f[i][2];
         if (FreeEndIni) {
@@ -429,7 +493,10 @@ void FixNEBCAC::min_post_force(int vflag)
             f[i][2]*tangent[i][2];
         }
       }
-  } else {
+    }
+  } 
+
+  else {
 
     // not the first or last replica
 
@@ -437,17 +504,74 @@ void FixNEBCAC::min_post_force(int vflag)
     double vmin = MIN(fabs(vnext-veng),fabs(vprev-veng));
 
 
-    for (int i = 0; i < nlocal; i++)
+    for (int i = 0; i < nlocal; i++) {
       if (mask[i] & groupbit) {
-        delxp = xnode[i][0] - xprevn[i][0];
-        delyp = xnode[i][1] - xprevn[i][1];
-        delzp = xnode[i][2] - xprevn[i][2];
+        nodes_per_element = nodes_count_list[element_type[i]];
+        // nodal coordinates
+        for (int p = 0; p < nodes_per_element; p++) {
+          for (int k = 0; k < poly_count[i]; k++){
+            delxp = xnode[i][p][k][0] - xprevn[i][p][k][0];
+            delyp = xnode[i][p][k][1] - xprevn[i][p][k][1];
+            delzp = xnode[i][p][k][2] - xprevn[i][p][k][2];
+            domain->minimum_image(delxp,delyp,delzp);
+            plennode += delxp*delxp + delyp*delyp + delzp*delzp;
+
+            delxn = xnextn[i][p][k][0] - xnode[i][p][k][0];
+            delyn = xnextn[i][p][k][1] - xnode[i][p][k][1];
+            delzn = xnextn[i][p][k][2] - xnode[i][p][k][2];
+            domain->minimum_image(delxn,delyn,delzn);
+
+            if (vnext > veng && veng > vprev) {
+              tangentnode[i][p][k][0] = delxn;
+              tangentnode[i][p][k][1] = delyn;
+              tangentnode[i][p][k][2] = delzn;
+            } else if (vnext < veng && veng < vprev) {
+              tangentnode[i][p][k][0] = delxp;
+              tangentnode[i][p][k][1] = delyp;
+              tangentnode[i][p][k][2] = delzp;
+            } else {
+              if (vnext > vprev) {
+                tangentnode[i][p][k][0] = vmax*delxn + vmin*delxp;
+                tangentnode[i][p][k][1] = vmax*delyn + vmin*delyp;
+                tangentnode[i][p][k][2] = vmax*delzn + vmin*delzp;
+              } else if (vnext < vprev) {
+                tangentnode[i][p][k][0] = vmin*delxn + vmax*delxp;
+                tangentnode[i][p][k][1] = vmin*delyn + vmax*delyp;
+                tangentnode[i][p][k][2] = vmin*delzn + vmax*delzp;
+              } else { // vnext == vprev, e.g. for potentials that do not compute an energy
+                tangentnode[i][p][k][0] = delxn + delxp;
+                tangentnode[i][p][k][1] = delyn + delyp;
+                tangentnode[i][p][k][2] = delzn + delzp;
+              }
+            }
+
+            nlennode += delxn*delxn + delyn*delyn + delzn*delzn;
+            tlennode += tangentnode[i][p][k][0]*tangentnode[i][p][k][0] +
+              tangentnode[i][p][k][1]*tangentnode[i][p][k][1] + tangentnode[i][p][k][2]*tangentnode[i][p][k][2];
+            gradlennode += fnode[i][p][k][0]*fnode[i][p][k][0] + fnode[i][p][k][1]*fnode[i][p][k][1] + fnode[i][p][k][2]*fnode[i][p][k][2];
+            dotpathnode += delxp*delxn + delyp*delyn + delzp*delzn;
+            dottangradnode += tangentnode[i][p][k][0]*fnode[i][p][k][0] +
+              tangentnode[i][p][k][1]*fnode[i][p][k][1] + tangentnode[i][p][k][2]*fnode[i][p][k][2];
+            gradnextlennode += fnextn[i][p][k][0]*fnextn[i][p][k][0] +
+              fnextn[i][p][k][1]*fnextn[i][p][k][1] +fnextn[i][p][k][2] * fnextn[i][p][k][2];
+            dotgradnode += fnode[i][p][k][0]*fnextn[i][p][k][0] + fnode[i][p][k][1]*fnextn[i][p][k][1] +
+              fnode[i][p][k][2]*fnextn[i][p][k][2];
+
+            springFnode[i][p][k][0] = kspringPerp*(delxn-delxp);
+            springFnode[i][p][k][1] = kspringPerp*(delyn-delyp);
+            springFnode[i][p][k][2] = kspringPerp*(delzn-delzp);
+          }
+        }
+        // atomic coordinates
+        delxp = x[i][0] - xprev[i][0];
+        delyp = x[i][1] - xprev[i][1];
+        delzp = x[i][2] - xprev[i][2];
         domain->minimum_image(delxp,delyp,delzp);
         plen += delxp*delxp + delyp*delyp + delzp*delzp;
 
-        delxn = xnextn[i][0] - xnode[i][0];
-        delyn = xnextn[i][1] - xnode[i][1];
-        delzn = xnextn[i][2] - xnode[i][2];
+        delxn = xnext[i][0] - x[i][0];
+        delyn = xnext[i][1] - x[i][1];
+        delzn = xnext[i][2] - x[i][2];
         domain->minimum_image(delxn,delyn,delzn);
 
         if (vnext > veng && veng > vprev) {
@@ -481,15 +605,16 @@ void FixNEBCAC::min_post_force(int vflag)
         dotpath += delxp*delxn + delyp*delyn + delzp*delzn;
         dottangrad += tangent[i][0]*f[i][0] +
           tangent[i][1]*f[i][1] + tangent[i][2]*f[i][2];
-        gradnextlen += fnextn[i][0]*fnextn[i][0] +
-          fnextn[i][1]*fnextn[i][1] +fnextn[i][2] * fnextn[i][2];
-        dotgrad += f[i][0]*fnextn[i][0] + f[i][1]*fnextn[i][1] +
-          f[i][2]*fnextn[i][2];
+        gradnextlen += fnext[i][0]*fnext[i][0] +
+          fnext[i][1]*fnext[i][1] +fnext[i][2] * fnext[i][2];
+        dotgrad += f[i][0]*fnext[i][0] + f[i][1]*fnext[i][1] +
+          f[i][2]*fnext[i][2];
 
         springF[i][0] = kspringPerp*(delxn-delxp);
         springF[i][1] = kspringPerp*(delyn-delyp);
         springF[i][2] = kspringPerp*(delzn-delzp);
       }
+    }
   }
 
   double bufin[BUFSIZE], bufout[BUFSIZE];
@@ -501,6 +626,18 @@ void FixNEBCAC::min_post_force(int vflag)
   bufin[5] = dotpath;
   bufin[6] = dottangrad;
   bufin[7] = dotgrad;
+
+  double nbufin[BUFSIZE], nbufout[BUFSIZE];
+  nbufin[0] = nlennode;
+  nbufin[1] = plennode;
+  nbufin[2] = tlennode;
+  nbufin[3] = gradlennode;
+  nbufin[4] = gradnextlennode;
+  nbufin[5] = dotpathnode;
+  nbufin[6] = dottangradnode;
+  nbufin[7] = dotgradnode;
+
+
   MPI_Allreduce(bufin,bufout,BUFSIZE,MPI_DOUBLE,MPI_SUM,world);
   nlen = sqrt(bufout[0]);
   plen = sqrt(bufout[1]);
@@ -511,7 +648,17 @@ void FixNEBCAC::min_post_force(int vflag)
   dottangrad = bufout[6];
   dotgrad = bufout[7];
 
-  // normalize tangent vector
+  MPI_Allreduce(nbufin,nbufout,BUFSIZE,MPI_DOUBLE,MPI_SUM,world);
+  nlennode = sqrt(nbufout[0]);
+  plennode = sqrt(nbufout[1]);
+  tlennode = sqrt(nbufout[2]);
+  gradlennode = sqrt(nbufout[3]);
+  gradnextlennode = sqrt(nbufout[4]);
+  dotpathnode = nbufout[5];
+  dottangradnode = nbufout[6];
+  dotgradnode = nbufout[7];
+
+  // normalize tangent vectors
 
   if (tlen > 0.0) {
     double tleninv = 1.0/tlen;
@@ -522,17 +669,36 @@ void FixNEBCAC::min_post_force(int vflag)
         tangent[i][2] *= tleninv;
       }
   }
+  if (tlennode > 0.0) {
+    double tleninvnode = 1.0/tlennode;
+    for (int i = 0; i < nlocal; i++) {
+      if (mask[i] & groupbit) {
+        nodes_per_element = nodes_count_list[element_type[i]];
+        for (int p = 0; p < nodes_per_element; p++) {
+          for (int k = 0; k < poly_count[i]; k++){
+            tangentnode[i][p][k][0] *= tleninvnode;
+            tangentnode[i][p][k][1] *= tleninvnode;
+            tangentnode[i][p][k][2] *= tleninvnode;
+          }
+        }
+      }
+    }
+  }
 
   // first or last replica has no change to forces, just return
 
   if (ireplica > 0 && ireplica < nreplica-1)
     dottangrad = dottangrad/(tlen*gradlen);
+    dottangradnode = dottangradnode/(tlennode*gradlennode);
   if (ireplica == 0)
     dottangrad = dottangrad/(nlen*gradlen);
+    dottangradnode = dottangradnode/(nlennode*gradlennode);
   if (ireplica == nreplica-1)
     dottangrad = dottangrad/(plen*gradlen);
+    dottangradnode = dottangradnode/(plennode*gradlennode);
   if (ireplica < nreplica-1)
     dotgrad = dotgrad /(gradlen*gradnextlen);
+    dotgradnode = dotgradnode /(gradlennode*gradnextlennode);
 
   if (FreeEndIni && ireplica == 0) {
     if (tlen > 0.0) {
@@ -549,6 +715,27 @@ void FixNEBCAC::min_post_force(int vflag)
           f[i][1] += prefactor *tangent[i][1];
           f[i][2] += prefactor *tangent[i][2];
         }
+    }
+    if (tlennode > 0.0) { 
+      double dotallnode;
+      MPI_Allreduce(&dotnode,&dotallnode,1,MPI_DOUBLE,MPI_SUM,world);
+      dotnode = dotallnode/tlennode;
+
+      if (dotnode < 0) prefactornode = -dotnode - kspringIni*(veng-EIniIni);
+      else prefactornode = -dotnode + kspringIni*(veng-EIniIni);
+
+      for (int i = 0; i < nlocal; i++) { 
+        nodes_per_element = nodes_count_list[element_type[i]];
+        if (mask[i] & groupbit) {
+          for (int p = 0; p < nodes_per_element; p++) {
+            for (int k = 0; k < poly_count[i]; k++){
+                fnode[i][p][k][0] += prefactornode *tangentnode[i][p][k][0];
+                fnode[i][p][k][1] += prefactornode *tangentnode[i][p][k][1];
+                fnode[i][p][k][2] += prefactornode *tangentnode[i][p][k][2];
+            }
+          }
+        }
+      }
     }
   }
 
@@ -569,6 +756,27 @@ void FixNEBCAC::min_post_force(int vflag)
           f[i][2] += prefactor *tangent[i][2];
         }
     }
+    if (tlennode > 0.0) { 
+      double dotallnode;
+      MPI_Allreduce(&dotnode,&dotallnode,1,MPI_DOUBLE,MPI_SUM,world);
+      dotnode = dotallnode/tlennode;
+
+      if (dotnode < 0) prefactornode = -dotnode - kspringFinal*(veng-EFinalIni);
+      else prefactornode = -dotnode + kspringFinal*(veng-EFinalIni);
+
+      for (int i = 0; i < nlocal; i++) { 
+        nodes_per_element = nodes_count_list[element_type[i]];
+        if (mask[i] & groupbit) {
+          for (int p = 0; p < nodes_per_element; p++) {
+            for (int k = 0; k < poly_count[i]; k++){
+                fnode[i][p][k][0] += prefactornode *tangentnode[i][p][k][0];
+                fnode[i][p][k][1] += prefactornode *tangentnode[i][p][k][1];
+                fnode[i][p][k][2] += prefactornode *tangentnode[i][p][k][2];
+            }
+          }
+        }
+      }
+    }
   }
 
   if (FreeEndFinalWithRespToEIni&&ireplica == nreplica -1) {
@@ -587,6 +795,28 @@ void FixNEBCAC::min_post_force(int vflag)
           f[i][2] += prefactor *tangent[i][2];
         }
     }
+    if (tlennode > 0.0) { 
+      double dotallnode;
+      MPI_Allreduce(&dotnode,&dotallnode,1,MPI_DOUBLE,MPI_SUM,world);
+      dotnode = dotallnode/tlennode;
+      if (veng < vIni) {
+        if (dotnode < 0) prefactornode = -dotnode - kspringFinal*(veng-vIni);
+        else prefactornode = -dotnode + kspringFinal*(veng-vIni);
+      }
+
+      for (int i = 0; i < nlocal; i++) { 
+        nodes_per_element = nodes_count_list[element_type[i]];
+        if (mask[i] & groupbit) {
+          for (int p = 0; p < nodes_per_element; p++) {
+            for (int k = 0; k < poly_count[i]; k++){
+                fnode[i][p][k][0] += prefactornode *tangentnode[i][p][k][0];
+                fnode[i][p][k][1] += prefactornode *tangentnode[i][p][k][1];
+                fnode[i][p][k][2] += prefactornode *tangentnode[i][p][k][2];
+            }
+          }
+        }
+      }
+    }
   }
 
   double lentot = 0;
@@ -595,10 +825,13 @@ void FixNEBCAC::min_post_force(int vflag)
   if (NEBLongRange) {
     if (cmode == SINGLE_PROC_DIRECT || cmode == SINGLE_PROC_MAP) {
       MPI_Allgather(&nlen,1,MPI_DOUBLE,&nlenall[0],1,MPI_DOUBLE,uworld);
+      MPI_Allgather(&nlennode,1,MPI_DOUBLE,&nlenallnode[0],1,MPI_DOUBLE,uworld);
     } else {
       if (me == 0)
         MPI_Allgather(&nlen,1,MPI_DOUBLE,&nlenall[0],1,MPI_DOUBLE,rootworld);
+        MPI_Allgather(&nlennode,1,MPI_DOUBLE,&nlenallnode[0],1,MPI_DOUBLE,rootworld);
       MPI_Bcast(nlenall,nreplica,MPI_DOUBLE,0,world);
+      MPI_Bcast(nlenallnode,nreplica,MPI_DOUBLE,0,world);
     }
 
     lenuntilIm = 0;
@@ -629,11 +862,28 @@ void FixNEBCAC::min_post_force(int vflag)
   dotpath = dotpath/(plen*nlen);
   AngularContr = 0.5 *(1+cos(MY_PI * dotpath));
 
+  double AngularContrN;
+  dotpathnode = dotpathnode/(plennode*nlennode);
+  AngularContrN = 0.5 *(1+cos(MY_PI * dotpathnode));
+
   double dotSpringTangent;
   dotSpringTangent=0;
 
+  double dotSpringTangentN = 0.0;
+
   for (int i = 0; i < nlocal; i++) {
     if (mask[i] & groupbit) {
+      nodes_per_element = nodes_count_list[element_type[i]];
+      for (int p = 0; p < nodes_per_element; p++) {
+        for (int k = 0; k < poly_count[i]; k++){
+          dotnode += fnode[i][p][k][0] * tangentnode[i][p][k][0] + 
+                     fnode[i][p][k][1] * tangentnode[i][p][k][1] + 
+                     fnode[i][p][k][2] * tangentnode[i][p][k][2];
+          dotSpringTangentN += springFnode[i][p][k][0] * tangentnode[i][p][k][0] + 
+                              springFnode[i][p][k][1] * tangentnode[i][p][k][1] + 
+                              springFnode[i][p][k][2] * tangentnode[i][p][k][2];
+        }
+      }
       dot += f[i][0]*tangent[i][0] + f[i][1]*tangent[i][1] +
         f[i][2]*tangent[i][2];
       dotSpringTangent += springF[i][0]*tangent[i][0] +
@@ -648,36 +898,72 @@ void FixNEBCAC::min_post_force(int vflag)
   MPI_Allreduce(&dot,&dotall,1,MPI_DOUBLE,MPI_SUM,world);
   dot=dotall;
 
-  if (ireplica == rclimber) prefactor = -2.0*dot;
+  double dotSpringTangentNall;
+  MPI_Allreduce(&dotSpringTangentN,&dotSpringTangentNall,1,
+                MPI_DOUBLE,MPI_SUM,world);
+  dotSpringTangentN = dotSpringTangentNall;
+
+  double dotallN;
+  MPI_Allreduce(&dotnode,&dotallN,1,MPI_DOUBLE,MPI_SUM,world);
+  dotnode = dotallN;
+
+  if (ireplica == rclimber){
+    prefactor = -2.0*dot;
+    prefactornode = -2.0*dotnode;
+  }
   else {
     if (NEBLongRange) {
       prefactor = -dot - kspring*(lenuntilIm-idealPos)/(2*meanDist);
-    } else if (StandardNEB) {
+    } 
+    else if (StandardNEB) {
       prefactor = -dot + kspring*(nlen-plen);
+      prefactornode = -dotnode + kspring*(nlennode-plennode);
     }
 
     if (FinalAndInterWithRespToEIni&& veng<vIni) {
       for (int i = 0; i < nlocal; i++)
         if (mask[i] & groupbit) {
+          nodes_per_element = nodes_count_list[element_type[i]];
+          for (int p = 0; p < nodes_per_element; p++) {
+            for (int k = 0; k < poly_count[i]; k++){
+              fnode[i][p][k][0] = 0;
+              fnode[i][p][k][1] = 0;
+              fnode[i][p][k][2] = 0;
+            }
+          }
+
           f[i][0] = 0;
           f[i][1] = 0;
           f[i][2] = 0;
         }
       prefactor =  kspring*(nlen-plen);
       AngularContr=0;
+      prefactornode = kspring*(nlennode - plennode);
+      AngularContrN = 0;
     }
   }
 
   for (int i = 0; i < nlocal; i++)
     if (mask[i] & groupbit) {
-      //printf("pre-Force components of %d: %f, %f, %f\n", i, f[i][0],f[i][1],f[i][2]);
+      nodes_per_element = nodes_count_list[element_type[i]];
+      for (int p = 0; p < nodes_per_element; p++) {
+        for (int k = 0; k < poly_count[i]; k++){
+          fnode[i][p][k][0] += prefactornode*tangentnode[i][p][k][0] +
+        AngularContrN*(springFnode[i][p][k][0] - dotSpringTangentN*tangentnode[i][p][k][0]);
+          fnode[i][p][k][1] += prefactornode*tangentnode[i][p][k][1] +
+        AngularContrN*(springFnode[i][p][k][1] - dotSpringTangentN*tangentnode[i][p][k][1]);
+          fnode[i][p][k][2] += prefactornode*tangentnode[i][p][k][2] +
+        AngularContrN*(springFnode[i][p][k][2] - dotSpringTangentN*tangentnode[i][p][k][2]);
+        }
+      }
+      //printf("pre-Force components of %d: %f, %f, %f\n", i, fnode[i][0],fnode[i][1],fnode[i][2]);
       f[i][0] += prefactor*tangent[i][0] +
         AngularContr*(springF[i][0] - dotSpringTangent*tangent[i][0]);
       f[i][1] += prefactor*tangent[i][1] +
         AngularContr*(springF[i][1] - dotSpringTangent*tangent[i][1]);
       f[i][2] += prefactor*tangent[i][2] +
         AngularContr*(springF[i][2] - dotSpringTangent*tangent[i][2]);
-      //printf("post-Force components of %d: %f, %f, %f\n", i, f[i][0],f[i][1],f[i][2]);
+      //printf("post-Force components of %d: %f, %f, %f\n", i, fnode[i][0],fnode[i][1],fnode[i][2]);
     }
 }
 
@@ -702,8 +988,15 @@ void FixNEBCAC::inter_replica_comm()
 
   double **x = atom->x;
   double **f = atom->f;
-  double **xnode = atom->nodal_positions[0][0];
-  double **fnode = atom->nodal_forces[0][0];
+  double ****xnode = atom->nodal_positions;
+  double ****fnode = atom->nodal_forces;
+
+  int *element_type = atom->element_type;
+  int *poly_count = atom->poly_count;
+  int **node_types = atom->node_types;
+  int *nodes_count_list = atom->nodes_per_element_list; 
+
+  int nodes_per_element;
   tagint *tag = atom->tag;
   int *mask = atom->mask;
   int nlocal = atom->nlocal;
@@ -720,41 +1013,47 @@ void FixNEBCAC::inter_replica_comm()
   // direct comm of x -> xprev and x -> xnext
 
   if (cmode == SINGLE_PROC_DIRECT) {
+    //   Debug block
+    // volatile int qq = 0;
+    // printf("set var qq = 1");
+    // while (qq == 0){}
     if (ireplica > 0)
       MPI_Irecv(xprev[0],3*nlocal,MPI_DOUBLE,procprev,0,uworld,&request);
-      MPI_Irecv(**xprevnode[0], 3*nlocalnode, MPI_DOUBLE, procprev, 0, uworld, &requestn);
-    if (ireplica < nreplica-1)
-      MPI_Send(x[0],3*nlocal,MPI_DOUBLE,procnext,0,uworld);
-      MPI_Send(xnode[0], 3*nlocalnode, MPI_DOUBLE, procnext, 0, uworld);
-
+    if (ireplica < nreplica-1) 
+      MPI_Send(x[0],3*nlocal,MPI_DOUBLE,procnext,0,uworld);    
     if (ireplica > 0) MPI_Wait(&request,MPI_STATUS_IGNORE);
-    if (ireplica > 0) MPI_Wait(&requestn,MPI_STATUS_IGNORE);
-
     if (ireplica < nreplica-1)
       MPI_Irecv(xnext[0],3*nlocal,MPI_DOUBLE,procnext,0,uworld,&request);
-      MPI_Irecv(**xnextnode[0],3*nlocalnode,MPI_DOUBLE,procnext,0,uworld,&requestn);
-
     if (ireplica > 0)
       MPI_Send(x[0],3*nlocal,MPI_DOUBLE,procprev,0,uworld);
-      MPI_Send(xnode[0],3*nlocalnode,MPI_DOUBLE,procprev,0,uworld);
-
-    if (ireplica < nreplica-1) { 
-       MPI_Wait(&request,MPI_STATUS_IGNORE);
-       MPI_Wait(&requestn,MPI_STATUS_IGNORE);
-    }
+    if (ireplica < nreplica-1) MPI_Wait(&request,MPI_STATUS_IGNORE);
 
     if (ireplica < nreplica-1)
       MPI_Irecv(fnext[0],3*nlocal,MPI_DOUBLE,procnext,0,uworld,&request);
-      MPI_Irecv(**fnextnode[0],3*nlocalnode,MPI_DOUBLE,procnext,0,uworld,&requestn);
-      
     if (ireplica > 0)
       MPI_Send(f[0],3*nlocal,MPI_DOUBLE,procprev,0,uworld);
-      MPI_Send(fnode[0],3*nlocalnode,MPI_DOUBLE,procprev,0,uworld);
-      
-    if (ireplica < nreplica-1) {
-      MPI_Wait(&request,MPI_STATUS_IGNORE);
-      MPI_Wait(&requestn,MPI_STATUS_IGNORE);
-    }
+ 
+    if (ireplica < nreplica-1) MPI_Wait(&request,MPI_STATUS_IGNORE);
+
+
+    // node info send/recv
+    if (ireplica > 0)
+      MPI_Irecv(xprevnode[0][0][0], 3*nlocalnode, MPI_DOUBLE, procprev, 1, uworld, &requestn);
+    if (ireplica < nreplica-1)
+      MPI_Send(xnode[0][0][0], 3*nlocalnode, MPI_DOUBLE, procnext, 1, uworld);
+    if (ireplica > 0) MPI_Wait(&requestn,MPI_STATUS_IGNORE);
+    if (ireplica < nreplica-1)
+      MPI_Irecv(xnextnode[0][0][0],3*nlocalnode,MPI_DOUBLE,procnext,1,uworld,&requestn);
+    if (ireplica > 0)
+      MPI_Send(xnode[0][0][0],3*nlocalnode,MPI_DOUBLE,procprev,1,uworld);
+    if (ireplica < nreplica-1) MPI_Wait(&requestn,MPI_STATUS_IGNORE);
+
+    if (ireplica < nreplica-1)
+      MPI_Irecv(fnextnode[0][0][0],3*nlocalnode,MPI_DOUBLE,procnext,1,uworld,&requestn);
+    if (ireplica > 0)
+      MPI_Send(fnode[0][0][0],3*nlocalnode,MPI_DOUBLE,procprev,1,uworld);
+    if (ireplica < nreplica-1) MPI_Wait(&requestn,MPI_STATUS_IGNORE);
+
     return;
   }
 
@@ -949,8 +1248,8 @@ void FixNEBCAC::reallocate()
   memory->destroy(springFnode);
 
   memory->create(xprevnode, maxlocal, atom->nodes_per_element, atom->maxpoly,3, "neb_CAC:xprevnode");
-  memory->create(xnextnode, maxlocal, atom->nodes_per_element, atom->maxpoly,3, "neb_CAC:xnextvnode");
-  memory->create(fnextnode, maxlocal, atom->nodes_per_element, atom->maxpoly,3, "neb_CAC:fnextvnode");
+  memory->create(xnextnode, maxlocal, atom->nodes_per_element, atom->maxpoly,3, "neb_CAC:xnextnode");
+  memory->create(fnextnode, maxlocal, atom->nodes_per_element, atom->maxpoly,3, "neb_CAC:fnextnode");
   memory->create(tangentnode, maxlocal, atom->nodes_per_element, atom->maxpoly,3, "neb_CAC:tangentnode");
   memory->create(springFnode, maxlocal, atom->nodes_per_element, atom->maxpoly,3, "neb_CAC:springFnode");
 
