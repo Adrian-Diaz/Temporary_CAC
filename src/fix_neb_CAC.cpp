@@ -395,9 +395,7 @@ void FixNEBCAC::min_post_force(int vflag)
 
   dotgrad = gradlen = dotpath = dottangrad = 0.0;
   dotgradnode = gradlennode = dotpathnode = dottangradnode = 0.0;
-  // volatile int qq = 0;
-  // printf("set var qq = 1");
-  // while (qq == 0){}
+
   if (ireplica == nreplica-1) {
     for (int i = 0; i < nlocal; i++) {
       if (mask[i] & groupbit) {
@@ -616,7 +614,10 @@ void FixNEBCAC::min_post_force(int vflag)
       }
     }
   }
-
+  // volatile int qq = 0;
+  // printf("set var qq = 1");
+  // while (qq == 0){}
+    
   double bufin[BUFSIZE], bufout[BUFSIZE];
   bufin[0] = nlen;
   bufin[1] = plen;
@@ -954,16 +955,23 @@ void FixNEBCAC::min_post_force(int vflag)
         AngularContrN*(springFnode[i][p][k][1] - dotSpringTangentN*tangentnode[i][p][k][1]);
           fnode[i][p][k][2] += prefactornode*tangentnode[i][p][k][2] +
         AngularContrN*(springFnode[i][p][k][2] - dotSpringTangentN*tangentnode[i][p][k][2]);
+
+        f[i][0] += fnode[i][p][k][0];
+        f[i][1] += fnode[i][p][k][1];
+        f[i][2] += fnode[i][p][k][2];
         }
       }
-      //printf("pre-Force components of %d: %f, %f, %f\n", i, fnode[i][0],fnode[i][1],fnode[i][2]);
-      f[i][0] += prefactor*tangent[i][0] +
-        AngularContr*(springF[i][0] - dotSpringTangent*tangent[i][0]);
-      f[i][1] += prefactor*tangent[i][1] +
-        AngularContr*(springF[i][1] - dotSpringTangent*tangent[i][1]);
-      f[i][2] += prefactor*tangent[i][2] +
-        AngularContr*(springF[i][2] - dotSpringTangent*tangent[i][2]);
-      //printf("post-Force components of %d: %f, %f, %f\n", i, fnode[i][0],fnode[i][1],fnode[i][2]);
+      f[i][0] = f[i][0] / nodes_per_element / poly_count[i];
+      f[i][1] = f[i][1] / nodes_per_element / poly_count[i];
+      f[i][2] = f[i][2] / nodes_per_element / poly_count[i];
+      // printf("pre-Force components of %d: %f, %f, %f\n", i, f[i][0],f[i][1],f[i][2]);
+      // f[i][0] += prefactor*tangent[i][0] +
+      //   AngularContr*(springF[i][0] - dotSpringTangent*tangent[i][0]);
+      // f[i][1] += prefactor*tangent[i][1] +
+      //   AngularContr*(springF[i][1] - dotSpringTangent*tangent[i][1]);
+      // f[i][2] += prefactor*tangent[i][2] +
+      //   AngularContr*(springF[i][2] - dotSpringTangent*tangent[i][2]);
+      // printf("post-Force components of %d: %f, %f, %f\n", i, f[i][0],f[i][1],f[i][2]);
     }
 }
 
@@ -1014,9 +1022,9 @@ void FixNEBCAC::inter_replica_comm()
 
   if (cmode == SINGLE_PROC_DIRECT) {
     //   Debug block
-    volatile int qq = 0;
-    printf("set var qq = 1");
-    while (qq == 0){}
+    // volatile int qq = 0;
+    // printf("set var qq = 1");
+    // while (qq == 0){}
     if (ireplica > 0)
       MPI_Irecv(xprev[0],3*nlocal,MPI_DOUBLE,procprev,0,uworld,&request);
     if (ireplica < nreplica-1) 

@@ -638,12 +638,12 @@ void NEBCAC::print_status()
   one[0] = fneb->veng;
   one[1] = fneb->plen;
   one[2] = fneb->nlen;
-  one[3] = fneb->gradlen;
+  one[3] = fneb->gradlennode;
 
   if (verbose) {
-    one[4] = fneb->dotpath;
-    one[5] = fneb->dottangrad;
-    one[6] = fneb->dotgrad;
+    one[4] = fneb->dotpathnode;
+    one[5] = fneb->dottangradnode;
+    one[6] = fneb->dotgradnode;
   }
 
   if (output->thermo->normflag) one[0] /= atom->natoms;
