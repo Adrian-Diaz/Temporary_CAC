@@ -35,6 +35,11 @@ class NBin : protected Pointers {
   int *bins;                   // index of next atom in same bin
   int *atom2bin;               // bin assignment for each atom (local+ghost)
 
+  //CAC package bin arrays
+  int *bin_ncontent;
+  int **bin_content;
+  int *quad2bin;
+
   double cutoff_custom;        // cutoff set by requestor
 
   NBin(class LAMMPS *);
