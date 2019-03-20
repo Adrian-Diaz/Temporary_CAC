@@ -32,40 +32,6 @@ class NBinCAC : public NBin {
   ~NBinCAC();
   void setup_bins(int);
   void bin_atoms();
-  virtual void bin_atoms_setup(int);
-  
-  protected:
-  //int *bin_overlap_buffer;
-  int *bin_overlap_limits;
-  int first_alloc;
-  int max_bin_expansion_count;
-  int *bin_expansion_counts;
-  int nmax;
-  double **current_element_quad_points;
-  double current_quad_point[3];
-  int **surface_counts;
-  int surface_counts_max[3];
-  double **interior_scales;
-	int surface_counts_max_old[3];
-	int *neighbor_copy_index;
-  int quadrature_counter;
-  int   quadrature_node_count;
-  double ***current_nodal_positions;
-  int **element_scale;
-  int current_element_scale[3];
-  int current_poly_counter;
-  double *quadrature_weights;
-  double *quadrature_abcissae;
-  int quad_rule_initialized;
-  
-  virtual int quad2bins(double *quad_position);
-  virtual int element2bins(int element_index);
-  int compute_quad_points(int);
-  void allocate_surface_counts();
-  void quadrature_init(int degree);
-  void compute_surface_depths(double &x, double &y, double &z,
-	  int &xb, int &yb, int &zb, int flag);
-  double shape_function(double, double, double, int, int);
 };
 
 }

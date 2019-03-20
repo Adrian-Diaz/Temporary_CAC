@@ -79,12 +79,6 @@ class NPair : protected Pointers {
   int *atom2bin,*bins;
   int *binhead;
 
-  //CAC package bin arrays
-  
-  int *bin_ncontent;
-  int **bin_content;
-  int *quad2bin;
-
   // data from NStencil class
 
   int nstencil;
