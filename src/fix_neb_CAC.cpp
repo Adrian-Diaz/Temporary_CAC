@@ -1014,9 +1014,9 @@ void FixNEBCAC::inter_replica_comm()
 
   if (cmode == SINGLE_PROC_DIRECT) {
     //   Debug block
-    // volatile int qq = 0;
-    // printf("set var qq = 1");
-    // while (qq == 0){}
+    volatile int qq = 0;
+    printf("set var qq = 1");
+    while (qq == 0){}
     if (ireplica > 0)
       MPI_Irecv(xprev[0],3*nlocal,MPI_DOUBLE,procprev,0,uworld,&request);
     if (ireplica < nreplica-1) 

@@ -90,6 +90,7 @@ int CACMinFire::iterate(int maxiter)
   int *nodes_count_list = atom->nodes_per_element_list;
   int nodes_per_element;
   double ****nodal_positions=atom->nodal_positions;
+  double ****nodal_velocities=atom->nodal_velocities;
 
 
   alpha_final = 0.0;
@@ -207,6 +208,7 @@ int CACMinFire::iterate(int maxiter)
     // Euler integration step
 
     double **xx = atom->x;
+    double **vv = atom->v;
     double **x = atom->nodal_positions[0][0];
     
     if (rmass) {
@@ -230,13 +232,12 @@ int CACMinFire::iterate(int maxiter)
         v[i][2] += dtfm * f[i][2];
       }
     }
-    // update x for elements and atoms using nodal variables
+    // update x,v for elements and atoms using nodal variables
     for (int i = 0; i < atom->nlocal; i++){
       //determine element type
       nodes_per_element = nodes_count_list[element_type[i]];    
-      xx[i][0] = 0;
-      xx[i][1] = 0;
-      xx[i][2] = 0;
+      xx[i][0] = xx[i][1] = xx[i][2] = 0;
+      vv[i][0] = vv[i][1] = vv[i][2] = 0.0;
 
       for(int k=0; k<nodes_per_element; k++){
         for (int poly_counter = 0; poly_counter < poly_count[i];poly_counter++) {
@@ -244,12 +245,18 @@ int CACMinFire::iterate(int maxiter)
             xx[i][0] += nodal_positions[i][k][poly_counter][0];
             xx[i][1] += nodal_positions[i][k][poly_counter][1];
             xx[i][2] += nodal_positions[i][k][poly_counter][2];
+            vv[i][0] += nodal_velocities[i][k][poly_counter][0];
+            vv[i][1] += nodal_velocities[i][k][poly_counter][1];
+            vv[i][2] += nodal_velocities[i][k][poly_counter][2];
           }
       }
 
       xx[i][0] = xx[i][0] / nodes_per_element / poly_count[i];
       xx[i][1] = xx[i][1] / nodes_per_element / poly_count[i];
       xx[i][2] = xx[i][2] / nodes_per_element / poly_count[i];
+      vv[i][0] = vv[i][0] / nodes_per_element / poly_count[i];
+      vv[i][1] = vv[i][1] / nodes_per_element / poly_count[i];
+      vv[i][2] = vv[i][2] / nodes_per_element / poly_count[i];
     }
     eprevious = ecurrent;
     ecurrent = energy_force(0);

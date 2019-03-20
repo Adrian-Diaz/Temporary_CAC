@@ -507,6 +507,7 @@ void NEBCAC::readfile(char *file, int flag)
       tag = ATOTAGINT(values[0]);
       m = atom->map(tag);
       if (m >= 0 && m < nlocal) {
+        x[m][0] = x[m][1] = x[m][2] = 0;
         for (int p = 0; p < nodecount; p++) {
           for (int k = 0; k < npoly; k++){
             ncount++;
@@ -529,8 +530,14 @@ void NEBCAC::readfile(char *file, int flag)
               xnodes[m][p][k][1] = yy;
               xnodes[m][p][k][2] = zz;
             }
+            x[m][0] += xnodes[m][p][k][0];
+            x[m][1] += xnodes[m][p][k][1];
+            x[m][2] += xnodes[m][p][k][2];
           }
         }
+        x[m][0] = x[m][0] / nodecount / npoly;
+        x[m][1] = x[m][1] / nodecount / npoly;
+        x[m][2] = x[m][2] / nodecount / npoly;
       }
     }
 
@@ -553,30 +560,6 @@ void NEBCAC::readfile(char *file, int flag)
       error->all(FLERR,"Invalid atom IDs in neb file");
   }
 
-  // update x for elements and atoms using nodal variables
-  int *element_type = atom->element_type;
-  int *poly_count = atom->poly_count;
-  int *nodes_count_list = atom->nodes_per_element_list;
-  for (int i = 0; i < atom->nlocal; i++){
-    //determine element type
-    nodes_per_element = nodes_count_list[element_type[i]];    
-    x[i][0] = 0;
-    x[i][1] = 0;
-    x[i][2] = 0;
-
-    for(int k=0; k<nodes_per_element; k++){
-      for (int poly_counter = 0; poly_counter < poly_count[i];poly_counter++) {
-        
-          x[i][0] += xnodes[i][k][poly_counter][0];
-          x[i][1] += xnodes[i][k][poly_counter][1];
-          x[i][2] += xnodes[i][k][poly_counter][2];
-        }
-    }
-
-    x[i][0] = x[i][0] / nodes_per_element / poly_count[i];
-    x[i][1] = x[i][1] / nodes_per_element / poly_count[i];
-    x[i][2] = x[i][2] / nodes_per_element / poly_count[i];
-  }
   // clean up
 
   delete [] buffer;
