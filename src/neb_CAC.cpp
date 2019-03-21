@@ -636,8 +636,8 @@ void NEBCAC::print_status()
 
   double one[numall];
   one[0] = fneb->veng;
-  one[1] = fneb->plen;
-  one[2] = fneb->nlen;
+  one[1] = fneb->plennode;
+  one[2] = fneb->nlennode;
   one[3] = fneb->gradlennode;
 
   if (verbose) {
