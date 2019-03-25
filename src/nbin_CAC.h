@@ -39,6 +39,10 @@ class NBinCAC : public NBin {
   int *bin_overlap_limits;
   int first_alloc;
   int max_bin_expansion_count;
+  int *bin_ncontent;
+  int **bin_content;
+  int *quad2bin;
+
   int *bin_expansion_counts;
   int nmax;
   double **current_element_quad_points;
