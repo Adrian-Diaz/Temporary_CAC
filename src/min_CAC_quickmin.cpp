@@ -49,10 +49,13 @@ void CACMinQuickMin::init()
 void CACMinQuickMin::setup_style()
 {
   double **v = atom->nodal_velocities[0][0];
+  double **atomv = atom->v;
   int nlocal = atom->maxpoly*atom->nodes_per_element * atom->nlocal;
 
   for (int i = 0; i < nlocal; i++)
     v[i][0] = v[i][1] = v[i][2] = 0.0;
+  for (int j = 0; j < atom->nlocal; j++)
+    atomv[j][0] = atomv[j][1] = atomv[j][2] = 0.0;
 }
 
 /* ----------------------------------------------------------------------
@@ -96,7 +99,7 @@ int CACMinQuickMin::iterate(int maxiter)
 
     // zero velocity if anti-parallel to force
     // else project velocity in direction of force
-
+    double **x = atom->nodal_positions[0][0];
     double **v = atom->nodal_velocities[0][0];
     double **f = atom->nodal_forces[0][0];
     int nlocal = atom->maxpoly*atom->nodes_per_element * atom->nlocal;
@@ -169,7 +172,7 @@ int CACMinQuickMin::iterate(int maxiter)
 
     // Euler integration step
 
-    double **x = atom->nodal_positions[0][0];
+
 
     if (rmass) {
       for (int i = 0; i < nlocal; i++) {
@@ -195,11 +198,13 @@ int CACMinQuickMin::iterate(int maxiter)
 
     // update x for elements and atoms using nodal variables
     double **xatom = atom->x;
+    double **vatom = atom->v;
     int *element_type = atom->element_type;
     int *poly_count = atom->poly_count;
     int **node_types = atom->node_types;
     int *nodes_count_list = atom->nodes_per_element_list; 
     double ****nodal_positions=atom->nodal_positions;
+    double ****nodal_velocities=atom->nodal_velocities;
 
     int nodes_per_element;
     for (int i = 0; i < atom->nlocal; i++){
@@ -213,11 +218,17 @@ int CACMinQuickMin::iterate(int maxiter)
           xatom[i][0] += nodal_positions[i][k][poly_counter][0];
           xatom[i][1] += nodal_positions[i][k][poly_counter][1];
           xatom[i][2] += nodal_positions[i][k][poly_counter][2];
+          vatom[i][0] += nodal_velocities[i][k][poly_counter][0];
+          vatom[i][1] += nodal_velocities[i][k][poly_counter][1];
+          vatom[i][2] += nodal_velocities[i][k][poly_counter][2];
         }
       }
       xatom[i][0] = xatom[i][0] / nodes_per_element / poly_count[i];
       xatom[i][1] = xatom[i][1] / nodes_per_element / poly_count[i];
       xatom[i][2] = xatom[i][2] / nodes_per_element / poly_count[i];
+      vatom[i][0] = vatom[i][0] / nodes_per_element / poly_count[i];
+      vatom[i][1] = vatom[i][1] / nodes_per_element / poly_count[i];
+      vatom[i][2] = vatom[i][2] / nodes_per_element / poly_count[i];
     }
 
     eprevious = ecurrent;

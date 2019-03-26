@@ -177,24 +177,24 @@ FixNEBCAC::~FixNEBCAC()
   modify->delete_compute(id_pe);
   delete [] id_pe;
 
-  memory->destroy(xprev);
-  memory->destroy(xnext);
-  memory->destroy(tangent);
-  memory->destroy(fnext);
-  memory->destroy(springF);
-  memory->destroy(xsend);
-  memory->destroy(xrecv);
-  memory->destroy(fsend);
-  memory->destroy(frecv);
-  memory->destroy(tagsend);
-  memory->destroy(tagrecv);
+  // memory->destroy(xprev);
+  // memory->destroy(xnext);
+  // memory->destroy(tangent);
+  // memory->destroy(fnext);
+  // memory->destroy(springF);
+  // memory->destroy(xsend);
+  // memory->destroy(xrecv);
+  // memory->destroy(fsend);
+  // memory->destroy(frecv);
+  // memory->destroy(tagsend);
+  // memory->destroy(tagrecv);
 
-  memory->destroy(xsendall);
-  memory->destroy(xrecvall);
-  memory->destroy(fsendall);
-  memory->destroy(frecvall);
-  memory->destroy(tagsendall);
-  memory->destroy(tagrecvall);
+  // memory->destroy(xsendall);
+  // memory->destroy(xrecvall);
+  // memory->destroy(fsendall);
+  // memory->destroy(frecvall);
+  // memory->destroy(tagsendall);
+  // memory->destroy(tagrecvall);
 
 
   memory->destroy(xprevnode);
@@ -352,7 +352,7 @@ void FixNEBCAC::min_post_force(int vflag)
       }
       }*/
 
-  // communicate atoms to/from adjacent replicas to fill xprev,xnext, xprevnode, xnextnode
+  // communicate atoms to/from adjacent replicas to fill xprevnode, xnextnode
 
   inter_replica_comm();
 
@@ -433,7 +433,7 @@ void FixNEBCAC::min_post_force(int vflag)
             delzn = xnextn[i][p][k][2] - xnode[i][p][k][2];
             domain->minimum_image(delxn,delyn,delzn);
             nlennode += delxn*delxn + delyn*delyn + delzn*delzn;
-            gradnextlen += fnextn[i][p][k][0]*fnextn[i][p][k][0] 
+            gradnextlennode += fnextn[i][p][k][0]*fnextn[i][p][k][0] 
               + fnextn[i][p][k][1]*fnextn[i][p][k][1] 
               + fnextn[i][p][k][2] * fnextn[i][p][k][2];
             dotgradnode += fnode[i][p][k][0]*fnextn[i][p][k][0] 
@@ -615,10 +615,10 @@ void FixNEBCAC::min_post_force(int vflag)
       double dotallnode;
       MPI_Allreduce(&dotnode,&dotallnode,1,MPI_DOUBLE,MPI_SUM,world);
       dotnode = dotallnode/tlennode;
-
-      if (dotnode < 0) prefactornode = -dotnode - kspringFinal*(veng-EFinalIni);
-      else prefactornode = -dotnode + kspringFinal*(veng-EFinalIni);
-
+      if (veng < EFinalIni) {
+        if (dotnode < 0) prefactornode = -dotnode - kspringFinal*(veng-EFinalIni);
+        else prefactornode = -dotnode + kspringFinal*(veng-EFinalIni);
+      }
       for (int i = 0; i < nlocal; i++) { 
         nodes_per_element = nodes_count_list[element_type[i]];
         if (mask[i] & groupbit) {
@@ -731,7 +731,7 @@ void FixNEBCAC::min_post_force(int vflag)
     prefactornode = -2.0*dotnode;
   else {
     if (NEBLongRange)
-      prefactornode = -dot - kspring*(lenuntilIm-idealPos)/(2*meanDist);
+      prefactornode = -dotnode - kspring*(lenuntilIm-idealPos)/(2*meanDist);
     else if (StandardNEB)
       prefactornode = -dotnode + kspring*(nlennode-plennode);
 
@@ -816,29 +816,6 @@ void FixNEBCAC::inter_replica_comm()
   // direct comm of x -> xprev and x -> xnext
 
   if (cmode == SINGLE_PROC_DIRECT) {
-    //   Debug block
-    // volatile int qq = 0;
-    // printf("set var qq = 1");
-    // while (qq == 0){}
-    // if (ireplica > 0)
-    //   MPI_Irecv(xprev[0],3*nlocal,MPI_DOUBLE,procprev,0,uworld,&request);
-    // if (ireplica < nreplica-1) 
-    //   MPI_Send(x[0],3*nlocal,MPI_DOUBLE,procnext,0,uworld);    
-    // if (ireplica > 0) MPI_Wait(&request,MPI_STATUS_IGNORE);
-    // if (ireplica < nreplica-1)
-    //   MPI_Irecv(xnext[0],3*nlocal,MPI_DOUBLE,procnext,0,uworld,&request);
-    // if (ireplica > 0)
-    //   MPI_Send(x[0],3*nlocal,MPI_DOUBLE,procprev,0,uworld);
-    // if (ireplica < nreplica-1) MPI_Wait(&request,MPI_STATUS_IGNORE);
-
-    // if (ireplica < nreplica-1)
-    //   MPI_Irecv(fnext[0],3*nlocal,MPI_DOUBLE,procnext,0,uworld,&request);
-    // if (ireplica > 0)
-    //   MPI_Send(f[0],3*nlocal,MPI_DOUBLE,procprev,0,uworld);
- 
-    // if (ireplica < nreplica-1) MPI_Wait(&request,MPI_STATUS_IGNORE);
-
-
     // node info send/recv
     if (ireplica > 0)
       MPI_Irecv(xprevnode[0][0][0], 3*nlocalnode, MPI_DOUBLE, procprev, 1, uworld, &requestn);
@@ -1031,17 +1008,17 @@ void FixNEBCAC::reallocate()
 {
   maxlocal = atom->nmax;
 
-  memory->destroy(xprev);
-  memory->destroy(xnext);
-  memory->destroy(tangent);
-  memory->destroy(fnext);
-  memory->destroy(springF);
+  // memory->destroy(xprev);
+  // memory->destroy(xnext);
+  // memory->destroy(tangent);
+  // memory->destroy(fnext);
+  // memory->destroy(springF);
 
-  memory->create(xprev,maxlocal,3,"neb_CAC:xprev");
-  memory->create(xnext,maxlocal,3,"neb_CAC:xnext");
-  memory->create(tangent,maxlocal,3,"neb_CAC:tangent");
-  memory->create(fnext,maxlocal,3,"neb_CAC:fnext");
-  memory->create(springF,maxlocal,3,"neb_CAC:springF");
+  // memory->create(xprev,maxlocal,3,"neb_CAC:xprev");
+  // memory->create(xnext,maxlocal,3,"neb_CAC:xnext");
+  // memory->create(tangent,maxlocal,3,"neb_CAC:tangent");
+  // memory->create(fnext,maxlocal,3,"neb_CAC:fnext");
+  // memory->create(springF,maxlocal,3,"neb_CAC:springF");
 
   //Allocate extra arrays for CAC data structures
   memory->destroy(xprevnode);
@@ -1074,7 +1051,7 @@ void FixNEBCAC::reallocate()
   }
 
   if (NEBLongRange) {
-    memory->destroy(nlenall);
-    memory->create(nlenall,nreplica,"neb:nlenall");
+    memory->destroy(nlenallnode);
+    memory->create(nlenallnode,nreplica,"neb_CAC:nlenallnode");
   }
 }

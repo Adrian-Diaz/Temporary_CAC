@@ -92,9 +92,9 @@ NEBCAC::NEBCAC(LAMMPS *lmp, double etol_in, double ftol_in, int n1steps_in,
     dely = buf_final[ii+1] - buf_init[ii+1];
     delz = buf_final[ii+2] - buf_init[ii+2];
     domain->minimum_image(delx,dely,delz);
-    x[i][0] = buf_init[ii] + fraction*delx;
-    x[i][1] = buf_init[ii+1] + fraction*dely;
-    x[i][2] = buf_init[ii+2] + fraction*delz;
+    nodes[i][0] = buf_init[ii] + fraction*delx;
+    nodes[i][1] = buf_init[ii+1] + fraction*dely;
+    nodes[i][2] = buf_init[ii+2] + fraction*delz;
     ii += 3;
   }
 }
