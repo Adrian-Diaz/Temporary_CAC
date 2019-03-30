@@ -1617,6 +1617,9 @@ int Neighbor::choose_bin(NeighRequest *rq)
     if (rq->CAC) {
 		  if (!(mask & NB_CAC)) continue;
 	  }
+    else{
+      if ((mask & NB_CAC)) continue;
+    }
 
     return i+1;
   }

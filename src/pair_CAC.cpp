@@ -719,9 +719,9 @@ void PairCAC::compute_forcev(int iii){
 
 
 					if (quadrature_abcissae[i] < 0)
-						s = s - 0.5*unit_cell_mapped[2];
+						s = s - 0.5*unit_cell_mapped[0];
 					else
-						s = s + 0.5*unit_cell_mapped[2];
+						s = s + 0.5*unit_cell_mapped[0];
 
 
 					if (quadrature_abcissae[j] < 0)
