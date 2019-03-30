@@ -322,12 +322,12 @@ void NBinCAC::setup_bins(int style)
 	}
 	}
 		
-    bsubboxlo[0] -= max_search_range+cutghost[0];
-    bsubboxlo[1] -= max_search_range+cutghost[1];
-    bsubboxlo[2] -= max_search_range+cutghost[2];
-    bsubboxhi[0] += max_search_range+cutghost[0];
-    bsubboxhi[1] += max_search_range+cutghost[1];
-    bsubboxhi[2] += max_search_range+cutghost[2];
+    bsubboxlo[0] -= 2*max_search_range+cutghost[0];
+    bsubboxlo[1] -= 2*max_search_range+cutghost[1];
+    bsubboxlo[2] -= 2*max_search_range+cutghost[2];
+    bsubboxhi[0] += 2*max_search_range+cutghost[0];
+    bsubboxhi[1] += 2*max_search_range+cutghost[1];
+    bsubboxhi[2] += 2*max_search_range+cutghost[2];
 		
   } else {
 	double lo[3],hi[3];

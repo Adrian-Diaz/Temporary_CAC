@@ -240,11 +240,11 @@ void CommCAC::setup()
       lo1[0] = sublo[0]; lo1[1] = sublo[1]; lo1[2] = sublo[2];
       hi1[0] = subhi[0]; hi1[1] = subhi[1]; hi1[2] = subhi[2];
       if (idir == 0) {
-        lo1[idim] = sublo[idim] - cut;
+        lo1[idim] = sublo[idim] - cut-atom->CAC_cut;
         hi1[idim] = sublo[idim];
       } else {
         lo1[idim] = subhi[idim];
-        hi1[idim] = subhi[idim] + cut;
+        hi1[idim] = subhi[idim] + cut+atom->CAC_cut;
       }
 
       two = 0;
