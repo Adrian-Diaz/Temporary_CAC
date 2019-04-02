@@ -99,7 +99,6 @@ int CACMinQuickMin::iterate(int maxiter)
 
     // zero velocity if anti-parallel to force
     // else project velocity in direction of force
-    double **x = atom->nodal_positions[0][0];
     double **v = atom->nodal_velocities[0][0];
     double **f = atom->nodal_forces[0][0];
     int nlocal = atom->maxpoly*atom->nodes_per_element * atom->nlocal;
@@ -172,55 +171,66 @@ int CACMinQuickMin::iterate(int maxiter)
 
     // Euler integration step
 
-
-
+    double ****xnode = atom->nodal_positions;
+    double ****vnode = atom->nodal_velocities;
+    double ****fnode = atom->nodal_forces;
+    int *element_type = atom->element_type;
+    int *poly_count = atom->poly_count;
+    int **node_types = atom->node_types;
+    int *nodes_count_list = atom->nodes_per_element_list;
+    int nodes_per_element;
+    // Use verbose looping due to nodal masses
     if (rmass) {
-      for (int i = 0; i < nlocal; i++) {
-        dtfm = dtf / rmass[i];
-        x[i][0] += dtv * v[i][0];
-        x[i][1] += dtv * v[i][1];
-        x[i][2] += dtv * v[i][2];
-        v[i][0] += dtfm * f[i][0];
-        v[i][1] += dtfm * f[i][1];
-        v[i][2] += dtfm * f[i][2];
+      for (int i = 0; i < atom->nlocal; i++) {
+        nodes_per_element = nodes_count_list[element_type[i]];
+
+        for (int j = 0; j < nodes_per_element; j++){
+          for (int k = 0; k < poly_count[i]; k++){
+            dtfm = dtf / rmass[i];
+            xnode[i][j][k][0] += dtv * vnode[i][j][k][0];
+            xnode[i][j][k][1] += dtv * vnode[i][j][k][1];
+            xnode[i][j][k][2] += dtv * vnode[i][j][k][2];
+            vnode[i][j][k][0] += dtfm * fnode[i][j][k][0];
+            vnode[i][j][k][1] += dtfm * fnode[i][j][k][1];
+            vnode[i][j][k][2] += dtfm * fnode[i][j][k][2];
+          }
+        }
       }
     } else {
       for (int i = 0; i < nlocal; i++) {
-        dtfm = dtf / mass[type[i]];
-        x[i][0] += dtv * v[i][0];
-        x[i][1] += dtv * v[i][1];
-        x[i][2] += dtv * v[i][2];
-        v[i][0] += dtfm * f[i][0];
-        v[i][1] += dtfm * f[i][1];
-        v[i][2] += dtfm * f[i][2];
+        nodes_per_element = nodes_count_list[element_type[i]];
+        for (int j = 0; j < nodes_per_element; j++){
+          for (int k = 0; k < poly_count[i]; k++){
+            dtfm = dtf / mass[node_types[i][k]];
+            xnode[i][j][k][0] += dtv * vnode[i][j][k][0];
+            xnode[i][j][k][1] += dtv * vnode[i][j][k][1];
+            xnode[i][j][k][2] += dtv * vnode[i][j][k][2];
+            vnode[i][j][k][0] += dtfm * fnode[i][j][k][0];
+            vnode[i][j][k][1] += dtfm * fnode[i][j][k][1];
+            vnode[i][j][k][2] += dtfm * fnode[i][j][k][2];
+          }
+        }
       }
     }
 
     // update x for elements and atoms using nodal variables
     double **xatom = atom->x;
     double **vatom = atom->v;
-    int *element_type = atom->element_type;
-    int *poly_count = atom->poly_count;
-    int **node_types = atom->node_types;
-    int *nodes_count_list = atom->nodes_per_element_list; 
-    double ****nodal_positions=atom->nodal_positions;
-    double ****nodal_velocities=atom->nodal_velocities;
 
-    int nodes_per_element;
+
     for (int i = 0; i < atom->nlocal; i++){
       //determine element type
-      nodes_per_element = nodes_count_list[element_type[i]];
-    
+      nodes_per_element = nodes_count_list[element_type[i]];    
       xatom[i][0] = xatom[i][1] = xatom[i][2] = 0;
-
+      vatom[i][0] = vatom[i][1] = vatom[i][2] = 0;
       for(int k=0; k<nodes_per_element; k++){
         for (int poly_counter = 0; poly_counter < poly_count[i];poly_counter++) {
-          xatom[i][0] += nodal_positions[i][k][poly_counter][0];
-          xatom[i][1] += nodal_positions[i][k][poly_counter][1];
-          xatom[i][2] += nodal_positions[i][k][poly_counter][2];
-          vatom[i][0] += nodal_velocities[i][k][poly_counter][0];
-          vatom[i][1] += nodal_velocities[i][k][poly_counter][1];
-          vatom[i][2] += nodal_velocities[i][k][poly_counter][2];
+          xatom[i][0] += xnode[i][k][poly_counter][0];
+          xatom[i][1] += xnode[i][k][poly_counter][1];
+          xatom[i][2] += xnode[i][k][poly_counter][2];
+          vatom[i][0] += vnode[i][k][poly_counter][0];
+          vatom[i][1] += vnode[i][k][poly_counter][1];
+          vatom[i][2] += vnode[i][k][poly_counter][2];
         }
       }
       xatom[i][0] = xatom[i][0] / nodes_per_element / poly_count[i];
