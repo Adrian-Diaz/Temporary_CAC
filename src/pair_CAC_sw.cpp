@@ -224,9 +224,12 @@ double PairCACSW::init_one(int i, int j) {
 	}
 	
     atom->CAC_skin=cutoff_skin;
-
-	MPI_Allreduce(&atom->scale_count,&atom->scale_count,1,MPI_INT,MPI_MAX,world);
-	MPI_Allreduce(&atom->max_search_range,&atom->max_search_range,1,MPI_DOUBLE,MPI_MAX,world);
+  int scale_count=0;
+	double max_search_range=0;
+	MPI_Allreduce(&atom->scale_count,&scale_count,1,MPI_INT,MPI_MAX,world);
+	MPI_Allreduce(&atom->max_search_range,&max_search_range,1,MPI_DOUBLE,MPI_MAX,world);
+	atom->max_search_range=max_search_range;
+	atom->scale_count=scale_count;
 	return atom->max_search_range;
 	//return cutmax;
 }

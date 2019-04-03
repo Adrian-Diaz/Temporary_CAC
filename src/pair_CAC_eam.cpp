@@ -33,8 +33,8 @@
 #include <stdint.h>
 
 //#include "math_extra.h"
-#define MAXNEIGH1  50
-#define MAXNEIGH2  10
+#define MAXNEIGH1  700
+#define MAXNEIGH2  300
 #define MAXLINE 1024
 #define DELTA 4
 using namespace LAMMPS_NS;
@@ -299,15 +299,12 @@ double PairCACEAM::init_one(int i, int j) {
 	}
 	
     atom->CAC_skin=cutoff_skin;
-    if (comm->me == 0){
-    	MPI_Allreduce(MPI_IN_PLACE,&atom->scale_count,1,MPI_INT,MPI_MAX,world);
-		MPI_Allreduce(MPI_IN_PLACE,&atom->max_search_range,1,MPI_DOUBLE,MPI_MAX,world);
-    }
-    else {
-		MPI_Allreduce(&atom->scale_count,&atom->scale_count,1,MPI_INT,MPI_MAX,world);
-		MPI_Allreduce(&atom->max_search_range,&atom->max_search_range,1,MPI_DOUBLE,MPI_MAX,world);
-    }
-
+  int scale_count=0;
+	double max_search_range=0;
+	MPI_Allreduce(&atom->scale_count,&scale_count,1,MPI_INT,MPI_MAX,world);
+	MPI_Allreduce(&atom->max_search_range,&max_search_range,1,MPI_DOUBLE,MPI_MAX,world);
+	atom->max_search_range=max_search_range;
+	atom->scale_count=scale_count;
 	return atom->max_search_range;
 }
 
