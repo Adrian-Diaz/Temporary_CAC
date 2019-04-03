@@ -73,12 +73,16 @@ PairCAC::PairCAC(LAMMPS *lmp) : Pair(lmp)
   surface_counts_max_old[0] = 0;
   surface_counts_max_old[1] = 0;
   surface_counts_max_old[2] = 0;
+  old_atom_count=0;
+  old_quad_count=0;
   one_layer_flag = 0;
   old_quad_minima= NULL;
   old_minima_neighbors= NULL;
 	cgParm=NULL;
   asaParm=NULL;
   Objective=NULL;
+	neighbor->pgsize=0;
+	neighbor->oneatom=0;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -3209,7 +3213,7 @@ void PairCAC::allocate_quad_neigh_list(int n1,int n2,int n3,int quad) {
 		}
 
 		
-    memory->sfree(inner_quad_lists_ucell);
+        memory->sfree(inner_quad_lists_ucell);
 		memory->sfree(inner_quad_lists_index);
 		memory->sfree(inner_quad_lists_counts);
 		memory->sfree(outer_quad_lists_ucell);
@@ -3304,9 +3308,11 @@ void PairCAC::allocate_quad_neigh_list(int n1,int n2,int n3,int quad) {
 		memory->create(neighbor_copy_index, maxneigh_quad_inner, 2, "Pair CAC:copy_index");
 	}
 	quad_allocated = 1;
+	if(atom->nlocal>old_atom_count)
+	memory->grow(old_atom_etype, atom->nlocal, "Pair CAC:old_element_type_map");
 	old_atom_count = atom->nlocal;
 	old_quad_count = quad_count*atom->maxpoly;
-	memory->grow(old_atom_etype, atom->nlocal, "Pair CAC:old_element_type_map");
+	
 	for (int init = 0; init < atom->nlocal; init++) {
 		old_atom_etype[init]= element_type[init];
 	}

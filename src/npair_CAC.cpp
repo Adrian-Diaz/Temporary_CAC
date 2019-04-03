@@ -81,7 +81,8 @@ if (quad_allocated) {
 
 	}
 
-
+    memory->destroy(surface_counts);
+	memory->destroy(interior_scales);
 }
 
 /* ----------------------------------------------------------------------
@@ -223,8 +224,8 @@ void NPairCAC::build(NeighList *list)
 		quadrature_count=compute_quad_points(i);
 		}
 		else{
-    	quadrature_count=1;
-    	current_element_quad_points[0][0]=x[i][0];
+    quadrature_count=1;
+    current_element_quad_points[0][0]=x[i][0];
 		current_element_quad_points[0][1]=x[i][1];
 		current_element_quad_points[0][2]=x[i][2];
 		}
@@ -232,20 +233,32 @@ void NPairCAC::build(NeighList *list)
 	// loop over all atoms in surrounding bins in stencil including self
 	// skip i = j
 
-	ibin = atom2bin[i];
+	//ibin = atom2bin[i];
 //loop over quadrature points of elements, by convention an atom is one quadrature point
 for (int iquad = 0; iquad < quadrature_count; iquad++) {
 	n = 0;
+	ibin = quad2bin[qi];
 	expansion_count=0;
 	int neigh_index;
 	for (k = 0; k < nstencil; k++) {
-		for (j = binhead[ibin + stencil[k]]; j >= 0; j = bins[j]) {
+		for (int jj = 0; jj < bin_ncontent[ibin + stencil[k]]; jj++) {
+			j = bin_content[ibin + stencil[k]][jj];
 			if (i == j) continue;
-
+      
 			jtype = type[j];
 			
 			neighbor_element_type = element_type[j];
-		
+		  //check if this element is already in the neighborlist
+			if(neighbor_element_type!=0){
+				int repeat_index_flag=0;
+				for(int neighscan=0; neighscan<n; neighscan++){
+					if(quad_list_container[i][iquad][neighscan]==j) {
+						repeat_index_flag=1;
+						break;
+					}
+				}
+				if(repeat_index_flag) continue;
+			}
 
 			if (exclude && exclusion(i, j, itype, jtype, mask, molecule)) continue;
       
@@ -488,7 +501,7 @@ int NPairCAC::compute_quad_points(int element_index){
 	unit_cell_mapped[0] = 2 / double(element_scale[element_index][0]);
 	unit_cell_mapped[1] = 2 / double(element_scale[element_index][1]);
 	unit_cell_mapped[2] = 2 / double(element_scale[element_index][2]);
-	current_nodal_positions = nodal_positions[element_index];
+	double ***current_nodal_positions = nodal_positions[element_index];
 	int current_poly_count = poly_count[element_index];
   int quadrature_counter=0;
 
@@ -1111,8 +1124,8 @@ void NPairCAC::allocate_quad_neigh_list(int n1,int n2,int n3,int quad) {
 
 //allocate surface counts array
 void NPairCAC::allocate_surface_counts() {
-	memory->grow(surface_counts, atom->nlocal , 3, "Pair CAC:surface_counts");
-	memory->grow(interior_scales, atom->nlocal , 3, "Pair CAC:interior_scales");
+	memory->grow(surface_counts, atom->nlocal , 3, "NPairCAC:surface_counts");
+	memory->grow(interior_scales, atom->nlocal , 3, "NPairCAC:interior_scales");
 	nmax = atom->nlocal;
 }
 
