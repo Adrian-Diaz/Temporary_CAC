@@ -909,9 +909,9 @@ void NBinCAC::bin_atoms()
   bin_overlap_limits[0]=ixl;
   bin_overlap_limits[1]=iyl;
   bin_overlap_limits[2]=izl;
-  bin_overlap_limits[3]=ixl;
-  bin_overlap_limits[4]=iyl;
-  bin_overlap_limits[5]=izl;
+  bin_overlap_limits[3]=ixh;
+  bin_overlap_limits[4]=iyh;
+  bin_overlap_limits[5]=izh;
 
   //return (iz-mbinzlo)*mbiny*mbinx + (iy-mbinylo)*mbinx + (ix-mbinxlo);
 
