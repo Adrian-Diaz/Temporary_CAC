@@ -42,6 +42,8 @@ class NStencil : protected Pointers {
   bigint memory_usage();
 
   virtual void create() = 0;
+  virtual void post_create() {}
+  virtual void post_create_setup() {}
 
   inline int get_maxstencil() {return maxstencil;}
 

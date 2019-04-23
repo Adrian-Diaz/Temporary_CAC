@@ -58,12 +58,19 @@ class NBinCAC : public NBin {
   double *quadrature_abcissae;
   int quad_rule_initialized;
   int setup_called;
-  
+  int bad_bin_flag;
+  double bsubbox[3],bsubboxlo[3],bsubboxhi[3];
+  int max_nall;                  //upper bound on number of local + ghost atoms that have been encountered
+  int *max_nbin_overlap;         //upper bound on how many bins an element has overlapped
+  int foreign_boxes;
   virtual int quad2bins(double *quad_position);
   virtual int element2bins(int element_index);
+  virtual void CAC_bin_atoms_setup(int);
   int compute_quad_points(int);
+  void CAC_setup_bins(int);
   void allocate_surface_counts();
   void quadrature_init(int degree);
+  void expand_overlap_arrays(int size);
   void compute_surface_depths(double &x, double &y, double &z,
 	  int &xb, int &yb, int &zb, int flag);
   double shape_function(double, double, double, int, int);

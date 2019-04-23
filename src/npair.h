@@ -81,9 +81,11 @@ class NPair : protected Pointers {
 
   //CAC package bin arrays
   
-  int *bin_ncontent;
-  int **bin_content;
-  int *quad2bin;
+  int *bin_ncontent;          //number of contents in each bin
+  int **bin_content;          //array of local and ghost indices in each bin
+  int *quad2bin;              //bin location of each local quadrature point
+  int *nbin_element_overlap;  //array storing the number of bins this element overlaps
+  int **bin_element_overlap;  //set of bins this element overlaps
 
   // data from NStencil class
 

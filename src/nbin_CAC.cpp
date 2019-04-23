@@ -28,7 +28,8 @@ enum{NSQ,BIN,MULTI};       // also in Neighbor
 #define SMALL 1.0e-6
 #define CUT2BIN_RATIO 100
 #define MAXBINCONTENT 100  //used to bound local memory
-#define EXPAND 100  
+#define EXPAND 100 
+#define MAXBINOVERLAP 10 
 
 /* ---------------------------------------------------------------------- */
 
@@ -39,21 +40,26 @@ NBinCAC::NBinCAC(LAMMPS *lmp) : NBin(lmp) {
   quad2bin=NULL;
   atom2bin=NULL;
   bin_expansion_counts=NULL;
+	nbin_element_overlap=NULL; 
+  bin_element_overlap=NULL;
+	max_nbin_overlap=NULL;
   first_alloc=0;
   max_bin_expansion_count=0;
   quad_rule_initialized=0;
   nmax=0;
   surface_counts = NULL;
 	interior_scales = NULL;
+	bad_bin_flag=0;
   current_element_quad_points=NULL;
+	setup_called=0;
+	max_nall=0;
   //quad_allocated = 0;
-  surface_counts_max[0] = 0;
-  surface_counts_max[1] = 0;
-  surface_counts_max[2] = 0;
+  surface_counts_max[0] = 1;
+  surface_counts_max[1] = 1;
+  surface_counts_max[2] = 1;
   surface_counts_max_old[0] = 0;
   surface_counts_max_old[1] = 0;
   surface_counts_max_old[2] = 0;
-	setup_called=0;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -69,16 +75,23 @@ NBinCAC::~NBinCAC() {
 	memory->destroy(current_element_quad_points);
   memory->destroy(surface_counts);
 	memory->destroy(interior_scales);
+	memory->destroy(nbin_element_overlap);
+	for(int i=0 ; i<max_nall; i++)
+	memory->destroy(bin_element_overlap[i]);
+	memory->sfree(bin_element_overlap);
 }
 
 /* ----------------------------------------------------------------------
    setup for bin_atoms()
 ------------------------------------------------------------------------- */
-
 void NBinCAC::bin_atoms_setup(int nall)
 {
-	if(!setup_called)
-	setup_bins(1);
+
+}
+void NBinCAC::CAC_bin_atoms_setup(int nall)
+{
+	//if(!setup_called)
+	//setup_bins(1);
   int *element_type = atom->element_type;
 	int *poly_count = atom->poly_count;
   int **element_scale = atom->element_scale;
@@ -92,19 +105,19 @@ void NBinCAC::bin_atoms_setup(int nall)
   // binhead = per-bin vector, mbins in length
   // add 1 bin for USER-INTEL package
   
- if (mbins > maxbin) {
+  if (mbins > maxbin) {
     //compute maximum expansion count used in previous allocations
     
     
     if(!first_alloc){
 		first_alloc=1;
-		memory->grow(bin_expansion_counts,mbins,"neigh:bin_ncontent");
+		memory->grow(bin_expansion_counts,mbins,"bin_CAC:bin_ncontent");
 		  for (int init = 0; init < mbins; init++){
       bin_expansion_counts[init]=max_bin_expansion_count;
     }
     bin_content= (int **) memory->smalloc(mbins*sizeof(int *), "bin_CAC:bin_content");
     for (int init = 0; init < mbins; init++) 
-    memory->create(bin_content[init],MAXBINCONTENT,"neigh:bin_content");
+    memory->create(bin_content[init],MAXBINCONTENT,"bin_CAC:bin_content");
     }
     else{
 		for (int init = 0; init < maxbin; init++){
@@ -127,9 +140,10 @@ void NBinCAC::bin_atoms_setup(int nall)
     
   }
 
+
   // bins and atom2bin = per-atom vectors
   // for both local and ghost atoms
- //allocate quad2bin in next patch
+ 
   if (nall > maxatom) {
     maxatom = nall;
     memory->destroy(bins);
@@ -239,8 +253,13 @@ void NBinCAC::bin_atoms_setup(int nall)
    mbinhi = highest global bin any of my ghost atoms could fall into
    mbin = number of bins I need in a dimension
 ------------------------------------------------------------------------- */
-
 void NBinCAC::setup_bins(int style)
+{
+comm->bin_pointer=this;
+
+}
+
+void NBinCAC::CAC_setup_bins(int style)
 {
   // bbox = size of bbox of entire domain
   // bsubbox lo/hi = bounding box of my subdomain extended by comm->cutghost
@@ -250,7 +269,7 @@ void NBinCAC::setup_bins(int style)
   //   include dimension-dependent extension via comm->cutghost
   //   domain->bbox() converts lamda extent to box coords and computes bbox
 
-  double bbox[3],bsubboxlo[3],bsubboxhi[3];
+  double bbox[3];
   double *cutghost = comm->cutghost;
 	double lamda_temp[3];
   double nodal_temp[3];
@@ -258,6 +277,7 @@ void NBinCAC::setup_bins(int style)
 	double shape_func;
 	int *element_type = atom->element_type;
 	int *poly_count = atom->poly_count;
+	double **x = atom->x;
 	double xtmp, ytmp, ztmp, delx, dely, delz, rsq;
 	double ebounding_boxlo[3];
 	double ebounding_boxhi[3];
@@ -267,7 +287,9 @@ void NBinCAC::setup_bins(int style)
 	int *nodes_per_element_list = atom->nodes_per_element_list;
 	double max_search_range=atom->max_search_range;
 	double cut_max=neighbor->cutneighmax;
-  setup_called=1;
+	double **eboxes=atom->eboxes;
+	int *ebox_ref=atom->ebox_ref;
+  //setup_called=1;
   //expand sub-box sizes to contain all element bounding boxes
 	//in general initial box wont since only x, element centroid, must lie 
 	//inside box for lammps comms
@@ -279,6 +301,12 @@ void NBinCAC::setup_bins(int style)
     bsubboxhi[0] = domain->subhi[0];
     bsubboxhi[1] = domain->subhi[1];
     bsubboxhi[2] = domain->subhi[2];
+		bsubboxlo[0] -= cut_max;
+    bsubboxlo[1] -= cut_max;
+    bsubboxlo[2] -= cut_max;
+    bsubboxhi[0] += cut_max;
+    bsubboxhi[1] += cut_max;
+    bsubboxhi[2] += cut_max;
 		//loop through elements to compute bounding boxes and test
 	//whether they should stretch the local bounding box
 	for(int element_index=0; element_index < atom->nlocal; element_index++){
@@ -288,30 +316,17 @@ void NBinCAC::setup_bins(int style)
     int current_poly_count = poly_count[element_index];
 	int nodes_per_element = nodes_per_element_list[element_type[element_index]];
  
-
-
-
-	//initialize bounding box values
-	ebounding_boxlo[0] = nodal_positions[0][0][0];
-	ebounding_boxlo[1] = nodal_positions[0][0][1];
-	ebounding_boxlo[2] = nodal_positions[0][0][2];
-	ebounding_boxhi[0] = nodal_positions[0][0][0];
-	ebounding_boxhi[1] = nodal_positions[0][0][1];
-	ebounding_boxhi[2] = nodal_positions[0][0][2];
-     //define the bounding box for the element being considered as a neighbor
-	
-	for (int poly_counter = 0; poly_counter < current_poly_count; poly_counter++) {
-		for (int kkk = 0; kkk < nodes_per_element; kkk++) {
-			for (int dim = 0; dim < 3; dim++) {
-				if (nodal_positions[kkk][poly_counter][dim] < ebounding_boxlo[dim]) {
-					ebounding_boxlo[dim] = nodal_positions[kkk][poly_counter][dim];
-				}
-				if (nodal_positions[kkk][poly_counter][dim] > ebounding_boxhi[dim]) {
-					ebounding_boxhi[dim] = nodal_positions[kkk][poly_counter][dim];
-				}
-			}
-		}
-	}
+  double *current_ebox;
+  
+  current_ebox = eboxes[ebox_ref[element_index]];
+  //define this elements bounding box
+	ebounding_boxlo[0] = current_ebox[0];
+	ebounding_boxlo[1] = current_ebox[1];
+	ebounding_boxlo[2] = current_ebox[2];
+	ebounding_boxhi[0] = current_ebox[3];
+	ebounding_boxhi[1] = current_ebox[4];
+	ebounding_boxhi[2] = current_ebox[5];
+   
 	//test if this bounding box exceeds local sub box
 	for(int dim=0; dim < dimension; dim++){
 	if(ebounding_boxhi[dim]>bsubboxhi[dim])
@@ -320,14 +335,20 @@ void NBinCAC::setup_bins(int style)
 	bsubboxlo[dim]=ebounding_boxlo[dim];
 	}
 	}
+	/*
+	else if(element_index>=atom->nlocal){ 
+  //test if this ghost exceeds local sub box
+	for(int dim=0; dim < dimension; dim++){
+	if(x[element_index][dim]>bsubboxhi[dim])
+	bsubboxhi[dim]=x[element_index][dim];
+	if(x[element_index][dim]<bsubboxlo[dim])
+	bsubboxlo[dim]=x[element_index][dim];
 	}
-		
-    bsubboxlo[0] -= 2*max_search_range+cutghost[0];
-    bsubboxlo[1] -= 2*max_search_range+cutghost[1];
-    bsubboxlo[2] -= 2*max_search_range+cutghost[2];
-    bsubboxhi[0] += 2*max_search_range+cutghost[0];
-    bsubboxhi[1] += 2*max_search_range+cutghost[1];
-    bsubboxhi[2] += 2*max_search_range+cutghost[2];
+	}
+	*/
+	}
+	
+
 		
   } else {
 	double lo[3],hi[3];
@@ -339,7 +360,7 @@ void NBinCAC::setup_bins(int style)
   hi[2] = domain->subhi_lamda[2];
 	//loop through elements to compute bounding boxes and test
 	//whether they should stretch the local bounding box
-	for(int element_index=0; element_index < atom->nlocal; element_index++){
+	for(int element_index=0; element_index < atom->nlocal+atom->nghost; element_index++){
 	if(element_type[element_index]){
    nodal_positions = atom->nodal_positions[element_index];
 	//int current_poly_count = poly_count[element_index];
@@ -376,6 +397,14 @@ void NBinCAC::setup_bins(int style)
 	}
 
 	}
+	else if(element_index>=atom->nlocal){
+		for(int dim=0; dim < dimension; dim++){
+	   if(x[element_index][dim]>hi[dim])
+	   hi[dim]=x[element_index][dim];
+	   if(x[element_index][dim]<lo[dim])
+	   lo[dim]=x[element_index][dim];
+	  }
+	}
 	}
 		
     lo[0] -= cutghost[0]*(max_search_range/cut_max+1);
@@ -392,17 +421,49 @@ void NBinCAC::setup_bins(int style)
 	bbox[0] = bboxhi[0] - bboxlo[0];
   bbox[1] = bboxhi[1] - bboxlo[1];
   bbox[2] = bboxhi[2] - bboxlo[2];
+	bsubbox[0]=bsubboxhi[0]-bsubboxlo[0];
+	bsubbox[1]=bsubboxhi[1]-bsubboxlo[1];
+	bsubbox[2]=bsubboxhi[2]-bsubboxlo[2];
   // optimal bin size is roughly 1/2 the cutoff
   // for BIN style, binsize = 1/2 of max neighbor cutoff
   // for MULTI style, binsize = 1/2 of min neighbor cutoff
   // special case of all cutoffs = 0.0, binsize = box size
-
+  
+	//compute optimal binsize using the average element ebox size for me
+	//only use if greater than half the force cutoff radius
+	double average_size=0;
+	for(int element_index=0; element_index < atom->nlocal+atom->nghost; element_index++){
+		if(element_type[element_index]){
+		double *current_ebox;
+  
+  current_ebox = eboxes[ebox_ref[element_index]];
+  //define this elements bounding box
+	ebounding_boxlo[0] = current_ebox[0];
+	ebounding_boxlo[1] = current_ebox[1];
+	ebounding_boxlo[2] = current_ebox[2];
+	ebounding_boxhi[0] = current_ebox[3];
+	ebounding_boxhi[1] = current_ebox[4];
+	ebounding_boxhi[2] = current_ebox[5];
+	for(int idim=0; idim < dimension; idim++){
+	if(ebounding_boxhi[idim]-ebounding_boxlo[idim]>cut_max)
+	average_size+=ebounding_boxhi[idim]-ebounding_boxlo[idim];
+	else
+	average_size+=cut_max;
+	}
+	}
+	else{
+  average_size+=dimension*cut_max;
+	}
+	}
+  if(atom->nlocal+atom->nghost!=0)
+	average_size=average_size/(dimension*(atom->nlocal+atom->nghost));
+  if(average_size<=cut_max) average_size=cut_max;
   double binsize_optimal;
   if (binsizeflag) binsize_optimal = binsize_user;
   else if (style == BIN) binsize_optimal = 0.5*cutneighmax;
   else binsize_optimal = 0.5*cutneighmin;
   if (binsize_optimal == 0.0) binsize_optimal = bbox[0];
-	binsize_optimal=0.5*max_search_range;
+	binsize_optimal=0.5*average_size;
   double binsizeinv = 1.0/binsize_optimal;
 
   // test for too many global bins in any dimension due to huge global domain
@@ -415,9 +476,9 @@ void NBinCAC::setup_bins(int style)
   // always have one bin even if cutoff > bbox
   // for 2d, nbinz = 1
 
-  nbinx = static_cast<int> (bbox[0]*binsizeinv);
-  nbiny = static_cast<int> (bbox[1]*binsizeinv);
-  if (dimension == 3) nbinz = static_cast<int> (bbox[2]*binsizeinv);
+  nbinx = static_cast<int> (bsubbox[0]*binsizeinv);
+  nbiny = static_cast<int> (bsubbox[1]*binsizeinv);
+  if (dimension == 3) nbinz = static_cast<int> (bsubbox[2]*binsizeinv);
   else nbinz = 1;
 
   if (nbinx == 0) nbinx = 1;
@@ -430,9 +491,9 @@ void NBinCAC::setup_bins(int style)
   // typically due to non-periodic, flat system in a particular dim
   // in that extreme case, should use NSQ not BIN neighbor style
 
-  binsizex = bbox[0]/nbinx;
-  binsizey = bbox[1]/nbiny;
-  binsizez = bbox[2]/nbinz;
+  binsizex = bsubbox[0]/nbinx;
+  binsizey = bsubbox[1]/nbiny;
+  binsizez = bsubbox[2]/nbinz;
 
   bininvx = 1.0 / binsizex;
   bininvy = 1.0 / binsizey;
@@ -451,45 +512,25 @@ void NBinCAC::setup_bins(int style)
   int mbinxhi,mbinyhi,mbinzhi;
   double coord;
 
-  coord = bsubboxlo[0] - SMALL*bbox[0];
-  mbinxlo = static_cast<int> ((coord-bboxlo[0])*bininvx);
-  if (coord < bboxlo[0]) mbinxlo = mbinxlo - 1;
-  coord = bsubboxhi[0] + SMALL*bbox[0];
-  mbinxhi = static_cast<int> ((coord-bboxlo[0])*bininvx);
-
-  coord = bsubboxlo[1] - SMALL*bbox[1];
-  mbinylo = static_cast<int> ((coord-bboxlo[1])*bininvy);
-  if (coord < bboxlo[1]) mbinylo = mbinylo - 1;
-  coord = bsubboxhi[1] + SMALL*bbox[1];
-  mbinyhi = static_cast<int> ((coord-bboxlo[1])*bininvy);
-
-  if (dimension == 3) {
-    coord = bsubboxlo[2] - SMALL*bbox[2];
-    mbinzlo = static_cast<int> ((coord-bboxlo[2])*bininvz);
-    if (coord < bboxlo[2]) mbinzlo = mbinzlo - 1;
-    coord = bsubboxhi[2] + SMALL*bbox[2];
-    mbinzhi = static_cast<int> ((coord-bboxlo[2])*bininvz);
-  }
-
+  mbinzlo=mbinylo=mbinxlo=-1;
+	
+ 
   // extend bins by 1 to insure stencil extent is included
   // for 2d, only 1 bin in z
 
-  mbinxlo = mbinxlo - 1;
-  mbinxhi = mbinxhi + 1;
-  mbinx = mbinxhi - mbinxlo + 1;
+  //mbinxlo = mbinxlo - 1;
+  //mbinxhi = mbinxhi + 1;
+  mbinx = nbinx+2;
 
-  mbinylo = mbinylo - 1;
-  mbinyhi = mbinyhi + 1;
-  mbiny = mbinyhi - mbinylo + 1;
+  //mbinylo = mbinylo - 1;
+  //mbinyhi = mbinyhi + 1;
+  mbiny = nbiny+2;
 
-  if (dimension == 3) {
-    mbinzlo = mbinzlo - 1;
-    mbinzhi = mbinzhi + 1;
-  } else mbinzlo = mbinzhi = 0;
-  mbinz = mbinzhi - mbinzlo + 1;
+  mbinz = nbinz+2;
 
   bigint bbin = ((bigint) mbinx) * ((bigint) mbiny) * ((bigint) mbinz) + 1;
   if (bbin > MAXSMALLINT) error->one(FLERR,"Too many neighbor bins");
+	if (bbin<=0) error->one(FLERR,"Too few neighbor bins");
   mbins = bbin;
 }
 
@@ -500,12 +541,19 @@ void NBinCAC::setup_bins(int style)
 void NBinCAC::bin_atoms()
 {
   int i,ibin;
-
-  last_bin = update->ntimestep;
+	if(atom->CAC_comm_flag==0)
+	error->all(FLERR,"Cannot use the CAC method without the CAC comm style");
+  
+	//grow element bin overlap arrays if needed
+  if(atom->nlocal+atom->nghost>max_nall)
+	expand_overlap_arrays(atom->nlocal+atom->nghost);
+	//initialize bin overlap arrays
+	for(int i=0; i<atom->nlocal+atom->nghost; i++){
+	nbin_element_overlap[i]=0;
+	max_nbin_overlap[i]=MAXBINOVERLAP;
+	}
   //for (i = 0; i < mbins; i++) binhead[i] = -1;
-  //initialize bin counts
-  for(int init=0; init<mbins; init++)
-  bin_ncontent[init]=0;
+  
   // bin in reverse order so linked list will be in forward order
   // also puts ghost atoms at end of list, which is necessary
 
@@ -520,10 +568,16 @@ void NBinCAC::bin_atoms()
   int current_bin;
   int qi=0;
   int quadrature_count;
+  CAC_setup_bins(0);
+	CAC_bin_atoms_setup(atom->nlocal+atom->nghost);
+	//initialize bin counts
+  for(int init=0; init<maxbin; init++)
+  bin_ncontent[init]=0;
 
   if (includegroup) {
     qi=0;
     int bitmask = group->bitmask[includegroup];
+		foreign_boxes=0;
     for (i = nlocal; i < nall; i++) {
       if (mask[i] & bitmask) {
 			int current_element_type = element_type[i];
@@ -533,7 +587,8 @@ void NBinCAC::bin_atoms()
  
   
 		//find the current quadrature points of this element
-		if(i<atom->nlocal){
+		if(i<atom->nlocal)
+		{
 		if(current_element_type!=0){
 		quadrature_count=compute_quad_points(i);
 		}
@@ -555,6 +610,7 @@ void NBinCAC::bin_atoms()
       ibin = element2bins(i);
       atom2bin[i] = ibin;
       if(element_type[i]==0){
+				    if(!atom->bin_foreign){
             current_bin_ncount=bin_ncontent[ibin];
             if(bin_ncontent[ibin]==MAXBINCONTENT+bin_expansion_counts[ibin]*EXPAND){
             bin_expansion_counts[ibin]++;
@@ -562,12 +618,23 @@ void NBinCAC::bin_atoms()
             }
             bin_content[ibin][current_bin_ncount] = i;
             bin_ncontent[ibin]++;
+				    }
+						if(atom->bin_foreign){
+						if(nbin_element_overlap[i]>=max_nbin_overlap[i]){
+							max_nbin_overlap[i]+=MAXBINOVERLAP;
+							memory->grow(bin_element_overlap[i],max_nbin_overlap[i],"nbin_CAC:bin_element_overlap[i] grow");
+						}
+						bin_element_overlap[i][nbin_element_overlap[i]]=ibin;
+						nbin_element_overlap[i]++;
+							
+						}
       }
       else{
       for(int overlapx=bin_overlap_limits[0]; overlapx<=bin_overlap_limits[3]; overlapx++){
         for(int overlapy=bin_overlap_limits[1]; overlapy<=bin_overlap_limits[4]; overlapy++){
           for(int overlapz=bin_overlap_limits[2]; overlapz<=bin_overlap_limits[5]; overlapz++){
             current_bin=(overlapz-mbinzlo)*mbiny*mbinx + (overlapy-mbinylo)*mbinx + (overlapx-mbinxlo);
+            if(!atom->bin_foreign){
             current_bin_ncount=bin_ncontent[current_bin];
             //check bin memory allocation is large enough and grow if needed
             if(bin_ncontent[current_bin]==MAXBINCONTENT+bin_expansion_counts[current_bin]*EXPAND){
@@ -576,6 +643,16 @@ void NBinCAC::bin_atoms()
             }
             bin_content[current_bin][current_bin_ncount] = i;
             bin_ncontent[current_bin]++;
+						}
+						if(atom->bin_foreign){
+						if(nbin_element_overlap[i]>=max_nbin_overlap[i]){
+							max_nbin_overlap[i]+=MAXBINOVERLAP;
+							memory->grow(bin_element_overlap[i],max_nbin_overlap[i],"nbin_CAC:bin_element_overlap[i] grow");
+						}
+						bin_element_overlap[i][nbin_element_overlap[i]]=current_bin;
+						nbin_element_overlap[i]++;
+							
+						}
           }
         }
       }
@@ -604,6 +681,7 @@ void NBinCAC::bin_atoms()
       //bin this element's quadrature points and assign to quad2bin
       for (int iquad = 0; iquad < quadrature_count; iquad++) {
       ibin = quad2bins(current_element_quad_points[iquad]);
+			if(ibin<0) error->one(FLERR," negative bin index");
       quad2bin[qi] = ibin;
       qi++;
       }
@@ -613,6 +691,7 @@ void NBinCAC::bin_atoms()
       ibin = element2bins(i);
       atom2bin[i] = ibin;
       if(element_type[i]==0){
+            if(!atom->bin_foreign){
             current_bin_ncount=bin_ncontent[ibin];
             if(bin_ncontent[ibin]==MAXBINCONTENT+bin_expansion_counts[ibin]*EXPAND){
             bin_expansion_counts[ibin]++;
@@ -620,12 +699,23 @@ void NBinCAC::bin_atoms()
             }
             bin_content[ibin][current_bin_ncount] = i;
             bin_ncontent[ibin]++;
+				    }
+						if(atom->bin_foreign){
+						if(nbin_element_overlap[i]>=max_nbin_overlap[i]){
+							max_nbin_overlap[i]+=MAXBINOVERLAP;
+							memory->grow(bin_element_overlap[i],max_nbin_overlap[i],"nbin_CAC:bin_element_overlap[i] grow");
+						}
+						bin_element_overlap[i][nbin_element_overlap[i]]=ibin;
+						nbin_element_overlap[i]++;
+							
+						}
       }
       else{
       for(int overlapx=bin_overlap_limits[0]; overlapx<=bin_overlap_limits[3]; overlapx++){
         for(int overlapy=bin_overlap_limits[1]; overlapy<=bin_overlap_limits[4]; overlapy++){
           for(int overlapz=bin_overlap_limits[2]; overlapz<=bin_overlap_limits[5]; overlapz++){
             current_bin=(overlapz-mbinzlo)*mbiny*mbinx + (overlapy-mbinylo)*mbinx + (overlapx-mbinxlo);
+            if(!atom->bin_foreign){
             current_bin_ncount=bin_ncontent[current_bin];
             //check bin memory allocation is large enough and grow if needed
             if(bin_ncontent[current_bin]==MAXBINCONTENT+bin_expansion_counts[current_bin]*EXPAND){
@@ -634,14 +724,26 @@ void NBinCAC::bin_atoms()
             }
             bin_content[current_bin][current_bin_ncount] = i;
             bin_ncontent[current_bin]++;
+						}
+						if(atom->bin_foreign){
+						if(nbin_element_overlap[i]>=max_nbin_overlap[i]){
+							max_nbin_overlap[i]+=MAXBINOVERLAP;
+							memory->grow(bin_element_overlap[i],max_nbin_overlap[i],"nbin_CAC:bin_element_overlap[i] grow");
+						}
+						bin_element_overlap[i][nbin_element_overlap[i]]=current_bin;
+						nbin_element_overlap[i]++;
+							
+						}
           }
         }
       }
       }
     }
 
-  } else {
+  } 
+	else {
     qi=0;
+		foreign_boxes=0;
     for (i = 0; i < nall; i++) {
       //computes the quadrature point locations for this ith element and returns the # of points
   int current_element_type = element_type[i];
@@ -664,6 +766,8 @@ void NBinCAC::bin_atoms()
       //bin this element's quadrature points and assign to quad2bin
       for (int iquad = 0; iquad < quadrature_count; iquad++) {
       ibin = quad2bins(current_element_quad_points[iquad]);
+			if(ibin<0) error->one(FLERR," negative bin index");
+			if(ibin>=mbins) error->one(FLERR," excessive bin index");
       quad2bin[qi] = ibin;
       qi++;
       }
@@ -673,6 +777,7 @@ void NBinCAC::bin_atoms()
       ibin = element2bins(i);
       
       if(element_type[i]==0){
+            if(!atom->bin_foreign){
             current_bin_ncount=bin_ncontent[ibin];
             if(bin_ncontent[ibin]==MAXBINCONTENT+bin_expansion_counts[ibin]*EXPAND){
             bin_expansion_counts[ibin]++;
@@ -680,12 +785,25 @@ void NBinCAC::bin_atoms()
             }
             bin_content[ibin][current_bin_ncount] = i;
             bin_ncontent[ibin]++;
+				    }
+						if(atom->bin_foreign){
+						if(nbin_element_overlap[i]>=max_nbin_overlap[i]){
+							max_nbin_overlap[i]+=MAXBINOVERLAP;
+							memory->grow(bin_element_overlap[i],max_nbin_overlap[i],"nbin_CAC:bin_element_overlap[i] grow");
+						}
+						bin_element_overlap[i][nbin_element_overlap[i]]=ibin;
+						nbin_element_overlap[i]++;
+							
+						}
       }
       if(element_type[i]!=0){
       for(int overlapx=bin_overlap_limits[0]; overlapx<=bin_overlap_limits[3]; overlapx++){
         for(int overlapy=bin_overlap_limits[1]; overlapy<=bin_overlap_limits[4]; overlapy++){
           for(int overlapz=bin_overlap_limits[2]; overlapz<=bin_overlap_limits[5]; overlapz++){
             current_bin=(overlapz-mbinzlo)*mbiny*mbinx + (overlapy-mbinylo)*mbinx + (overlapx-mbinxlo);
+						if(current_bin<0) error->one(FLERR," negative bin index");
+						if(current_bin>=mbins) error->one(FLERR," excessive bin index");
+						if(!atom->bin_foreign){
             current_bin_ncount=bin_ncontent[current_bin];
             //check bin memory allocation is large enough and grow if needed
             if(bin_ncontent[current_bin]==MAXBINCONTENT+bin_expansion_counts[current_bin]*EXPAND){
@@ -694,12 +812,46 @@ void NBinCAC::bin_atoms()
             }
             bin_content[current_bin][current_bin_ncount] = i;
             bin_ncontent[current_bin]++;
+						}
+						if(atom->bin_foreign){
+						if(nbin_element_overlap[i]>=max_nbin_overlap[i]){
+							max_nbin_overlap[i]+=MAXBINOVERLAP;
+							memory->grow(bin_element_overlap[i],max_nbin_overlap[i],"nbin_CAC:bin_element_overlap[i] grow");
+						}
+						bin_element_overlap[i][nbin_element_overlap[i]]=current_bin;
+						nbin_element_overlap[i]++;
+							
+						}
           }
         }
       }
       }
     }
   }
+
+	//bin foreign eboxes for Comm CAC if needed
+	if(atom->bin_foreign){
+		foreign_boxes=1;
+		for(int i=0; i<atom->nforeign_eboxes; i++){
+		ibin = element2bins(i);
+     for(int overlapx=bin_overlap_limits[0]; overlapx<=bin_overlap_limits[3]; overlapx++)
+        for(int overlapy=bin_overlap_limits[1]; overlapy<=bin_overlap_limits[4]; overlapy++)
+          for(int overlapz=bin_overlap_limits[2]; overlapz<=bin_overlap_limits[5]; overlapz++){
+            current_bin=(overlapz-mbinzlo)*mbiny*mbinx + (overlapy-mbinylo)*mbinx + (overlapx-mbinxlo);
+						if(current_bin<0) error->one(FLERR," negative bin index");
+						if(current_bin>=mbins) error->one(FLERR," excessive bin index");
+            current_bin_ncount=bin_ncontent[current_bin];
+            //check bin memory allocation is large enough and grow if needed
+            if(bin_ncontent[current_bin]==MAXBINCONTENT+bin_expansion_counts[current_bin]*EXPAND){
+            bin_expansion_counts[current_bin]++;
+            memory->grow(bin_content[current_bin],MAXBINCONTENT+bin_expansion_counts[current_bin]*EXPAND,"neigh:bin_content grow");
+            }
+            bin_content[current_bin][current_bin_ncount] = i;
+            bin_ncontent[current_bin]++;
+						
+          }
+		}
+	}
 }
 /* ----------------------------------------------------------------------
    convert atom and CAC element coords into local bin #
@@ -725,29 +877,29 @@ void NBinCAC::bin_atoms()
   if (!ISFINITE(x[0]) || !ISFINITE(x[1]) || !ISFINITE(x[2]))
     error->one(FLERR,"Non-numeric positions - simulation unstable");
 
-  if (x[0] >= bboxhi[0])
-    ix = static_cast<int> ((x[0]-bboxhi[0])*bininvx) + nbinx;
-  else if (x[0] >= bboxlo[0]) {
-    ix = static_cast<int> ((x[0]-bboxlo[0])*bininvx);
-    ix = MIN(ix,nbinx-1);
+  if (x[0] >= bsubboxhi[0])
+    error->one(FLERR,"quadrature_point outside of bin domain");
+  else if (x[0] >= bsubboxlo[0]) {
+    ix = static_cast<int> ((x[0]-bsubboxlo[0])*bininvx);
+    ix = MIN(ix,mbinx-3);
   } else
-    ix = static_cast<int> ((x[0]-bboxlo[0])*bininvx) - 1;
+    error->one(FLERR,"quadrature_point outside of bin domain");
 
-  if (x[1] >= bboxhi[1])
-    iy = static_cast<int> ((x[1]-bboxhi[1])*bininvy) + nbiny;
-  else if (x[1] >= bboxlo[1]) {
-    iy = static_cast<int> ((x[1]-bboxlo[1])*bininvy);
-    iy = MIN(iy,nbiny-1);
+  if (x[1] >= bsubboxhi[1])
+    error->one(FLERR,"quadrature_point outside of bin domain");
+  else if (x[1] >= bsubboxlo[1]) {
+    iy = static_cast<int> ((x[1]-bsubboxlo[1])*bininvy);
+    iy = MIN(iy,mbiny-3);
   } else
-    iy = static_cast<int> ((x[1]-bboxlo[1])*bininvy) - 1;
+    error->one(FLERR,"quadrature_point outside of bin domain");
 
-  if (x[2] >= bboxhi[2])
-    iz = static_cast<int> ((x[2]-bboxhi[2])*bininvz) + nbinz;
-  else if (x[2] >= bboxlo[2]) {
-    iz = static_cast<int> ((x[2]-bboxlo[2])*bininvz);
-    iz = MIN(iz,nbinz-1);
+  if (x[2] >= bsubboxhi[2])
+    error->one(FLERR,"quadrature_point outside of bin domain");
+  else if (x[2] >= bsubboxlo[2]) {
+    iz = static_cast<int> ((x[2]-bsubboxlo[2])*bininvz);
+    iz = MIN(iz,mbinz-3);
   } else
-    iz = static_cast<int> ((x[2]-bboxlo[2])*bininvz) - 1;
+    error->one(FLERR,"quadrature_point outside of bin domain");
 
 
   //return the bin id of this quadrature point
@@ -768,143 +920,142 @@ void NBinCAC::bin_atoms()
 
  int NBinCAC::element2bins(int element_index)
 {
-
-  double *x = atom->x[element_index];
-
-	
-	double ***nodal_positions = atom->nodal_positions[element_index];
+  
 	double shape_func;
 	int *element_type = atom->element_type;
 	int *poly_count = atom->poly_count;
 	double xtmp, ytmp, ztmp, delx, dely, delz, rsq;
 	double bounding_boxlo[3];
 	double bounding_boxhi[3];
-  double CAC_cut= atom->CAC_cut;
+	double *cutghost = comm->cutghost;
+  //double CAC_cut= atom->CAC_cut;
   double CAC_skin= atom->CAC_skin;
-  CAC_cut=CAC_cut+CAC_skin;
+	double **eboxes=atom->eboxes;
+	double **foreign_eboxes=atom->foreign_eboxes;
+	int *ebox_ref=atom->ebox_ref;
+	double *x;
+	double ***nodal_positions;
+	int current_poly_count;
+	int nodes_per_element;
+  //CAC_cut=CAC_cut+CAC_skin;
 	int *nodes_per_element_list = atom->nodes_per_element_list;
   int ix,iy,iz;
   int ixl,iyl,izl,ixh,iyh,izh;
+	if(!foreign_boxes){
+   x = atom->x[element_index];
+	nodal_positions = atom->nodal_positions[element_index];
+	current_poly_count = poly_count[element_index];
+	nodes_per_element = nodes_per_element_list[element_type[element_index]];
+	}
   //typical binning for atoms
-  
+  if(!foreign_boxes){
   if (!ISFINITE(x[0]) || !ISFINITE(x[1]) || !ISFINITE(x[2]))
     error->one(FLERR,"Non-numeric positions - simulation unstable");
 
-  if (x[0] >= bboxhi[0])
-    ix = static_cast<int> ((x[0]-bboxhi[0])*bininvx) + nbinx;
-  else if (x[0] >= bboxlo[0]) {
-    ix = static_cast<int> ((x[0]-bboxlo[0])*bininvx);
-    ix = MIN(ix,nbinx-1);
+  if (x[0] > bsubboxhi[0])
+    ix = mbinx-2;
+  else if (x[0] >= bsubboxlo[0]) {
+    ix = static_cast<int> ((x[0]-bsubboxlo[0])*bininvx);
+    ix = MIN(ix,mbinx-3);
   } else
-    ix = static_cast<int> ((x[0]-bboxlo[0])*bininvx) - 1;
+    ix = -1;
 
-  if (x[1] >= bboxhi[1])
-    iy = static_cast<int> ((x[1]-bboxhi[1])*bininvy) + nbiny;
-  else if (x[1] >= bboxlo[1]) {
-    iy = static_cast<int> ((x[1]-bboxlo[1])*bininvy);
-    iy = MIN(iy,nbiny-1);
+if (x[1] > bsubboxhi[1])
+    iy = mbiny-2;
+  else if (x[1] >= bsubboxlo[1]) {
+    iy = static_cast<int> ((x[1]-bsubboxlo[1])*bininvy);
+    iy = MIN(iy,mbiny-3);
   } else
-    iy = static_cast<int> ((x[1]-bboxlo[1])*bininvy) - 1;
+    ix = -1;
 
-  if (x[2] >= bboxhi[2])
-    iz = static_cast<int> ((x[2]-bboxhi[2])*bininvz) + nbinz;
-  else if (x[2] >= bboxlo[2]) {
-    iz = static_cast<int> ((x[2]-bboxlo[2])*bininvz);
-    iz = MIN(iz,nbinz-1);
+if (x[2] > bsubboxhi[2])
+    iz = mbinz-2;
+  else if (x[2] >= bsubboxlo[2]) {
+    iz = static_cast<int> ((x[2]-bsubboxlo[2])*bininvz);
+    iz = MIN(iz,mbinz-3);
   } else
-    iz = static_cast<int> ((x[2]-bboxlo[2])*bininvz) - 1;
-
+    iz = -1;
+	}
   
   
 
   //calculate the set of bins this element's bounding box overlaps
-  if(element_type[element_index]){
+  if(element_type[element_index]||foreign_boxes){
     
 	//int current_poly_count = poly_count[element_index];
-    int current_poly_count = poly_count[element_index];
-	int nodes_per_element = nodes_per_element_list[element_type[element_index]];
+    
  
 
+  double *current_ebox;
+  if(!foreign_boxes)
+  current_ebox = eboxes[ebox_ref[element_index]];
+	else
+	current_ebox = foreign_eboxes[element_index];
+  bounding_boxlo[0] = current_ebox[0];
+	bounding_boxlo[1] = current_ebox[1];
+	bounding_boxlo[2] = current_ebox[2];
+	bounding_boxhi[0] = current_ebox[3];
+	bounding_boxhi[1] = current_ebox[4];
+	bounding_boxhi[2] = current_ebox[5];
 
-
-	//initialize bounding box values
-	bounding_boxlo[0] = nodal_positions[0][0][0];
-	bounding_boxlo[1] = nodal_positions[0][0][1];
-	bounding_boxlo[2] = nodal_positions[0][0][2];
-	bounding_boxhi[0] = nodal_positions[0][0][0];
-	bounding_boxhi[1] = nodal_positions[0][0][1];
-	bounding_boxhi[2] = nodal_positions[0][0][2];
-     //define the bounding box for the element being considered as a neighbor
-	
-	for (int poly_counter = 0; poly_counter < current_poly_count; poly_counter++) {
-		for (int kkk = 0; kkk < nodes_per_element; kkk++) {
-			for (int dim = 0; dim < 3; dim++) {
-				if (nodal_positions[kkk][poly_counter][dim] < bounding_boxlo[dim]) {
-					bounding_boxlo[dim] = nodal_positions[kkk][poly_counter][dim];
-				}
-				if (nodal_positions[kkk][poly_counter][dim] > bounding_boxhi[dim]) {
-					bounding_boxhi[dim] = nodal_positions[kkk][poly_counter][dim];
-				}
-			}
-		}
+	if(!foreign_boxes&&atom->bin_foreign){
+	bounding_boxlo[0] += cutghost[0];
+	bounding_boxlo[1] += cutghost[1];
+	bounding_boxlo[2] += cutghost[2];
+	bounding_boxhi[0] -= cutghost[0];
+	bounding_boxhi[1] -= cutghost[1];
+	bounding_boxhi[2] -= cutghost[2];
 	}
-
-	bounding_boxlo[0] -= CAC_cut;
-	bounding_boxlo[1] -= CAC_cut;
-	bounding_boxlo[2] -= CAC_cut;
-	bounding_boxhi[0] += CAC_cut;
-	bounding_boxhi[1] += CAC_cut;
-	bounding_boxhi[2] += CAC_cut;
-    
+  
     //compute lowest overlap id for each dimension
-    if (bounding_boxlo[0] >= bboxhi[0])
-    ixl = static_cast<int> ((bounding_boxlo[0]-bboxhi[0])*bininvx) + nbinx;
-  else if (bounding_boxlo[0] >= bboxlo[0]) {
-    ixl = static_cast<int> ((bounding_boxlo[0]-bboxlo[0])*bininvx);
-    ixl = MIN(ixl,nbinx-1);
+    if (bounding_boxlo[0] > bsubboxhi[0])
+    ixl = mbinx - 2;
+   else if (bounding_boxlo[0] >= bsubboxlo[0]) {
+    ixl = static_cast<int> ((bounding_boxlo[0]-bsubboxlo[0])*bininvx);
+    ixl = MIN(ixl,mbinx-3);
   } else
-    ixl = static_cast<int> ((bounding_boxlo[0]-bboxlo[0])*bininvx) - 1;
+    ixl = -1;
 
-  if (bounding_boxlo[1] >= bboxhi[1])
-    iyl = static_cast<int> ((bounding_boxlo[1]-bboxhi[1])*bininvy) + nbiny;
-  else if (bounding_boxlo[1] >= bboxlo[1]) {
-    iyl = static_cast<int> ((bounding_boxlo[1]-bboxlo[1])*bininvy);
-    iyl = MIN(iyl,nbiny-1);
+  if (bounding_boxlo[1] > bsubboxhi[1])
+    iyl = mbiny-2;
+  else if (bounding_boxlo[1] >= bsubboxlo[1]) {
+    iyl = static_cast<int> ((bounding_boxlo[1]-bsubboxlo[1])*bininvy);
+    iyl = MIN(iyl,mbiny-3);
   } else
-    iyl = static_cast<int> ((bounding_boxlo[1]-bboxlo[1])*bininvy) - 1;
+    iyl = -1;
 
-  if (bounding_boxlo[2] >= bboxhi[2])
-    izl = static_cast<int> ((bounding_boxlo[2]-bboxhi[2])*bininvz) + nbinz;
-  else if (bounding_boxlo[2] >= bboxlo[2]) {
-    izl = static_cast<int> ((bounding_boxlo[2]-bboxlo[2])*bininvz);
-    izl = MIN(izl,nbinz-1);
+  if (bounding_boxlo[2] > bsubboxhi[2])
+    izl = mbinz-2;
+  else if (bounding_boxlo[2] >= bsubboxlo[2]) {
+    izl = static_cast<int> ((bounding_boxlo[2]-bsubboxlo[2])*bininvz);
+    izl = MIN(izl,mbinz-3);
   } else
-    izl = static_cast<int> ((bounding_boxlo[2]-bboxlo[2])*bininvz) - 1;
+    izl = -1;
  
   //compute highest overlap id for each dimension
-   if (bounding_boxhi[0] >= bboxhi[0])
-    ixh = static_cast<int> ((bounding_boxhi[0]-bboxhi[0])*bininvx) + nbinx;
-  else if (bounding_boxhi[0] >= bboxlo[0]) {
-    ixh = static_cast<int> ((bounding_boxhi[0]-bboxlo[0])*bininvx);
-    ixh = MIN(ixh,nbinx-1);
+   if (bounding_boxhi[0] > bsubboxhi[0])
+    ixh = mbinx - 2;
+   else if (bounding_boxhi[0] >= bsubboxlo[0]) {
+    ixh = static_cast<int> ((bounding_boxhi[0]-bsubboxlo[0])*bininvx);
+    ixh = MIN(ixh,mbinx-3);
   } else
-    ixh = static_cast<int> ((bounding_boxhi[0]-bboxlo[0])*bininvx) - 1;
+    ixh = -1;
 
-  if (bounding_boxhi[1] >= bboxhi[1])
-    iyh = static_cast<int> ((bounding_boxhi[1]-bboxhi[1])*bininvy) + nbiny;
-  else if (bounding_boxhi[1] >= bboxlo[1]) {
-    iyh = static_cast<int> ((bounding_boxhi[1]-bboxlo[1])*bininvy);
-    iyh = MIN(iyh,nbiny-1);
+  if (bounding_boxhi[1] > bsubboxhi[1])
+    iyh = mbiny-2;
+  else if (bounding_boxhi[1] >= bsubboxlo[1]) {
+    iyh = static_cast<int> ((bounding_boxhi[1]-bsubboxlo[1])*bininvy);
+    iyh = MIN(iyh,mbiny-3);
   } else
-    iyh = static_cast<int> ((bounding_boxhi[1]-bboxlo[1])*bininvy) - 1;
+    iyh = -1;
 
-  if (bounding_boxhi[2] >= bboxhi[2])
-    izh = static_cast<int> ((bounding_boxhi[2]-bboxhi[2])*bininvz) + nbinz;
-  else if (bounding_boxhi[2] >= bboxlo[2]) {
-    izh = static_cast<int> ((bounding_boxhi[2]-bboxlo[2])*bininvz);
-    izh = MIN(izh,nbinz-1);
+  if (bounding_boxhi[2] > bsubboxhi[2])
+    izh = mbinz-2;
+  else if (bounding_boxhi[2] >= bsubboxlo[2]) {
+    izh = static_cast<int> ((bounding_boxhi[2]-bsubboxlo[2])*bininvz);
+    izh = MIN(izh,mbinz-3);
   } else
-    izh = static_cast<int> ((bounding_boxhi[2]-bboxlo[2])*bininvz) - 1;
+    izh = -1;
   
   bin_overlap_limits[0]=ixl;
   bin_overlap_limits[1]=iyl;
@@ -926,7 +1077,7 @@ void NBinCAC::compute_surface_depths(double &scalex, double &scaley, double &sca
 	int poly = current_poly_counter;
 	double unit_cell_mapped[3];
 	double rcut;
-	rcut = atom->CAC_cut - atom->CAC_skin; 
+	rcut = neighbor->cutneighmax - neighbor->skin; 
 	//flag determines the current element type and corresponding procedure to calculate parameters for 
 	//surface penetration depth to be used when computing force density with influences from neighboring
 	//elements
@@ -1517,6 +1668,29 @@ int NBinCAC::compute_quad_points(int element_index){
 
 
 	return quadrature_counter;
+
+}
+
+//resize bin element overlap arrays
+void NBinCAC::expand_overlap_arrays(int size){
+if(max_nall==0){
+ max_nall=size+100;
+bin_element_overlap= (int **) memory->smalloc(max_nall*sizeof(int *), "bin_CAC:bin_element_overlap");
+for(int i=0 ; i<max_nall; i++)
+memory->create(bin_element_overlap[i],MAXBINOVERLAP,"bin_CAC:bin_element_overlap[i]");
+memory->grow(nbin_element_overlap,max_nall,"bin_CAC:nbin_element_overlap");
+memory->grow(max_nbin_overlap,max_nall,"bin_CAC:max_nbin_overlap");
+}
+else{
+	size+=100;
+ bin_element_overlap= (int **) memory->srealloc(bin_element_overlap,size*sizeof(int *), "bin_CAC:bin_element_overlap");
+for(int i=max_nall ; i<size; i++)
+memory->create(bin_element_overlap[i],MAXBINOVERLAP,"bin_CAC:bin_element_overlap[i]");
+memory->grow(nbin_element_overlap,size,"bin_CAC:nbin_element_overlap");	
+memory->grow(max_nbin_overlap,size,"bin_CAC:max_nbin_overlap");
+ max_nall=size;
+ 
+}
 
 }
 

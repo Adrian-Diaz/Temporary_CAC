@@ -1676,11 +1676,11 @@ int Neighbor::choose_stencil(NeighRequest *rq)
     } else if (rq->full) {
       if (!(mask & NS_FULL)) continue;
     }
-	/*
+	
 	if (rq->CAC) {
 		if (!(mask & NS_CAC)) continue;
 	}
-	*/
+	
     // newtflag is on or off and must match
 
     if (newtflag) {
@@ -2084,6 +2084,14 @@ void Neighbor::build(int topoflag)
       neigh_bin[i]->bin_atoms_setup(nall);
       neigh_bin[i]->bin_atoms();
     }
+  }
+  
+  //call stencils in case new data introduced since setup has to be used
+  //if not empty void function is called
+
+  for (int i = 0; i < nstencil_perpetual; i++) {
+    neigh_stencil[slist[i]]->post_create_setup();
+    neigh_stencil[slist[i]]->post_create();
   }
 
   // build pairwise lists for all perpetual NPair/NeighList

@@ -68,9 +68,10 @@ class Atom : protected Pointers {
 
   //CAC package
   double **node_charges, ****nodal_positions, ****nodal_velocities, ****nodal_forces,
-	  ****nodal_gradients, ****initial_nodal_positions, *scale_search_range;
+	  ****nodal_gradients, ****initial_nodal_positions, *scale_search_range, **eboxes, **foreign_eboxes;
   int *poly_count, **node_types,  *element_type,
-	  **element_scale, *nodes_per_element_list, scale_count, oneflag, *scale_list, initial_size;
+	  **element_scale, *nodes_per_element_list, scale_count, bin_foreign, CAC_comm_flag, *scale_list
+    , initial_size, neboxes, local_neboxes, nforeign_eboxes, *ebox_ref;
  
   double CAC_cut, CAC_skin, max_search_range;				//used by npair_CAC styles
   int one_layer_flag;

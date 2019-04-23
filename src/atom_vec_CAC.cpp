@@ -44,7 +44,6 @@ AtomVecCAC::AtomVecCAC(LAMMPS *lmp) : AtomVec(lmp)
   xcol_data = 3;
   forceclearflag = 1;
   atom->CAC_flag=1;
- atom->oneflag=0;
   search_range_max = 0;
    initial_size=0;
  
@@ -67,10 +66,7 @@ void AtomVecCAC::process_args(int narg, char **arg)
  atom->nodes_per_element=nodes_per_element;
  atom-> words_per_node = 6;
  atom->maxpoly = maxpoly;
- if(narg==3){
-	 if (strcmp(arg[2], "one") == 0) atom->oneflag = 1;
-	 else error->all(FLERR,"Invalid argument in atom_style CAC command");
- }
+ 
 
 
   size_forward = 12*nodes_per_element*maxpoly +8+ maxpoly;
@@ -91,35 +87,10 @@ void AtomVecCAC::process_args(int narg, char **arg)
 		atom->nodes_per_element_list[1] = 8;
 	}	
 
-	//place search range initialization here now for convenience
-
-	atom->initial_size=10;
-		 memory->grow(atom->scale_search_range, atom->initial_size, "atom:scale_search_range");
-		memory->grow(atom->scale_list, atom->initial_size, "atom:scale_search_range");
-		atom->scale_search_range[0]=0;
-		atom->scale_list[0]=1;
-		for(int i=1; i<atom->initial_size; i++){ 
-			atom->scale_search_range[i]=0;
-			atom->scale_list[i]=0;
-			}
-		atom->scale_count=1;
-}
-
-/* ----------------------------------------------------------------------
-  initialize arrays
-------------------------------------------------------------------------- */
-void AtomVecCAC::init()
-{
-  	
-    deform_vremap = domain->deform_vremap;
-  	deform_groupbit = domain->deform_groupbit;
-  	h_rate = domain->h_rate;
-
-  	if (lmp->kokkos != NULL && !kokkosable)
-    error->all(FLERR,"KOKKOS package requires a kokkos enabled atom_style");
-    
 	
 }
+
+
 
 /* ----------------------------------------------------------------------
    grow atom arrays
@@ -1372,129 +1343,7 @@ int AtomVecCAC::unpack_restart(double *buf)
   int error_scale=1.10; //essentially a fudge factor since  the search algorithm is not so rigorous
   int expand=0;
   int match[3];
-//edit scale search ranges and scale counts if necessary
-	if(!atom->oneflag){
-	
-		/*
-	if(scale_count==0&&element_type[nlocal]!=1){
-		
-		
-		scale_count=1;
-		scale_list[scale_count]=element_scale[nlocal][0];
-		if(element_scale[nlocal][0]!=element_scale[nlocal][1]){
-			scale_count++;
-			scale_list[scale_count]=element_scale[nlocal][1];
-		}
-		if(element_scale[nlocal][0]!=element_scale[nlocal][2]&&element_scale[nlocal][1]!=element_scale[nlocal][2]){
-			scale_count++;
-			scale_list[scale_count]=element_scale[nlocal][2];
-		}
 
-				 max_distancesq=0;
-	
-		//compute search radius using maximum distance between nodes an element;
-		//not the most rigorous approach; feel free to improve :).
-	
-		for(int ipoly=0; ipoly < poly_count[nlocal]; ipoly++)
-		for(int i=0; i<current_node_count; i++){
-			for (int j=i+1; j<current_node_count; j++){
-				dx=nodal_positions[nlocal][i][ipoly][0]-nodal_positions[nlocal][j][ipoly][0];
-				dy=nodal_positions[nlocal][i][ipoly][1]-nodal_positions[nlocal][j][ipoly][1];
-				dz=nodal_positions[nlocal][i][ipoly][2]-nodal_positions[nlocal][j][ipoly][2];
-				current_distancesq=dx*dx+dy*dy+dz*dz;
-				if(current_distancesq>max_distancesq) max_distancesq=current_distancesq;
-			}
-		}
-		search_radius=sqrt(max_distancesq);
-		search_radius*=error_scale;
-		scale_search_range[scale_count]=search_radius;
-		if(scale_count>1)
-		scale_search_range[scale_count-1]=search_radius;
-		if(scale_count>2)
-		scale_search_range[scale_count-2]=search_radius;
-	}
-	*/
-
-	match[0]=match[1]=match[2]=0;
-	for(int scalecheck=0; scalecheck<scale_count; scalecheck++){
-	if(element_scale[nlocal][0]==scale_list[scalecheck]){
-		match[0]=1;
-	}
-	if(element_scale[nlocal][1]==scale_list[scalecheck]){
-		match[1]=1;
-	}
-	if(element_scale[nlocal][2]==scale_list[scalecheck]){
-		match[2]=1;
-	}
-	}	
-	if(!match[0]){
-		expand++;
-	}
-	if(!match[1]&&element_scale[nlocal][0]!=element_scale[nlocal][1]){
-		expand++;
-	}
-	if(!match[2]&&element_scale[nlocal][0]!=element_scale[nlocal][2]&&element_scale[nlocal][1]!=element_scale[nlocal][2]){
-		expand++;
-	}
-	int element_max_scale;
-	element_max_scale=element_scale[nlocal][0];
-	if(element_max_scale<element_scale[nlocal][1])
-	element_max_scale=element_scale[nlocal][1];
-	if(element_max_scale<element_scale[nlocal][2])
-	element_max_scale=element_scale[nlocal][2];
-
-//expand the scale list and ranges if need be
-
-	if(expand)
-	{
-		 max_distancesq=0;
-	
-		//compute search radius using maximum distance between nodes of an element;
-		//not the most rigorous approach; feel free to improve :).
-	
-		for(int ipoly=0; ipoly < poly_count[nlocal]; ipoly++)
-		for(int i=0; i<current_node_count; i++){
-			for (int j=i+1; j<current_node_count; j++){
-				dx=nodal_positions[nlocal][i][ipoly][0]-nodal_positions[nlocal][j][ipoly][0];
-				dy=nodal_positions[nlocal][i][ipoly][1]-nodal_positions[nlocal][j][ipoly][1];
-				dz=nodal_positions[nlocal][i][ipoly][2]-nodal_positions[nlocal][j][ipoly][2];
-				current_distancesq=dx*dx+dy*dy+dz*dz;
-				if(current_distancesq>max_distancesq) max_distancesq=current_distancesq;
-			}
-		}
-		search_radius=sqrt(max_distancesq);
-		search_radius*=error_scale;
-		
-		if(scale_count+expand>initial_size){
-		initial_size+=grow_size;	
-		scale_search_range= memory->grow(atom->scale_search_range, initial_size, "atom:element_type");
-		scale_list= memory->grow(atom->scale_list, initial_size, "atom:scale_search_range");
-		for(int i=scale_count; i<initial_size; i++){
-			scale_search_range[i]=0;
-			scale_list[i]=0;
-			}
-		}
-		scale_count+=expand;
-		scale_search_range[scale_count-1]=search_radius;
-		scale_list[scale_count-1]=element_scale[nlocal][0];
-		if(expand>1){
-		scale_search_range[scale_count-2]=search_radius;
-		scale_list[scale_count-2]=element_scale[nlocal][0];
-		}
-		if(expand>2){
-		scale_search_range[scale_count-3]=search_radius;
-		scale_list[scale_count-3]=element_scale[nlocal][0];
-		}
-		
-		
-		
-	}
-	//compute maximum search range
-	for(int i=1; i<scale_count; i++) {
-		if(scale_search_range[i]>atom->max_search_range) atom->max_search_range=scale_search_range[i];
-	}
-	}
-	atom->scale_count=scale_count;
 
 
   double **extra = atom->extra;
@@ -1690,139 +1539,7 @@ void AtomVecCAC::data_atom(double *coord, imageint imagetmp, char **values)
 	}
 	}
 	
-  double max_distancesq;
-  double current_distancesq;
-  double search_radius;
-  double dx,dy,dz;
-  int current_node_count;
-  int search_range_delta_ratio = 4;
- 
-  int grow_size = 10;
-  int error_scale=1.10; //essentially a fudge factor since  the search algorithm is not so rigorous
-  int expand=0;
-  int match[3];
-	if(!atom->oneflag){
-	
-		/*
-	if(scale_count==0&&element_type[nlocal]!=1){
-		
-		
-		scale_count=1;
-		scale_list[scale_count]=element_scale[nlocal][0];
-		if(element_scale[nlocal][0]!=element_scale[nlocal][1]){
-			scale_count++;
-			scale_list[scale_count]=element_scale[nlocal][1];
-		}
-		if(element_scale[nlocal][0]!=element_scale[nlocal][2]&&element_scale[nlocal][1]!=element_scale[nlocal][2]){
-			scale_count++;
-			scale_list[scale_count]=element_scale[nlocal][2];
-		}
 
-				 max_distancesq=0;
-	
-		//compute search radius using maximum distance between nodes an element;
-		//not the most rigorous approach; feel free to improve :).
-	
-		for(int ipoly=0; ipoly < poly_count[nlocal]; ipoly++)
-		for(int i=0; i<current_node_count; i++){
-			for (int j=i+1; j<current_node_count; j++){
-				dx=nodal_positions[nlocal][i][ipoly][0]-nodal_positions[nlocal][j][ipoly][0];
-				dy=nodal_positions[nlocal][i][ipoly][1]-nodal_positions[nlocal][j][ipoly][1];
-				dz=nodal_positions[nlocal][i][ipoly][2]-nodal_positions[nlocal][j][ipoly][2];
-				current_distancesq=dx*dx+dy*dy+dz*dz;
-				if(current_distancesq>max_distancesq) max_distancesq=current_distancesq;
-			}
-		}
-		search_radius=sqrt(max_distancesq);
-		search_radius*=error_scale;
-		scale_search_range[scale_count]=search_radius;
-		if(scale_count>1)
-		scale_search_range[scale_count-1]=search_radius;
-		if(scale_count>2)
-		scale_search_range[scale_count-2]=search_radius;
-	}
-	*/
-
-	match[0]=match[1]=match[2]=0;
-	for(int scalecheck=0; scalecheck<scale_count; scalecheck++){
-	if(element_scale[nlocal][0]==scale_list[scalecheck]){
-		match[0]=1;
-	}
-	if(element_scale[nlocal][1]==scale_list[scalecheck]){
-		match[1]=1;
-	}
-	if(element_scale[nlocal][2]==scale_list[scalecheck]){
-		match[2]=1;
-	}
-	}	
-	if(!match[0]){
-		expand++;
-	}
-	if(!match[1]&&element_scale[nlocal][0]!=element_scale[nlocal][1]){
-		expand++;
-	}
-	if(!match[2]&&element_scale[nlocal][0]!=element_scale[nlocal][2]&&element_scale[nlocal][1]!=element_scale[nlocal][2]){
-		expand++;
-	}
-	int element_max_scale;
-	element_max_scale=element_scale[nlocal][0];
-	if(element_max_scale<element_scale[nlocal][1])
-	element_max_scale=element_scale[nlocal][1];
-	if(element_max_scale<element_scale[nlocal][2])
-	element_max_scale=element_scale[nlocal][2];
-
-//expand the scale list and ranges if need be
-
-	if(expand)
-	{
-		 max_distancesq=0;
-	
-		//compute search radius using maximum distance between nodes of an element;
-		//not the most rigorous approach; feel free to improve :).
-	
-		for(int ipoly=0; ipoly < poly_count[nlocal]; ipoly++)
-		for(int i=0; i<nodetotal; i++){
-			for (int j=i+1; j<nodetotal; j++){
-				dx=nodal_positions[nlocal][i][ipoly][0]-nodal_positions[nlocal][j][ipoly][0];
-				dy=nodal_positions[nlocal][i][ipoly][1]-nodal_positions[nlocal][j][ipoly][1];
-				dz=nodal_positions[nlocal][i][ipoly][2]-nodal_positions[nlocal][j][ipoly][2];
-				current_distancesq=dx*dx+dy*dy+dz*dz;
-				if(current_distancesq>max_distancesq) max_distancesq=current_distancesq;
-			}
-		}
-		search_radius=sqrt(max_distancesq);
-		search_radius*=error_scale;
-		
-		if(scale_count+expand>initial_size){
-		initial_size+=grow_size;	
-		scale_search_range= memory->grow(atom->scale_search_range, initial_size, "atom:element_type");
-		scale_list= memory->grow(atom->scale_list, initial_size, "atom:scale_search_range");
-		for(int i=scale_count; i<initial_size; i++){
-			scale_search_range[i]=0;
-			scale_list[i]=0;
-			}
-		}
-		scale_count+=expand;
-		scale_search_range[scale_count-1]=search_radius;
-		scale_list[scale_count-1]=element_scale[nlocal][0];
-		if(expand>1){
-		scale_search_range[scale_count-2]=search_radius;
-		scale_list[scale_count-2]=element_scale[nlocal][0];
-		}
-		if(expand>2){
-		scale_search_range[scale_count-3]=search_radius;
-		scale_list[scale_count-3]=element_scale[nlocal][0];
-		}
-		
-		
-		
-	}
-	//compute maximum search range
-	for(int i=0; i<scale_count; i++) {
-		if(scale_search_range[i]>atom->max_search_range) atom->max_search_range=scale_search_range[i];
-	}
-	}
-	atom->scale_count=scale_count;
   x[nlocal][0] = coord[0];
   x[nlocal][1] = coord[1];
   x[nlocal][2] = coord[2];
