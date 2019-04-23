@@ -38,7 +38,7 @@ class NPairCAC : public NPair {
 	  int &xb, int &yb, int &zb, int flag);
   int CAC_decide_quad2element(int);
   double ***current_nodal_positions;
-  double CAC_cut;
+  double cutneighmax;
   int   quadrature_node_count;
   int   quadrature_point_count;
   int **element_scale;
@@ -65,8 +65,9 @@ protected:
 	int surface_counts_max_old[3];
 	int *neighbor_copy_index;
   int quadrature_counter;
-
+  int bad_bin_flag;
   int ***quad_list_container;
+  int *scan_flags;
   
   void allocate_quad_neigh_list(int,int,int,int);
   int compute_quad_points(int);

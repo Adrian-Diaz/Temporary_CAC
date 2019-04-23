@@ -34,7 +34,7 @@
 #include <vector>
 //#include "math_extra.h"
 #define MAXNEIGH1  500
-#define MAXNEIGH2  100
+#define MAXNEIGH2  10
 #define EXPAND 10
 #define MAXLINE 1024
 #define DELTA 4
@@ -67,22 +67,21 @@ PairCAC::PairCAC(LAMMPS *lmp) : Pair(lmp)
   atomic_counter_map = NULL;
   old_atom_etype = NULL;
   quad_allocated = 0;
-  surface_counts_max[0] = 0;
-  surface_counts_max[1] = 0;
-  surface_counts_max[2] = 0;
-  surface_counts_max_old[0] = 0;
-  surface_counts_max_old[1] = 0;
-  surface_counts_max_old[2] = 0;
-  old_atom_count=0;
-  old_quad_count=0;
+  surface_counts_max[0] = 1;
+  surface_counts_max[1] = 1;
+  surface_counts_max[2] = 1;
+  surface_counts_max_old[0] = 1;
+  surface_counts_max_old[1] = 1;
+  surface_counts_max_old[2] = 1;
   one_layer_flag = 0;
   old_quad_minima= NULL;
   old_minima_neighbors= NULL;
 	cgParm=NULL;
   asaParm=NULL;
   Objective=NULL;
-	neighbor->pgsize=0;
-	neighbor->oneatom=0;
+	neighbor->pgsize=10;
+	neighbor->oneatom=1;
+	old_atom_count=0;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -217,7 +216,7 @@ void PairCAC::compute(int eflag, int vflag) {
   int nodes_per_element;
 	int *nodes_count_list = atom->nodes_per_element_list;	
   quad_eflag = eflag;
-  
+  cutoff_skin = neighbor->skin;
   inum = list->inum;
   ilist = list->ilist;
   numneigh = list->numneigh;
@@ -1435,7 +1434,7 @@ void PairCAC::quad_list_build(int iii, double s, double t, double w) {
 		b_orth[1] = b[1] - proj_b2a*a[1] / norm_a;
 		b_orth[2] = b[2] - proj_b2a*a[2] / norm_a;
 
-		double proj_c2a = (b[0] * a[0] + b[1] * a[1] + b[2] * a[2]) / norm_a;
+		double proj_c2a = (c[0] * a[0] + c[1] * a[1] + c[2] * a[2]) / norm_a;
 		double proj_c2b = (b[0] * c[0] + b[1] * c[1] + b[2] * c[2]) / norm_b;
 		double norm_b_orth = sqrt(b_orth[0] * b_orth[0] + b_orth[1] * b_orth[1]
 			+ b_orth[2] * b_orth[2]);
@@ -3160,7 +3159,6 @@ void PairCAC::allocate_quad_neigh_list(int n1,int n2,int n3,int quad) {
 	int quad_count = quad*quad*quad + 2 * n1*quad*quad + 2 * n2*quad*quad +
 		+2 * n3*quad*quad + 4 * n1*n2*quad + 4 * n3*n2*quad + 4 * n1*n3*quad
 		+ 8 * n1*n2*n3;
-
 	
 		//(surface_counts_max_old[0] != n1 || surface_counts_max_old[1] != n2 || surface_counts_max_old[2] != n3)
 
@@ -3213,7 +3211,7 @@ void PairCAC::allocate_quad_neigh_list(int n1,int n2,int n3,int quad) {
 		}
 
 		
-        memory->sfree(inner_quad_lists_ucell);
+    memory->sfree(inner_quad_lists_ucell);
 		memory->sfree(inner_quad_lists_index);
 		memory->sfree(inner_quad_lists_counts);
 		memory->sfree(outer_quad_lists_ucell);

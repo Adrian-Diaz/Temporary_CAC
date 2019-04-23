@@ -291,21 +291,23 @@ double PairCACEAM::init_one(int i, int j) {
 	else if (fs) cut_global_s = fs->cut;
 	
 	cutforcesq = cut_global_s*cut_global_s;
-	atom->scale_search_range[0]=atom->CAC_cut = cut_global_s+cutoff_skin;
-	if (outer_neighflag) { atom->scale_search_range[0]=atom->CAC_cut = 2 * cut_global_s+cutoff_skin; }
-	
+
+	/*
 	for(int i=0; i<=atom->scale_count; i++) {
 		if(atom->scale_search_range[i]>atom->max_search_range) atom->max_search_range=atom->scale_search_range[i];
 	}
-	
-    atom->CAC_skin=cutoff_skin;
-  int scale_count=0;
-	double max_search_range=0;
-	MPI_Allreduce(&atom->scale_count,&scale_count,1,MPI_INT,MPI_MAX,world);
-	MPI_Allreduce(&atom->max_search_range,&max_search_range,1,MPI_DOUBLE,MPI_MAX,world);
-	atom->max_search_range=max_search_range;
-	atom->scale_count=scale_count;
-	return atom->max_search_range;
+	*/
+    //atom->CAC_skin=cutoff_skin;
+  //int scale_count=0;
+	//double max_search_range=0;
+	//MPI_Allreduce(&atom->scale_count,&scale_count,1,MPI_INT,MPI_MAX,world);
+	//MPI_Allreduce(&atom->max_search_range,&max_search_range,1,MPI_DOUBLE,MPI_MAX,world);
+	//atom->max_search_range=max_search_range;
+	//atom->scale_count=scale_count;
+	if (outer_neighflag)
+	return 2*cut_global_s;
+	else
+	return cut_global_s;
 }
 
 /* ---------------------------------------------------------------------- */
