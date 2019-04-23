@@ -181,6 +181,7 @@ void PairCAC::compute(int eflag, int vflag) {
   double *special_lj = force->special_lj;
   int newton_pair = force->newton_pair;
   int nodes_per_element;
+	int *nodes_count_list = atom->nodes_per_element_list;	
   quad_eflag = eflag;
   
   inum = list->inum;
@@ -297,11 +298,8 @@ void PairCAC::compute(int eflag, int vflag) {
 			if (current_element_type == 0) atomic_counter += 1;
 			
 				//int ri = i - atomic_counter_map[i];
-				if (current_element_type == 1) {
-					nodes_per_element = 8;
-				}
+				nodes_per_element = nodes_count_list[current_element_type];
 				if (current_element_type == 0) {
-					nodes_per_element = 1;
 					atomic_flag = 1;
 				}
 				neigh_quad_counter = 0;
@@ -537,6 +535,20 @@ if(quadrature_rank==5)
 
 memory->create(shape_quad_result, max_nodes_per_element, quadrature_node_count*quadrature_node_count*quadrature_node_count, "pairCAC:shape_quad_result");
 memory->create(shape_quad_interior, max_nodes_per_element, quadrature_node_count*quadrature_node_count*quadrature_node_count, "pairCAC:shape_quad_interior");
+
+//place search range initialization here now for convenience
+
+	atom->initial_size=10;
+		 memory->grow(atom->scale_search_range, atom->initial_size, "atom:scale_search_range");
+		memory->grow(atom->scale_list, atom->initial_size, "atom:scale_search_range");
+		atom->scale_search_range[0]=0;
+		atom->scale_list[0]=1;
+		for(int i=1; i<atom->initial_size; i++){ 
+			atom->scale_search_range[i]=0;
+			atom->scale_list[i]=0;
+			}
+			atom->scale_count=1;
+
 }
 
 //---------------------------------------------------------------------
@@ -611,16 +623,12 @@ void PairCAC::compute_forcev(int iii){
 	
 	double unit_cell_mapped[3];
 	int nodes_per_element;
+	int *nodes_count_list = atom->nodes_per_element_list;	
 	unit_cell_mapped[0] = 2 / double(current_element_scale[0]);
 	unit_cell_mapped[1] = 2 / double(current_element_scale[1]);
 	unit_cell_mapped[2] = 2 / double(current_element_scale[2]);
 
-	if (current_element_type == 1) {
-		nodes_per_element = 8;
-	}
-	if (current_element_type == 0) {
-		nodes_per_element = 1;
-	}
+	nodes_per_element = nodes_count_list[current_element_type];
 	for (int js = 0; js<nodes_per_element; js++) {
 		for (int jj = 0; jj<3; jj++) {
 
@@ -1248,6 +1256,7 @@ void PairCAC::quad_list_build(int iii, double s, double t, double w) {
 	double maxdw = 0;
 	int neighbor_cell_count[3];
 	int nodes_per_element;
+	int *nodes_count_list = atom->nodes_per_element_list;	
 	expansion_count_inner = 0;
 	expansion_count_outer = 0;
 	if (!atomic_flag) {
@@ -1284,13 +1293,9 @@ void PairCAC::quad_list_build(int iii, double s, double t, double w) {
 		current_position[0] = 0;
 		current_position[1] = 0;
 		current_position[2] = 0;
-		if (current_element_type == 1) {
-			nodes_per_element = 8;
-		}
-		if (current_element_type == 0) {
-			nodes_per_element = 1;
-		}
-
+	
+    nodes_per_element=nodes_count_list[current_element_type];
+		
 		for (int kkk = 0; kkk < nodes_per_element; kkk++) {
 			shape_func = shape_function(unit_cell[0], unit_cell[1], unit_cell[2], 2, kkk + 1);
 			current_position[0] += current_nodal_positions[kkk][poly_counter][0] * shape_func;
@@ -1626,9 +1631,10 @@ void PairCAC::neighbor_accumulate(double x,double y,double z,int iii,int inner_n
     double rsq,r2inv,r6inv,forcelj,factor_lj;
     int *ilist,*jlist,*numneigh,**firstneigh;
     double ****nodal_positions= atom->nodal_positions;
-	int *element_type = atom->element_type;
-	int **element_scale = atom->element_scale;
-	int *poly_count = atom->poly_count;
+	  int *element_type = atom->element_type;
+	  int **element_scale = atom->element_scale;
+	  int *poly_count = atom->poly_count;
+		int *nodes_count_list = atom->nodes_per_element_list;	
     double distancesq;
     double distance;
     //double surface_normal[3];
@@ -1714,10 +1720,8 @@ void PairCAC::neighbor_accumulate(double x,double y,double z,int iii,int inner_n
 			unit_cell_mapped[0] = 2 / double(neighbor_element_scale[0]);
 			unit_cell_mapped[1] = 2 / double(neighbor_element_scale[1]);
 			unit_cell_mapped[2] = 2 / double(neighbor_element_scale[2]);
-			if (neighbor_element_type == 1) {
-				neigh_nodes_per_element = 8;
-			}
-			
+
+			neigh_nodes_per_element=nodes_count_list[neighbor_element_type];
 
 			xm[0] = 0;
 			xm[1] = 0;
@@ -2616,11 +2620,10 @@ void PairCAC::neigh_list_cord(double& coordx, double& coordy, double& coordz, in
 	double ****nodal_positions = atom->nodal_positions;
 	int *element_type = atom->element_type;
 	int etype = element_type[e_index];
+	int *nodes_count_list = atom->nodes_per_element_list;	
 	int list_nodes_per_element;
 		if (etype != 0) {
-			if (etype == 1) {
-				list_nodes_per_element = 8;
-			}
+			list_nodes_per_element = nodes_count_list[etype];
 			for (int kk = 0; kk < list_nodes_per_element; kk++) {
 				shape_func = shape_function(ucells, ucellt, ucellw, 2, kk + 1);
 				coordx += nodal_positions[e_index][kk][p_index][0] * shape_func;

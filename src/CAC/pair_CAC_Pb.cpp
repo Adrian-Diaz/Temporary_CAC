@@ -32,7 +32,7 @@
 #include "asa_user.h"
 
 #define MAXNEIGH1  50
-#define MAXNEIGH2  20
+#define MAXNEIGH2  460
 //#include "math_extra.h"
 
 
@@ -416,7 +416,8 @@ double qqrd2e = force->qqrd2e;
 double cbox_positions[3];
 
 int flagm;
-int nodes_per_element = 1;
+int nodes_per_element;
+int *nodes_count_list = atom->nodes_per_element_list;	
 int neigh_count=0;
 int neigh_index=0;
 double cds[3];
@@ -462,7 +463,7 @@ int distanceflag=0;
     current_position[2]=0;
 
 	if (!atomic_flag) {
-		if (current_element_type == 1) { nodes_per_element = 8; }
+		nodes_per_element = nodes_count_list[current_element_type];
 		for (int kkk = 0; kkk < nodes_per_element; kkk++) {
 			shape_func = shape_function(unit_cell[0], unit_cell[1], unit_cell[2], 2, kkk + 1);
 			current_position[0] += current_nodal_positions[kkk][poly_counter][0] * shape_func;
