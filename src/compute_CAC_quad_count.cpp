@@ -18,10 +18,15 @@
 #include "modify.h"
 #include "comm.h"
 #include "force.h"
+#include "neighbor.h"
 #include "pair.h"
 #include "memory.h"
 #include "error.h"
 #include <math.h>
+
+#define QUADSCALE  1.2 //adhoc scaling used to offset the fact that quadrature points
+//for elements are more expensive due to the tendency to have more nodal interpolation
+//for their neighbors
 
 using namespace LAMMPS_NS;
 
@@ -106,7 +111,7 @@ void ComputeCACQuadCount::compute_peratom()
 			  quad_count[i]= quad*quad*quad + 2 * n1*quad*quad + 2 * n2*quad*quad +
 				  +2 * n3*quad*quad + 4 * n1*n2*quad + 4 * n3*n2*quad + 4 * n1*n3*quad
 				  + 8 * n1*n2*n3;
-			  quad_count[i] *= current_poly_count;
+			  quad_count[i] *= QUADSCALE*current_poly_count;
 		
 		  
 
@@ -125,8 +130,8 @@ void ComputeCACQuadCount::compute_surface_depths(double &scalex, double &scaley,
 	int poly = 0;
 	double unit_cell_mapped[3];
 	
-	double rcut=force->pair->cut_global_s;
-	if (force->pair->outer_neighflag) rcut = 2 * rcut;
+	double rcut=neighbor->cutneighmax - neighbor->skin;
+	//if (force->pair->outer_neighflag) rcut = 2 * rcut;
 	//flag determines the current element type and corresponding procedure to calculate parameters for 
 	//surface penetration depth to be used when computing force density with influences from neighboring
 	//elements

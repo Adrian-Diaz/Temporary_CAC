@@ -335,6 +335,16 @@ void NBinCAC::CAC_setup_bins(int style)
 	bsubboxlo[dim]=ebounding_boxlo[dim];
 	}
 	}
+	else{
+	for(int dim=0; dim < dimension; dim++){
+	if(x[element_index][dim]>bsubboxhi[dim])
+	bsubboxhi[dim]=x[element_index][dim];
+	if(x[element_index][dim]<bsubboxlo[dim])
+	bsubboxlo[dim]=x[element_index][dim]; //make sure assignment of expanded box to particle or ebox position happens last
+	//this prevents epsilon error issues when binning something right on the box edge
+	//i.e. a local particle being binned where ghosts would normally be binned
+	}
+	}
 	/*
 	else if(element_index>=atom->nlocal){ 
   //test if this ghost exceeds local sub box
@@ -775,7 +785,8 @@ void NBinCAC::bin_atoms()
       //returns the set of bins an elements bounding box overlaps
       //atoms are binned typically
       ibin = element2bins(i);
-      
+      if(ibin<0) error->one(FLERR," negative bin index");
+			if(ibin>=mbins) error->one(FLERR," excessive bin index");
       if(element_type[i]==0){
             if(!atom->bin_foreign){
             current_bin_ncount=bin_ncontent[ibin];
@@ -966,7 +977,7 @@ if (x[1] > bsubboxhi[1])
     iy = static_cast<int> ((x[1]-bsubboxlo[1])*bininvy);
     iy = MIN(iy,mbiny-3);
   } else
-    ix = -1;
+    iy = -1;
 
 if (x[2] > bsubboxhi[2])
     iz = mbinz-2;
@@ -1142,7 +1153,9 @@ void NBinCAC::compute_surface_depths(double &scalex, double &scaley, double &sca
 	countx = (int)(ds_surf / unit_cell_mapped[0]);
 	county = (int)(dt_surf / unit_cell_mapped[1]);
 	countz = (int)(dw_surf / unit_cell_mapped[2]);
-
+  if(countx==0) countx=1;
+	if(county==0) county=1;
+	if(countz==0) countz=1;
 
 
 

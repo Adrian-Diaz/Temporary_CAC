@@ -42,6 +42,7 @@ using namespace LAMMPS_NS;
 #define BUFMIN 1000
 #define BUFEXTRA 1000
 #define EPSILON 1.0e-6
+#define BOXEPSILON 1.0e-8
 #define DELTA_PROCS 16
 
 /* ---------------------------------------------------------------------- */
@@ -312,8 +313,8 @@ void CommCAC::setup()
   
   //double element_overlap_range[6];
   element_overlap_range[0]=element_overlap_range[1]=element_overlap_range[2]=
-  element_overlap_range[3]=element_overlap_range[4]=element_overlap_range[5]=max_search_range;
-  cutghost[0] = cutghost[1] = cutghost[2] = cut;
+  element_overlap_range[3]=element_overlap_range[4]=element_overlap_range[5]=max_search_range+BOXEPSILON;
+  cutghost[0] = cutghost[1] = cutghost[2] = cut+BOXEPSILON;
   
   if ((periodicity[0] && cutghost[0] > prd[0]) ||
       (periodicity[1] && cutghost[1] > prd[1]) ||
@@ -2160,8 +2161,8 @@ int CommCAC::sendbox_include(int iswap, int m, int current_element)
   reduced_ebox[5]=eboxes[ebox_id][5]-cutghost[2];
   }
    bbox = sendbox[iswap][m];
-      xlo = bbox[0]; ylo = bbox[1]; zlo = bbox[2];
-      xhi = bbox[3]; yhi = bbox[4]; zhi = bbox[5];
+      xlo = bbox[0]-BOXEPSILON; ylo = bbox[1]-BOXEPSILON; zlo = bbox[2]-BOXEPSILON;
+      xhi = bbox[3]+BOXEPSILON; yhi = bbox[4]+BOXEPSILON; zhi = bbox[5]+BOXEPSILON;
   
   (this->*box_other_full)(0,0,sendproc[iswap][m],oboxlo,oboxhi);
   oboxlo[0]-=pbc[iswap][m][0]*prd[0];

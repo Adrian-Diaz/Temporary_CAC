@@ -458,7 +458,9 @@ void NPairCAC::compute_surface_depths(double &scalex, double &scaley, double &sc
 	countx = (int)(ds_surf / unit_cell_mapped[0]);
 	county = (int)(dt_surf / unit_cell_mapped[1]);
 	countz = (int)(dw_surf / unit_cell_mapped[2]);
-
+  if(countx==0) countx=1;
+	if(county==0) county=1;
+	if(countz==0) countz=1;
 
 
 
