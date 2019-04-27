@@ -25,7 +25,7 @@ class Comm : protected Pointers {
                  // LAYOUT_NONUNIFORM = logical bricks, but diff sizes via LB
                  // LAYOUT_TILED = general tiling, due to RCB LB
   enum{LAYOUT_UNIFORM,LAYOUT_NONUNIFORM,LAYOUT_TILED};
-  int mode;      // 0 = single cutoff, 1 = multi-type cutoff, 2 = multicutoff for CAC package
+  int mode;      // 0 = single cutoff, 1 = multi-type cutoff
   enum{SINGLE,MULTI};
 
   int me,nprocs;                    // proc info
@@ -57,6 +57,8 @@ class Comm : protected Pointers {
   double mysplit[3][2];             // fractional (0-1) bounds of my sub-domain
   double rcbcutfrac;                // fractional RCB cut by this proc
   int rcbcutdim;                    // dimension of RCB cut
+  class NBin *bin_pointer;                //used to invoke possible binning for comm substyles
+  class NStencil *stencil_pointer;        //used for possible binning in comm substyle
 
   // methods
 
@@ -142,6 +144,7 @@ class Comm : protected Pointers {
   int ncores;                       // # of cores per node
   int coregrid[3];                  // 3d grid of cores within a node
   int user_coregrid[3];             // user request for cores in each dim
+  
  public:
   enum{MULTIPLE};
 };
