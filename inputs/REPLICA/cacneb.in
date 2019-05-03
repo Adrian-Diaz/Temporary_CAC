@@ -17,17 +17,11 @@ pair_coeff 		* * Cu_u3.eam
 group			vac id 252 
 delete_atoms	group vac
 
-
-#min_style			CAC_quickmin
-#minimize			1e-16 0.0 5000 10000
-
-reset_timestep	0
-
-fix				1 all neb_CAC 1.0 #perp 1.0 end last 1.0
-compute			centro all centro/atom fcc
+fix				1 all neb_CAC 1.0 perp 1.0 end last 1.0
+compute		centro all centro/atom fcc
 variable		this_u equal $u-1
-dump 			1 all cfg 500 *_${this_u}.cfg mass type xs ys zs c_centro
+dump 			1 all cfg 10000 *_${this_u}.cfg mass type xs ys zs c_centro
 dump_modify		1 element Cu
 
 min_style 			CAC_quickmin
-neb_CAC 			1e-16 0.0 1000 1000 500 final cac.last
+neb_CAC 			1e-16 0.0 10000 10000 500 final cac.last

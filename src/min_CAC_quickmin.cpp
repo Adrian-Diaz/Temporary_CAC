@@ -74,6 +74,7 @@ void CACMinQuickMin::reset_vectors()
   nvec = 3*atom->maxpoly*atom->nodes_per_element * atom->nlocal;
   if (nvec) xvec = atom->nodal_positions[0][0][0];
   if (nvec) fvec = atom->nodal_forces[0][0][0];
+
 }
 
 /* ----------------------------------------------------------------------

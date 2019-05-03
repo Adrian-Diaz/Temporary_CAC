@@ -265,13 +265,17 @@ void NEBCAC::run()
     print_status();
     if (update->minimize->stop_condition) break;
   }
-
+  // printf("Energy (%i): %f", me_universe, update->minimize->einitial);
+  //   //   Debug block
+  //   volatile int qq = 0;
+  //   printf("set var qq = 1");
+  //   while (qq == 0){}
   timer->barrier_stop();
 
-  update->minimize->cleanup();
+  // update->minimize->cleanup();
 
-  Finish finish(lmp);
-  finish.end(1);
+  // Finish finish(lmp);
+  // finish.end(1);
 
   // switch fix NEB to climbing mode
   // top = replica that becomes hill climber
@@ -297,16 +301,16 @@ void NEBCAC::run()
       fprintf(ulogfile,"Climbing replica = %d\n",top+1);
   }
 
-  update->beginstep = update->firststep = update->ntimestep;
+  // update->beginstep = update->firststep = update->ntimestep;
   update->endstep = update->laststep = update->firststep + n2steps;
   update->nsteps = n2steps;
   update->max_eval = n2steps;
   if (update->laststep < 0)
     error->all(FLERR,"Too many timesteps");
 
-  update->minimize->init();
+  // update->minimize->init();
   fneb->rclimber = top;
-  update->minimize->setup();
+  // update->minimize->setup();
 
   if (me_universe == 0) {
     if (uscreen)
@@ -357,7 +361,7 @@ void NEBCAC::run()
   timer->barrier_stop();
 
   update->minimize->cleanup();
-
+  Finish finish(lmp);
   finish.end(1);
 
   update->whichflag = 0;
@@ -455,10 +459,6 @@ void NEBCAC::readfile(char *file, int flag)
 
     buf = buffer;
     
-//   Debug block
-    // volatile int qq = 0;
-    // printf("set var qq = 1");
-    // while (qq == 0){}
 
     // loop over lines of element/nodal coords
     // tokenize the line into values
@@ -550,7 +550,6 @@ void NEBCAC::readfile(char *file, int flag)
   if (flag == 0) {
     int ntotal;
     MPI_Allreduce(&ncount,&ntotal,1,MPI_INT,MPI_SUM,uworld);
-    printf("Total %d, expected: %d", ntotal, nreplica*nlines);
     if (ntotal != nreplica*nlines)
       error->universe_all(FLERR,"Invalid atom IDs in neb file");
   } else {

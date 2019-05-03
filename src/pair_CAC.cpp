@@ -81,8 +81,8 @@ PairCAC::PairCAC(LAMMPS *lmp) : Pair(lmp)
 	cgParm=NULL;
   asaParm=NULL;
   Objective=NULL;
-	neighbor->pgsize=0;
-	neighbor->oneatom=0;
+	neighbor->pgsize=10;
+	neighbor->oneatom=1;
 }
 
 /* ---------------------------------------------------------------------- */

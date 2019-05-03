@@ -1,0 +1,143 @@
+LAMMPS (16 Mar 2018)
+units			metal
+dimension		3
+boundary		p p p
+atom_style     	CAC 1 1
+atom_modify		map array sort 0 0
+
+newton			off
+read_data		cacinit.data
+Reading data file ...
+  orthogonal box = (6.05885e-08 6.05885e-08 6.05885e-08) to (18.075 18.075 18.075)
+  1 by 2 by 2 MPI processor grid
+  500 CAC_Elements
+
+
+variable		u uloop 31 # for NEB per-replica output
+pair_style 		CAC/eam
+pair_coeff 		* * Cu_u3.eam
+Reading potential file Cu_u3.eam with DATE: 2007-06-11
+
+#fix				1 all box/relax iso 0.0 vmax 0.001
+min_style			CAC_cg
+minimize			1e-16 0.0 5000 10000
+WARNING: Using 'neigh_modify every 1 delay 0 check yes' setting during minimization (../min.cpp:168)
+Neighbor list info ...
+  update every 1 steps, delay 0 steps, check yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 13.9
+  ghost atom cutoff = 13.9
+  binsize = 6.95, bins = 3 3 3
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair CAC/eam, perpetual
+      attributes: , newton off
+      pair build: CAC
+      stencil: full/bin/3d
+      bin: CAC
+Setting up CAC_cg style minimization ...
+  Unit style    : metal
+  Current step  : 0
+Per MPI rank memory allocation (min/avg/max) = 8.938 | 8.938 | 8.938 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+       0            0        -1770            0        -1770            0 
+       1            0        -1770            0        -1770            0 
+Loop time of 0.160788 on 4 procs for 1 steps with 500 atoms
+
+99.4% CPU use with 4 MPI tasks x no OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+        -1770.00000114     -1770.00000114     -1770.00000114
+  Force two-norm initial, final = 1.73638e-13 1.27779e-13
+  Force max component initial, final = 1.56698e-14 1.10181e-14
+  Final line search alpha, max atom move = 1 1.10181e-14
+  Iterations, force evaluations = 1 2
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.11721    | 0.14087    | 0.1554     |   3.8 | 87.61
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0.0027683  | 0.0031651  | 0.0035751  |   0.7 |  1.97
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.01675    |            |       | 10.42
+
+Nlocal:    125 ave 135 max 103 min
+Histogram: 1 0 0 0 0 0 0 0 2 1
+Nghost:    4875 ave 4897 max 4865 min
+Histogram: 1 2 0 0 0 0 0 0 0 1
+Neighs:    0 ave 0 max 0 min
+Histogram: 4 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 0
+Ave neighs/atom = 0
+Neighbor list builds = 0
+Dangerous builds = 0
+
+
+group			vac id 252
+1 atoms in group vac
+delete_atoms	group vac
+Deleted 1 atoms, new total = 499
+
+min_style			CAC_cg
+minimize			1e-16 0.0 5000 10000
+WARNING: Using 'neigh_modify every 1 delay 0 check yes' setting during minimization (../min.cpp:168)
+Setting up CAC_cg style minimization ...
+  Unit style    : metal
+  Current step  : 1
+Per MPI rank memory allocation (min/avg/max) = 8.938 | 8.938 | 8.938 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+       1            0   -1765.1435            0   -1765.1435            0 
+      37            0   -1765.1758            0   -1765.1758            0 
+Loop time of 3.35417 on 4 procs for 36 steps with 499 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+        -1765.14346159     -1765.17581074     -1765.17581074
+  Force two-norm initial, final = 0.549256 2.50201e-12
+  Force max component initial, final = 0.107602 2.90948e-13
+  Final line search alpha, max atom move = 1 2.90948e-13
+  Iterations, force evaluations = 36 72
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 3.1442     | 3.1977     | 3.2694     |   2.6 | 95.33
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0.05668    | 0.057217   | 0.057735   |   0.2 |  1.71
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.09928    |            |       |  2.96
+
+Nlocal:    124.75 ave 125 max 124 min
+Histogram: 1 0 0 0 0 0 0 0 0 3
+Nghost:    4863.25 ave 4864 max 4863 min
+Histogram: 3 0 0 0 0 0 0 0 0 1
+Neighs:    0 ave 0 max 0 min
+Histogram: 4 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 0
+Ave neighs/atom = 0
+Neighbor list builds = 0
+Dangerous builds = 0
+
+#unfix			1
+reset_timestep	0
+fix			2 all neb_CAC 1.0 perp 1.0 end last/efirst/middle 2.0
+compute			centro all centro/atom fcc
+variable		this_u equal $u-1
+variable		this_u equal 1-1
+dump 			1 all cfg 100000 *_${this_u}.cfg mass type xs ys zs c_centro
+dump 			1 all cfg 100000 *_0.cfg mass type xs ys zs c_centro
+dump_modify		1 element Cu
+
+min_style 			CAC_fire
+neb_CAC 			1e-16 0.0 1000 1000 500 final cacat.last
+ERROR: Cannot use NEB with a single replica (../neb_CAC.cpp:146)
+Last command: neb_CAC 			1e-16 0.0 1000 1000 500 final cacat.last
