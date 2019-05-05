@@ -34,8 +34,8 @@
 #include <stdint.h>
 
 //#include "math_extra.h"
-#define MAXNEIGH1  700
-#define MAXNEIGH2  300
+#define MAXNEIGH1  70
+#define MAXNEIGH2  30
 #define MAXLINE 1024
 #define DELTA 4
 using namespace LAMMPS_NS;
