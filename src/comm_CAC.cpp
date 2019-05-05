@@ -288,8 +288,8 @@ void CommCAC::setup()
 		//not the most rigorous approach; feel free to improve :).
 	
 		for(int ipoly=0; ipoly < poly_count[element_index]; ipoly++){
-		for(int i=0; i<nodetotal; i++){
-			for (int j=i+1; j<nodetotal; j++){
+		for(i=0; i<nodetotal; i++){
+			for (j=i+1; j<nodetotal; j++){
 				dx=nodal_positions[element_index][i][ipoly][0]-nodal_positions[element_index][j][ipoly][0];
 				dy=nodal_positions[element_index][i][ipoly][1]-nodal_positions[element_index][j][ipoly][1];
 				dz=nodal_positions[element_index][i][ipoly][2]-nodal_positions[element_index][j][ipoly][2];
@@ -1069,9 +1069,7 @@ void CommCAC::forward_comm(int /*dummy*/)
   int i,irecv,n,nsend,nrecv;
   AtomVec *avec = atom->avec;
   double **x = atom->x;
-  int size_border= avec->size_border;
-  int size_difference = size_border-size_forward;
-  int size_offset;
+  
   // exchange data with another set of procs in each swap
   // post recvs from all procs except self
   // send data to all procs except self
@@ -1090,7 +1088,7 @@ void CommCAC::forward_comm(int /*dummy*/)
         //size_offset+=size_difference*recvnum[iswap][i-1];
           MPI_Irecv(&buf_recv[recvoffset[iswap][i]],
                     recvsize[iswap][i],
-                    MPI_DOUBLE,recvproc[iswap][i],0,world,&requests[i]);
+                    MPI_DOUBLE,recvproc[iswap][i],9,world,&requests[i]);
                   
         }
       }
@@ -1098,7 +1096,7 @@ void CommCAC::forward_comm(int /*dummy*/)
         for (i = 0; i < nsend; i++) {
           n = avec->pack_comm_vel(sendnum[iswap][i],sendlist[iswap][i],
                               buf_send,pbc_flag[iswap][i],pbc[iswap][i]);
-          MPI_Send(buf_send,n,MPI_DOUBLE,sendproc[iswap][i],0,world);
+          MPI_Send(buf_send,n,MPI_DOUBLE,sendproc[iswap][i],9,world);
         }
       }
       if (recvother[iswap]) {
@@ -1135,7 +1133,7 @@ void CommCAC::forward_comm(int /*dummy*/)
 void CommCAC::exchange()
 {
   int i,m,nexch,nsend,nrecv,nlocal,proc,offset;
-  double lo,hi,value;
+  double lo,hi,value,lo_ep,hi_ep;
   double **x;
   AtomVec *avec = atom->avec;
 
@@ -1186,11 +1184,13 @@ void CommCAC::exchange()
     x = atom->x;
     lo = sublo[dim];
     hi = subhi[dim];
+    lo_ep = sublo[dim]-BOXEPSILON;
+    hi_ep = subhi[dim]+BOXEPSILON;
     nlocal = atom->nlocal;
     i = nsend = 0;
 
     while (i < nlocal) {
-      if (x[i][dim] < lo || x[i][dim] >= hi) {
+      if (x[i][dim] < lo_ep || x[i][dim] >= hi_ep) {
         if (nsend > maxsend) grow_send(nsend,1);
         proc = (this->*point_drop)(dim,x[i]);
         if (proc != me) {
@@ -1213,9 +1213,9 @@ void CommCAC::exchange()
 
     for (m = 0; m < nexch; m++)
       MPI_Irecv(&exchnum[dim][m],1,MPI_INT,
-                exchproc[dim][m],0,world,&requests[m]);
+                exchproc[dim][m],7,world,&requests[m]);
     for (m = 0; m < nexch; m++)
-      MPI_Send(&nsend,1,MPI_INT,exchproc[dim][m],0,world);
+      MPI_Send(&nsend,1,MPI_INT,exchproc[dim][m],7,world);
     MPI_Waitall(nexch,requests,MPI_STATUS_IGNORE);
 
     nrecv = 0;
@@ -1225,11 +1225,11 @@ void CommCAC::exchange()
     offset = 0;
     for (m = 0; m < nexch; m++) {
       MPI_Irecv(&buf_recv[offset],exchnum[dim][m],
-                MPI_DOUBLE,exchproc[dim][m],0,world,&requests[m]);
+                MPI_DOUBLE,exchproc[dim][m],8,world,&requests[m]);
       offset += exchnum[dim][m];
     }
     for (m = 0; m < nexch; m++)
-      MPI_Send(buf_send,nsend,MPI_DOUBLE,exchproc[dim][m],0,world);
+      MPI_Send(buf_send,nsend,MPI_DOUBLE,exchproc[dim][m],8,world);
     MPI_Waitall(nexch,requests,MPI_STATUS_IGNORE);
 
     // check incoming atoms to see if I own it and they are in my box
@@ -1558,10 +1558,10 @@ void CommCAC::overlap_element_comm(int iswap){
     if (recvother[iswap])
       for (m = 0; m < nrecv; m++)
         MPI_Irecv(&overlap_recvnum[iswap][m],1,MPI_INT,
-                  recvproc[iswap][m],0,world,&requests[m]);
+                  recvproc[iswap][m],1,world,&requests[m]);
     if (sendother[iswap])
       for (m = 0; m < nsend; m++)
-        MPI_Send(&overlap_sendnum[iswap][m],1,MPI_INT,sendproc[iswap][m],0,world);
+        MPI_Send(&overlap_sendnum[iswap][m],1,MPI_INT,sendproc[iswap][m],1,world);
     //if (sendself[iswap]){ overlap_recvnum[iswap][nrecv] = overlap_sendnum[iswap][nsend];}
     if (sendself[iswap]) 
         for(int selfcount=nsendproc[iswap]-sendself[iswap]; selfcount<nsendproc[iswap]; selfcount++)
@@ -1622,13 +1622,13 @@ void CommCAC::overlap_element_comm(int iswap){
       if (recvother[iswap]) {
         for (m = 0; m < nrecv; m++)
           MPI_Irecv(&overlap_recvsize[iswap][m],
-                    1, MPI_INT,recvproc[iswap][m],0,world,&requests[m]);
+                    1, MPI_INT,recvproc[iswap][m],2,world,&requests[m]);
       }
       //send buffer sizes to recv procs
      if (sendother[iswap]) {
         for (m = 0; m < nsend; m++) {
           MPI_Send(&overlap_sendsize[iswap][m],1,
-          MPI_INT,sendproc[iswap][m],0,world);
+          MPI_INT,sendproc[iswap][m],2,world);
         }
       }
       //wait for sizes to be received and resize recv buffer accordingly
@@ -1646,12 +1646,12 @@ void CommCAC::overlap_element_comm(int iswap){
         for (m = 0; m < nrecv; m++)
           MPI_Irecv(&buf_recv[overlap_recvoffset[iswap][m]],
                     overlap_recvsize[iswap][m],
-                    MPI_DOUBLE,recvproc[iswap][m],0,world,&requests[m]);
+                    MPI_DOUBLE,recvproc[iswap][m],3,world,&requests[m]);
       }
       if (sendother[iswap]) {
         for (m = 0; m < nsend; m++) {
           MPI_Send(&buf_send[overlap_sendoffset[iswap][m]],overlap_sendsize[iswap][m],
-          MPI_DOUBLE,sendproc[iswap][m],0,world);
+          MPI_DOUBLE,sendproc[iswap][m],3,world);
         }
       }
       if (recvother[iswap]) {
@@ -1754,7 +1754,7 @@ void CommCAC::borders()
   get_aug_oboxes(iswap);
   //recheck_overlap(iswap);
   overlap_element_comm(iswap);
-  MPI_Barrier(world);
+  //MPI_Barrier(world);
   // loop over swaps in all dimensions
   //update_setup();
   atom->nforeign_eboxes=nforeign_eboxes;
@@ -1890,10 +1890,10 @@ void CommCAC::borders()
     if (recvother[iswap])
       for (m = 0; m < nrecv; m++)
         MPI_Irecv(&recvnum[iswap][m],1,MPI_INT,
-                  recvproc[iswap][m],0,world,&requests[m]);
+                  recvproc[iswap][m],4,world,&requests[m]);
     if (sendother[iswap])
       for (m = 0; m < nsend; m++)
-        MPI_Send(&sendnum[iswap][m],1,MPI_INT,sendproc[iswap][m],0,world);
+        MPI_Send(&sendnum[iswap][m],1,MPI_INT,sendproc[iswap][m],4,world);
     //if (sendself[iswap]) recvnum[iswap][nrecv] = sendnum[iswap][nsend];//look at pbc later
     if (sendself[iswap]) 
         for(int selfcount=nsendproc[iswap]-sendself[iswap]; selfcount<nsendproc[iswap]; selfcount++)
@@ -1962,13 +1962,13 @@ void CommCAC::borders()
       if (recvother[iswap]) {
         for (m = 0; m < nrecv; m++)
           MPI_Irecv(&recvsize[iswap][m],
-                    1, MPI_INT,recvproc[iswap][m],0,world,&requests[m]);
+                    1, MPI_INT,recvproc[iswap][m],5,world,&requests[m]);
       }
       //send buffer sizes to recv procs
      if (sendother[iswap]) {
         for (m = 0; m < nsend; m++) {
           MPI_Send(&sendsize[iswap][m],1,
-          MPI_INT,sendproc[iswap][m],0,world);
+          MPI_INT,sendproc[iswap][m],5,world);
         }
       }
       //wait for sizes to be received and resize recv buffer accordingly
@@ -1986,12 +1986,12 @@ void CommCAC::borders()
         for (m = 0; m < nrecv; m++)
           MPI_Irecv(&buf_recv[recvoffset[iswap][m]],
                     recvsize[iswap][m],
-                    MPI_DOUBLE,recvproc[iswap][m],0,world,&requests[m]);
+                    MPI_DOUBLE,recvproc[iswap][m],6,world,&requests[m]);
       }
       if (sendother[iswap]) {
         for (m = 0; m < nsend; m++) {
           MPI_Send(&buf_send[sendoffset[iswap][m]],sendsize[iswap][m],
-          MPI_DOUBLE,sendproc[iswap][m],0,world);
+          MPI_DOUBLE,sendproc[iswap][m],6,world);
         }
       }
       if (recvother[iswap]) {

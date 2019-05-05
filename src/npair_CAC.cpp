@@ -22,8 +22,8 @@
 #include "error.h"
 #include "memory.h"
 #include <math.h> 
-#define MAXNEIGH  300
-#define EXPAND 10
+#define MAXNEIGH  10
+#define EXPAND 50
 using namespace LAMMPS_NS;
 
 /* ---------------------------------------------------------------------- */
@@ -77,7 +77,7 @@ if (quad_allocated) {
 		}
 
 		memory->sfree(quad_list_container);
-		memory->destroy(neighbor_copy_index);
+		
 
 	
     memory->destroy(current_element_quad_points);
@@ -197,8 +197,13 @@ void NPairCAC::build(NeighList *list)
 		  if(quadrature_point_count>atom->nlocal){
       memory->grow(list->ilist,quadrature_point_count,"NPairCAC:ilist");
       memory->grow(list->numneigh,quadrature_point_count,"NPairCAC:numneigh");
+			if(firstneigh==NULL)
+      list->firstneigh=(int **) memory->smalloc(quadrature_point_count*sizeof(int *),
+                                        "NPairCAC:firstneigh");
+		  else{
       list->firstneigh=(int **) memory->srealloc(list->firstneigh,quadrature_point_count*sizeof(int *),
                                         "NPairCAC:firstneigh");
+			}
 			
 		  ilist = list->ilist;
 	      numneigh = list->numneigh;
@@ -1122,7 +1127,7 @@ void NPairCAC::allocate_quad_neigh_list(int n1,int n2,int n3,int quad) {
 		}
 
 		memory->sfree(quad_list_container);
-		memory->sfree(neighbor_copy_index);
+	
 		
 	
 	}
@@ -1156,8 +1161,7 @@ void NPairCAC::allocate_quad_neigh_list(int n1,int n2,int n3,int quad) {
 				}
 			}
 		}
-			
-	memory->create(neighbor_copy_index, maxneigh_quad, "NPair CAC:copy_index");
+
 	
 	quad_allocated = 1;
 	old_atom_count = atom->nlocal;
@@ -1206,7 +1210,7 @@ bigint NPairCAC::memory_usage()
 		}
 
 		//bytes_used +=memory->usage(quad_list_container,old_atom_count);
-		//bytes_used +=memory->usage(neighbor_copy_index,maxneigh_quad);
+		
 
 	
     bytes_used +=memory->usage(current_element_quad_points,max_quad_count);

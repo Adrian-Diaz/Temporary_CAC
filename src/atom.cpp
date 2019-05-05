@@ -132,6 +132,9 @@ Atom::Atom(LAMMPS *lmp) : Pointers(lmp)
   local_neboxes=0;
   CAC_comm_flag=0;
   bin_foreign=0;
+  neigh_weight_flag=0;
+  neighbor_weights=NULL;
+  weight_count=0;
   
   // USER-MESO
 

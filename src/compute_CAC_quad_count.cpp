@@ -24,9 +24,11 @@
 #include "error.h"
 #include <math.h>
 
-#define QUADSCALE  1.2 //adhoc scaling used to offset the fact that quadrature points
+#define QUADSCALE  1.0 //adhoc scaling used to offset the fact that quadrature points
+#define QUADSCALE2  0 //adhoc scaling used to offset the fact that quadrature points
+#define MAXNEIGH   1000 //used to divide weights so they aren't such large numbers
 //for elements are more expensive due to the tendency to have more nodal interpolation
-//for their neighbors
+//for their neighbors; optimized for a case with a block of atoms inside a block of FE
 
 using namespace LAMMPS_NS;
 
@@ -73,18 +75,18 @@ void ComputeCACQuadCount::compute_peratom()
   if (atom->nmax > nmax) {
     memory->destroy(quad_count);
     nmax = atom->nmax;
-    memory->create(quad_count,nmax,"ke/atom:ke");
+    memory->create(quad_count,nmax,"comput_CAC_quad_count: quad_count");
     vector_atom = quad_count;
   }
   int nlocal = atom->nlocal;
   // compute quadrature counts for each CAC element in the group
   for (int i = 0; i < nlocal; i++) {
-	  quad_count[i] = 0;
+	  quad_count[i] = 1;
   }
 
   int *mask = atom->mask;
   int *element_type = atom->element_type;
- 
+  int **neighbor_weights = atom->neighbor_weights;
   double ****nodal_positions = atom->nodal_positions;
   int *poly_count = atom->poly_count;
   int **node_types = atom->node_types;
@@ -94,8 +96,10 @@ void ComputeCACQuadCount::compute_peratom()
   int n1, n2, n3;
   //enable passing quadrature rank that is not 2
   int  quad = force->pair->quadrature_node_count;
+	if(nlocal!=atom->weight_count&&atom->neigh_weight_flag!=0)
+	error->one(FLERR, "weight_counts don't match nlocal");
   for (int i = 0; i < nlocal; i++) {
-	  
+	  if(atom->neigh_weight_flag==0){
 	  current_element_scale = element_scale[i];
 	  current_nodal_positions = nodal_positions[i];
 	  current_element_type = element_type[i];
@@ -111,12 +115,17 @@ void ComputeCACQuadCount::compute_peratom()
 			  quad_count[i]= quad*quad*quad + 2 * n1*quad*quad + 2 * n2*quad*quad +
 				  +2 * n3*quad*quad + 4 * n1*n2*quad + 4 * n3*n2*quad + 4 * n1*n3*quad
 				  + 8 * n1*n2*n3;
-			  quad_count[i] *= QUADSCALE*current_poly_count;
+			  quad_count[i] *= current_poly_count;
 		
 		  
 
 	  }
+	}
+	else{
+    quad_count[i]=neighbor_weights[i][0]+QUADSCALE*neighbor_weights[i][1]+QUADSCALE2*neighbor_weights[i][2];
+	}
   }
+	atom->neigh_weight_flag=0;
 }
 
 
@@ -196,7 +205,9 @@ void ComputeCACQuadCount::compute_surface_depths(double &scalex, double &scaley,
 	countx = (int)(ds_surf / unit_cell_mapped[0]);
 	county = (int)(dt_surf / unit_cell_mapped[1]);
 	countz = (int)(dw_surf / unit_cell_mapped[2]);
-
+  if(countx==0) countx=1;
+	if(county==0) county=1;
+	if(countz==0) countz=1;
 
 
 
