@@ -22,6 +22,7 @@
 #include "neighbor.h"
 #include "neigh_request.h"
 #include "update.h"
+#include "timer.h"
 #include "neigh_list.h"
 #include "integrate.h"
 #include "respa.h"
@@ -844,15 +845,16 @@ unit_cell[2] = w;
  scanning_unit_cell[1]=unit_cell[1];
  scanning_unit_cell[2]=unit_cell[2];
 
-
 int distanceflag=0;
     current_position[0]=0;
     current_position[1]=0;
     current_position[2]=0;
+	
 	if (!atomic_flag) {
 		nodes_per_element = nodes_count_list[current_element_type];
 		for (int kkk = 0; kkk < nodes_per_element; kkk++) {
 			shape_func = shape_function(unit_cell[0], unit_cell[1], unit_cell[2], 2, kkk + 1);
+			//shape_func = (this->*shape_functions[kkk])(unit_cell[0], unit_cell[1], unit_cell[2]);
 			current_position[0] += current_nodal_positions[kkk][poly_counter][0] * shape_func;
 			current_position[1] += current_nodal_positions[kkk][poly_counter][1] * shape_func;
 			current_position[2] += current_nodal_positions[kkk][poly_counter][2] * shape_func;
@@ -863,7 +865,7 @@ int distanceflag=0;
 		current_position[1] = t;
 		current_position[2] = w;
 	}
-
+  
 	rcut = cut_global_s;
 	int origin_type = type_array[poly_counter];
 	
@@ -885,14 +887,21 @@ int distanceflag=0;
 	double *coeff;
 	int dummy1, m;
 	double dummy2;
-
+  //if(update->ntimestep==1)
+  //timer->stamp(Timer::CAC_INIT);
+  if(neigh_max_inner>local_inner_max){
 	memory->grow(rho, neigh_max_inner + 1, "Pair_CAC_eam:rho");
 	memory->grow(fp, neigh_max_inner + 1, "Pair_CAC_eam:fp");
-	memory->grow(inner_neighbor_coords, neigh_max_inner, 3, "Pair_CAC_eam:inner_neighbor_coords");
-	memory->grow(outer_neighbor_coords, neigh_max_outer, 3, "Pair_CAC_eam:outer_neighbor_coords");
 	memory->grow(inner_neighbor_types, neigh_max_inner, "Pair_CAC_eam:inner_neighbor_types");
+	memory->grow(inner_neighbor_coords, neigh_max_inner, 3, "Pair_CAC_eam:inner_neighbor_coords");
+	local_inner_max=neigh_max_inner;
+	}
+	if(neigh_max_outer>local_outer_max){
+	memory->grow(outer_neighbor_coords, neigh_max_outer, 3, "Pair_CAC_eam:outer_neighbor_coords");
 	memory->grow(outer_neighbor_types, neigh_max_outer, "Pair_CAC_eam:outer_neighbor_types");
-
+	local_outer_max=neigh_max_outer;
+	}
+  
 	for (int l = 0; l < neigh_max_inner+1; l++) {
 		rho[l] = 0;
 		fp[l] = 0;
@@ -910,6 +919,8 @@ int distanceflag=0;
 	origin_type = type_array[poly_counter];
 	double inner_scan_position[3];
 	//precompute virtual neighbor atom locations
+  	
+	
 	for (int l = 0; l < neigh_max_inner; l++) {
 		scanning_unit_cell[0] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][0];
 		scanning_unit_cell[1] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][1];
@@ -938,6 +949,7 @@ int distanceflag=0;
 			element_index, poly_index, scanning_unit_cell[0], scanning_unit_cell[1], scanning_unit_cell[2]);
 
 	}
+
 	//two body accumulation of electron densities to quadrature site
 	for (int l = 0; l < neigh_max_inner; l++) {
 
@@ -1190,8 +1202,9 @@ int distanceflag=0;
             }
         }
 	}
-
-
+  //if(update->ntimestep==1)
+  //timer->stamp(Timer::CAC_FD);
+   
 //end of scanning loop
 
 

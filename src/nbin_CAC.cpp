@@ -281,9 +281,9 @@ void NBinCAC::CAC_setup_bins(int style)
 	double xtmp, ytmp, ztmp, delx, dely, delz, rsq;
 	double ebounding_boxlo[3];
 	double ebounding_boxhi[3];
-  double CAC_cut= atom->CAC_cut;
+  //double CAC_cut= atom->CAC_cut;
   double CAC_skin= atom->CAC_skin;
-  CAC_cut=CAC_cut+CAC_skin;
+  //CAC_cut=CAC_cut+CAC_skin;
 	int *nodes_per_element_list = atom->nodes_per_element_list;
 	double max_search_range=atom->max_search_range;
 	double cut_max=neighbor->cutneighmax;

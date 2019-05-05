@@ -72,9 +72,9 @@ class Atom : protected Pointers {
   int *poly_count, **node_types,  *element_type,
 	  **element_scale, *nodes_per_element_list, scale_count, bin_foreign, CAC_comm_flag, *scale_list
     , initial_size, neboxes, local_neboxes, nforeign_eboxes, *ebox_ref;
- 
+  int neigh_weight_flag, **neighbor_weights;
   double CAC_cut, CAC_skin, max_search_range;				//used by npair_CAC styles
-  int one_layer_flag;
+  int one_layer_flag, weight_count;
 
   // PERI package
 

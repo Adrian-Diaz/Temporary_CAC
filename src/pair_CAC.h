@@ -40,8 +40,18 @@ class PairCAC : public Pair {
   virtual void coeff(int, char **){}
   virtual void init_style();
   virtual double init_one(int, int){ return 0.0; }
-  
-  
+ 
+ //set of shape functions
+ double quad_shape_one(double s, double t, double w){ return (1-s)*(1-t)*(1-w)/8;}
+ double quad_shape_two(double s, double t, double w){ return (1+s)*(1-t)*(1-w)/8;}
+ double quad_shape_three(double s, double t, double w){ return (1+s)*(1+t)*(1-w)/8;}
+ double quad_shape_four(double s, double t, double w){ return (1-s)*(1+t)*(1-w)/8;}
+ double quad_shape_five(double s, double t, double w){ return (1-s)*(1-t)*(1+w)/8;}
+ double quad_shape_six(double s, double t, double w){ return (1+s)*(1-t)*(1+w)/8;}
+ double quad_shape_seven(double s, double t, double w){ return (1+s)*(1+t)*(1+w)/8;}
+ double quad_shape_eight(double s, double t, double w){ return (1-s)*(1+t)*(1+w)/8;}
+
+ //end of shape function declarations
 
 
 
@@ -77,7 +87,9 @@ class PairCAC : public Pair {
 	int warning_flag;
 	int warned_flag;
 	int one_layer_flag;
-
+  //used to call set of shape functions
+  typedef double(PairCAC::*Shape_Functions)(double s, double t, double w);
+  Shape_Functions *shape_functions;
 
     int surf_select[2];
   double **cut;
@@ -86,7 +98,7 @@ class PairCAC : public Pair {
   double quadrature_energy;
   double **mass_matrix;
   double **mass_copy;
-
+  
   double **force_column;
   double *current_nodal_forces;
   double *current_force_column;
@@ -137,6 +149,8 @@ class PairCAC : public Pair {
 	int interior_flag;
 	int neigh_quad_counter;
   int quad_list_counter;
+  int local_inner_max;
+	int local_outer_max;
 	virtual void allocate();
 	virtual void read_file(char *) {}
   virtual void array2spline(){}
@@ -152,13 +166,13 @@ class PairCAC : public Pair {
   void compute_mass_matrix();
   void compute_forcev(int);
   double myvalue(asa_objective *asa);
-   void mygrad(asa_objective *asa);
-   void neigh_list_cord(double& coordx, double& coordy, double& coordz, int, int, double, double, double);
-  
+  void mygrad(asa_objective *asa);
+  void neigh_list_cord(double& coordx, double& coordy, double& coordz, int, int, double, double, double);
+  void set_shape_functions();
   double shape_function(double, double, double,int,int);
-   double shape_function_derivative(double, double, double,int,int,int);
-    void compute_surface_depths(double &x, double &y, double &z, 
-		int &xb, int &yb, int &zb, int flag);
+  double shape_function_derivative(double, double, double,int,int,int);
+  void compute_surface_depths(double &x, double &y, double &z, 
+	int &xb, int &yb, int &zb, int flag);
       
   void LUPSolve(double **A, int *P, double *b, int N, double *x);
   void neighbor_accumulate(double,double,double,int, int,int);
