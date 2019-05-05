@@ -1080,16 +1080,12 @@ int distanceflag=0;
 	fp[0] = (coeff[0] * p + coeff[1])*p + coeff[2];
 
 	if (quad_eflag){
-
 		phi = ((coeff[3]*p + coeff[4])*p + coeff[5])*p + coeff[6];
-
 		if (rho[0] > rhomax) phi += fp[0] * (rho[0]-rhomax);
-
  		phi *= scale[origin_type][scan_type];
-
   		quadrature_energy += phi;
-
 	}
+	
 
 	//compute derivative of the embedding energy for all atoms in the inner neighborlist
 	for (int l = 0; l < neigh_max_inner; l++) {

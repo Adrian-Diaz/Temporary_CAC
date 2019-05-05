@@ -79,8 +79,10 @@ void AtomVecCAC_Charge::process_args(int narg, char **arg)
   xcol_data = 4;
 
 	comm->maxexchange_atom=size_border;	
+
   
 	//initialize node counts associated with each element type
+
 	if(element_type_count==0){
 		element_type_count = 2; //increase if new types added
 		memory->grow(atom->nodes_per_element_list, element_type_count, "atom:nodes_per_element_list");
@@ -89,9 +91,11 @@ void AtomVecCAC_Charge::process_args(int narg, char **arg)
 		atom->nodes_per_element_list[1] = 8;
 	}	
 
+
    
 
 }
+
 
 
 /* ----------------------------------------------------------------------
@@ -1328,7 +1332,9 @@ int AtomVecCAC_Charge::unpack_restart(double *buf)
 {
   int current_node_count;	
   int nlocal = atom->nlocal;
+
   int *nodes_count_list = atom->nodes_per_element_list;
+
   scale_search_range=atom->scale_search_range;
   scale_list=atom->scale_list;
   scale_count=atom->scale_count;
@@ -1338,6 +1344,7 @@ int AtomVecCAC_Charge::unpack_restart(double *buf)
     if (atom->nextra_store)
       memory->grow(atom->extra,nmax,atom->nextra_store,"atom:extra");
   }
+
   int m = 1;
   x[nlocal][0] = buf[m++];
   x[nlocal][1] = buf[m++];
@@ -1452,7 +1459,9 @@ void AtomVecCAC_Charge::data_atom(double *coord, imageint imagetmp, char **value
 	if (nlocal == nmax) grow(0);
 	int nodetotal, npoly;
 	int tmp;
+
 	int *nodes_count_list = atom->nodes_per_element_list;
+
 	int types_filled = 0;
     scale_search_range=atom->scale_search_range;
     scale_list=atom->scale_list;

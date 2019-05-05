@@ -516,9 +516,11 @@ void NPairCAC::quadrature_init(int quadrature_rank) {
 
 }
 
+
 //compute and store quad points for the element referred to by element_index
 
 int NPairCAC::compute_quad_points(int element_index){
+
 
 	double unit_cell_mapped[3];
 	double interior_scale[3];
@@ -999,12 +1001,10 @@ int NPairCAC::compute_quad_points(int element_index){
 
 }
 
-
-
-
 //decide if an atom or quadrature point is close enough to an element to consider for nonlocal quadrature calculation
 
 int NPairCAC::CAC_decide_quad2element(int neighbor_element_index) {
+
 	double unit_cell_mapped[3];
 	double interior_scale[3];
 	
@@ -1083,6 +1083,7 @@ int NPairCAC::CAC_decide_quad2element(int neighbor_element_index) {
 
 }
 
+
 //allocate quadrature based neighbor storage
 
 void NPairCAC::allocate_quad_neigh_list(int n1,int n2,int n3,int quad) {
@@ -1153,18 +1154,14 @@ void NPairCAC::allocate_quad_neigh_list(int n1,int n2,int n3,int quad) {
 				
 			  quad_list_container[init]= (int **) memory->smalloc(max_quad_count*atom->maxpoly*sizeof(int *), "NPair CAC:list2ucell");
 				for (int neigh_loop = 0; neigh_loop < max_quad_count*atom->maxpoly; neigh_loop++) {
+
 					quad_list_container[init][neigh_loop]=memory->create(quad_list_container[init][neigh_loop], maxneigh_quad, "NPair CAC:cell_indexes");
+
+
 				}
 			}
 		}
-	
-	
-	
 
-
-	
-		
-	
 	
 	quad_allocated = 1;
 	old_atom_count = atom->nlocal;
@@ -1222,4 +1219,5 @@ bigint NPairCAC::memory_usage()
     
    
   return bytes_used;
+
 }
