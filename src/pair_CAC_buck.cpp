@@ -471,9 +471,12 @@ int distanceflag=0;
 			jlist = firstneigh[iii];
 			double ****nodal_positions = atom->nodal_positions;
 
-			memory->grow(inner_neighbor_coords, neigh_max, 3, "Pair_CAC_eam:inner_neighbor_coords");
-
-			memory->grow(inner_neighbor_types, neigh_max, "Pair_CAC_eam:inner_neighbor_types");
+			
+			if(neigh_max>local_inner_max){
+      memory->grow(inner_neighbor_coords, neigh_max, 3, "Pair_CAC_buck:inner_neighbor_coords");
+			memory->grow(inner_neighbor_types, neigh_max, "Pair_CAC_buck:inner_neighbor_types");
+	     local_inner_max=neigh_max;
+	     }   
 			for (int l = 0; l < neigh_max; l++) {
 			scanning_unit_cell[0] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][0];
 		    scanning_unit_cell[1] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][1];
