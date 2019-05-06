@@ -715,10 +715,17 @@ int distanceflag=0;
 	int dummy1;
 	double dummy2;
 	dummy1 = dummy2 = 0;
-	memory->grow(inner_neighbor_coords, neigh_max_inner,3 ,"Pair_CAC_sw:inner_neighbor_coords");
+
+	if(neigh_max_inner>local_inner_max){
+	memory->grow(inner_neighbor_types, neigh_max_inner, "Pair_CAC_sw:inner_neighbor_types");
+	memory->grow(inner_neighbor_coords, neigh_max_inner, 3, "Pair_CAC_sw:inner_neighbor_coords");
+	local_inner_max=neigh_max_inner;
+	}
+	if(neigh_max_outer>local_outer_max){
 	memory->grow(outer_neighbor_coords, neigh_max_outer, 3, "Pair_CAC_sw:outer_neighbor_coords");
-	memory->grow(inner_neighbor_types, neigh_max_inner,  "Pair_CAC_sw:inner_neighbor_types");
-	memory->grow(outer_neighbor_types, neigh_max_outer,  "Pair_CAC_sw:outer_neighbor_types");
+	memory->grow(outer_neighbor_types, neigh_max_outer, "Pair_CAC_sw:outer_neighbor_types");
+	local_outer_max=neigh_max_outer;
+	}
 
 	tagint itag, jtag;
 	double rsq, rsq1, rsq2;

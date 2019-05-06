@@ -410,11 +410,14 @@ int distanceflag=0;
 			double neighbor_element_charge;
 			qisq = origin_element_charge*origin_element_charge;
 			e_self = -(e_shift / 2.0 + alf / MY_PIS) * qisq*qqrd2e;
-			memory->grow(inner_neighbor_coords, neigh_max, 3, "Pair_CAC_eam:inner_neighbor_coords");
+			
+			if(neigh_max>local_inner_max){
+      memory->grow(inner_neighbor_coords, neigh_max, 3, "Pair_CAC_coul_wolf:neighbor_coords");
 
-			memory->grow(inner_neighbor_types, neigh_max, "Pair_CAC_eam:inner_neighbor_types");
-			memory->grow(inner_neighbor_charges, neigh_max, "Pair_CAC_eam:inner_neighbor_types");
-
+			memory->grow(inner_neighbor_types, neigh_max, "Pair_CAC_coul_wolf:neighbor_types");
+			memory->grow(inner_neighbor_charges, neigh_max, "Pair_CAC_coul_wolf:neighbor_charges");
+	     local_inner_max=neigh_max;
+	     }      
 			for (int l = 0; l < neigh_max; l++) {
 			scanning_unit_cell[0] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][0];
 		    scanning_unit_cell[1] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][1];
