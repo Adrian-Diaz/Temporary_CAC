@@ -535,7 +535,7 @@ void RCB::compute(int dimension, int n, double **x, double *wt,
       if (dotmark[i] == markactive)
         memcpy(&buf[outgoing++],&dots[i],sizeof(Dot));
       else
-        memcpy(&dots[keep++],&dots[i],sizeof(Dot));
+        memmove(&dots[keep++],&dots[i],sizeof(Dot));
     }
 
     // post receives for dots
@@ -1027,7 +1027,7 @@ void RCB::compute_old(int dimension, int n, double **x, double *wt,
       if (dotmark[i] == markactive)
         memcpy(&buf[outgoing++],&dots[i],sizeof(Dot));
       else
-        memcpy(&dots[keep++],&dots[i],sizeof(Dot));
+        memmove(&dots[keep++],&dots[i],sizeof(Dot));
     }
 
     // post receives for dots
