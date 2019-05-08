@@ -988,10 +988,12 @@ if (x[2] > bsubboxhi[2])
     iz = -1;
 	}
   
-  
+  int decision_flag=0;
+	if(foreign_boxes)decision_flag=1;
+	else decision_flag=element_type[element_index];
 
   //calculate the set of bins this element's bounding box overlaps
-  if(element_type[element_index]||foreign_boxes){
+  if(decision_flag){
     
 	//int current_poly_count = poly_count[element_index];
     
