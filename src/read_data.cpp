@@ -1731,10 +1731,10 @@ void ReadData::CAC_elements()
 	int m, nchunk, nline, nlineinner, nmax, npoly, tmp, nodecount;
 
 	char *eof;
-	char *element_type = (char*)malloc(sizeof(char) * 20);
+	char *element_type = (char*)memory->smalloc(sizeof(char) * 20, "read_data: element type string");
 	int chunk = 20;
 	int mapflag = 0;
-	char *CAC_buffer = new char[chunk*MAXLINE*MAXELEMENT];
+	char *CAC_buffer = (char*)memory->smalloc(sizeof(char) *(chunk*MAXLINE*(MAXELEMENT+1)+1), "read_data: CAC_buffer");
 	//std::ofstream myfile;
 
 	// nmax = max # of bodies to read in this chunk
@@ -1783,7 +1783,7 @@ void ReadData::CAC_elements()
 					if (eof == NULL) error->one(FLERR, "Unexpected end of data file");
 
 					m += strlen(&CAC_buffer[m]);
-					if (nlineinner + 1 > MAXELEMENT)
+					if (nlineinner + 1 >= MAXELEMENT)
 						error->one(FLERR,
 							"Too many lines in one element in data file - increase MAXELEMENT in read_data.cpp");
 
@@ -1802,13 +1802,17 @@ void ReadData::CAC_elements()
 
 			}
 
-
+    if (m) {
+      if (CAC_buffer[m-1] != '\n') strcpy(&CAC_buffer[m++],"\n");
+      m++;
+    }
 
 		}
 
 
 		MPI_Bcast(&nchunk, 1, MPI_INT, 0, world);
 		MPI_Bcast(&m, 1, MPI_INT, 0, world);
+    
 		MPI_Bcast(CAC_buffer, m, MPI_CHAR, 0, world);
 
 
@@ -1845,8 +1849,10 @@ void ReadData::CAC_elements()
 		if (logfile) fprintf(logfile, "  " BIGINT_FORMAT " CAC_Elements\n", nCAC_elements);
 	}
 	*/
-	free(element_type);
-	delete[] CAC_buffer;
+
+	free (element_type);
+	free (CAC_buffer);
+
 }
 
 //----------------------------------------------------

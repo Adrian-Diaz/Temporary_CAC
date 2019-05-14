@@ -230,8 +230,10 @@ void PairCAC::compute(int eflag, int vflag) {
   numneigh = list->numneigh;
   firstneigh = list->firstneigh;
   reneighbor_time = neighbor->lastcall;
-	if (update->ntimestep == reneighbor_time||update->whichflag==2)
+	if (update->ntimestep == reneighbor_time||update->whichflag==2){
 	atom->neigh_weight_flag=1;
+	atom->weight_count=atom->nlocal;
+	}
   //quadrature warning
   /*
   if (warning_flag && !warned_flag) {
@@ -358,7 +360,6 @@ void PairCAC::compute(int eflag, int vflag) {
 	    neighbor_weights[i][0]=0;
 	    neighbor_weights[i][1]=0;
 	    neighbor_weights[i][2]=0;
-	    atom->weight_count=atom->nlocal;
 	    }
 			if (eflag) {
 				element_energy = 0;
