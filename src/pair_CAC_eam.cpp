@@ -1010,7 +1010,7 @@ int distanceflag=0;
 
 
 		for (int k = 0; k < neigh_max_inner; k++) {
-
+      if(l==k) continue;
 			scan_type2 = inner_neighbor_types[k];
 			scan_position[0] = inner_neighbor_coords[k][0];
 			scan_position[1] = inner_neighbor_coords[k][1];
