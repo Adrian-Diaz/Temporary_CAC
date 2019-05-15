@@ -70,7 +70,7 @@ protected:
   int bad_bin_flag;
   int ***quad_list_container;
   int *scan_flags;
-  
+  int max_quad_alloc;
   void allocate_quad_neigh_list(int,int,int,int);
   int compute_quad_points(int);
   void allocate_surface_counts();

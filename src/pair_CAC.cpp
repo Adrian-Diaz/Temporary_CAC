@@ -197,7 +197,7 @@ void PairCAC::compute(int eflag, int vflag) {
     int i,j,ii,jj,inum,jnum,itype,jtype;
   double xtmp,ytmp,ztmp,delx,dely,delz,evdwl,fpair;
   double rsq,r2inv,r6inv,forcelj,factor_lj;
-  int *ilist,*jlist,*numneigh,**firstneigh;
+  //int *ilist,*jlist,*numneigh,**firstneigh;
   int mi;
   int mj;
   
@@ -225,10 +225,10 @@ void PairCAC::compute(int eflag, int vflag) {
 	int *nodes_count_list = atom->nodes_per_element_list;	
   quad_eflag = eflag;
   cutoff_skin = neighbor->skin;
-  inum = list->inum;
-  ilist = list->ilist;
-  numneigh = list->numneigh;
-  firstneigh = list->firstneigh;
+  
+  
+
+  
   reneighbor_time = neighbor->lastcall;
 	if (update->ntimestep == reneighbor_time||update->whichflag==2){
 	atom->neigh_weight_flag=1;
@@ -347,8 +347,6 @@ void PairCAC::compute(int eflag, int vflag) {
 			ytmp = x[i][1];
 			ztmp = x[i][2];
 			itype = type[i];
-			jlist = firstneigh[i];
-			jnum = numneigh[i];
 			current_element_type = element_type[i];
 			current_element_scale = element_scale[i];
 			current_poly_count = poly_count[i];
