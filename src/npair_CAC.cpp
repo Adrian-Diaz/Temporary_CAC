@@ -33,7 +33,6 @@ NPairCAC::NPairCAC(LAMMPS *lmp) : NPair(lmp) {
 	maxneigh_quad = MAXNEIGH;
 	max_expansion_count = 0;
 	bad_bin_flag=0;
-	
   //interior_scales = NULL;
   surface_counts = NULL;
 	interior_scales = NULL;
@@ -41,7 +40,7 @@ NPairCAC::NPairCAC(LAMMPS *lmp) : NPair(lmp) {
   current_element_quad_points=NULL;
   quad_allocated = 0;
 	scan_flags = NULL;
-
+  max_quad_alloc=0;
   surface_counts_max[0] = 1;
   surface_counts_max[1] = 1;
   surface_counts_max[2] = 1;
@@ -194,17 +193,16 @@ void NPairCAC::build(NeighList *list)
 			if (atom->nlocal)
 			allocate_quad_neigh_list(surface_counts_max[0], surface_counts_max[1], surface_counts_max[2], quadrature_node_count);
       //firstneigh[0] = neighptr;
-		  if(quadrature_point_count>atom->nlocal){
-      memory->grow(list->ilist,quadrature_point_count,"NPairCAC:ilist");
-      memory->grow(list->numneigh,quadrature_point_count,"NPairCAC:numneigh");
-			if(firstneigh==NULL)
+		  if(quadrature_point_count>list->maxatom){
+		  memory->destroy(list->ilist);
+			memory->destroy(list->numneigh);
+      memory->create(list->ilist,quadrature_point_count,"NPairCAC:ilist");
+      memory->create(list->numneigh,quadrature_point_count,"NPairCAC:numneigh");
+			memory->sfree(list->firstneigh);
       list->firstneigh=(int **) memory->smalloc(quadrature_point_count*sizeof(int *),
                                         "NPairCAC:firstneigh");
-		  else{
-      list->firstneigh=(int **) memory->srealloc(list->firstneigh,quadrature_point_count*sizeof(int *),
-                                        "NPairCAC:firstneigh");
-			}
-			
+		 
+			max_quad_alloc=quadrature_point_count;
 		  ilist = list->ilist;
 	      numneigh = list->numneigh;
 	      firstneigh = list->firstneigh;
@@ -1178,6 +1176,8 @@ void NPairCAC::allocate_surface_counts() {
 	memory->grow(interior_scales, atom->nlocal , 3, "NPairCAC:interior_scales");
 	nmax = atom->nlocal;
 }
+
+
 
 //memory usage due to quadrature point list memory structure
 bigint NPairCAC::memory_usage()
