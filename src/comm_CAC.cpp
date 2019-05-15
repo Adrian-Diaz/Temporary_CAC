@@ -1190,7 +1190,7 @@ void CommCAC::exchange()
     i = nsend = 0;
 
     while (i < nlocal) {
-      if (x[i][dim] < lo_ep || x[i][dim] >= hi_ep) {
+      if (x[i][dim] < lo || x[i][dim] >= hi) {
         if (nsend > maxsend) grow_send(nsend,1);
         proc = (this->*point_drop)(dim,x[i]);
         if (proc != me) {
