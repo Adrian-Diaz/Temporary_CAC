@@ -66,7 +66,8 @@ class AtomVecHybrid : public AtomVec {
   int property_atom(char *);
   void pack_property_atom(int, double *, int, int);
   bigint memory_usage();
-
+  virtual int check_distance_function(double deltasq);
+  virtual void set_hold_properties(); //specific neighbor rebuild check function an atom style might need
  private:
   tagint *tag;
   int *type,*mask;

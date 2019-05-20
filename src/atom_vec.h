@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include "pointers.h"
 
+
 namespace LAMMPS_NS {
 
 class AtomVec : protected Pointers {
@@ -47,6 +48,10 @@ class AtomVec : protected Pointers {
 
   int nargcopy;          // copy of command-line args for atom_style command
   char **argcopy;        // used when AtomVec is realloced (restart,replicate)
+  
+  int check_distance_flag; //determines whether the atom style has its own neighbor rebuild check
+
+  
 
   AtomVec(class LAMMPS *);
   virtual ~AtomVec();
@@ -116,6 +121,10 @@ class AtomVec : protected Pointers {
   virtual void pack_property_atom(int, double *, int, int) {}
 
   virtual bigint memory_usage() = 0;
+  virtual int check_distance_function(double deltasq) {return 0;} //specific neighbor rebuild check function an atom style might need
+  virtual void set_hold_properties() {} //specific neighbor rebuild check function an atom style might need
+
+
 
  protected:
   int nmax;                             // local copy of atom->nmax

@@ -95,6 +95,7 @@ pairclass(NULL), pairnames(NULL), pairmasks(NULL)
   build_once = 0;
   cluster_check = 0;
   ago = -1;
+  atomvec_check_flag=0;
 
   cutneighmax = 0.0;
   cutneighsq = NULL;
@@ -895,6 +896,13 @@ int Neighbor::init_pair()
       if (!done) break;
     }
   }
+  
+  //check if special neighbor check function is needed by the atom style
+  if(atom->avec->check_distance_flag!=0)
+  atomvec_check_flag=1;
+    
+    
+  
 
   // debug output
 
@@ -1968,7 +1976,7 @@ int Neighbor::check_distance()
 {
   double delx,dely,delz,rsq;
   double delta,deltasq,delta1,delta2;
-
+  
   if (boxcheck) {
     if (triclinic == 0) {
       delx = bboxlo[0] - boxlo_hold[0];
@@ -1996,7 +2004,7 @@ int Neighbor::check_distance()
       deltasq = delta*delta;
     }
   } else deltasq = triggersq;
-
+  
   double **x = atom->x;
   int nlocal = atom->nlocal;
   if (includegroup) nlocal = atom->nfirst;
@@ -2009,6 +2017,18 @@ int Neighbor::check_distance()
     rsq = delx*delx + dely*dely + delz*delz;
     if (rsq > deltasq) flag = 1;
   }
+
+  //check if npair style requires its own neighbor list rebuild check
+  if(atomvec_check_flag){
+    int m;
+    int current_flag;
+    if(atom->avec->check_distance_flag!=0)
+    current_flag=atom->avec->check_distance_function(deltasq);
+    if(current_flag!=0) flag=1;
+    else flag=0;
+  }
+
+  
 
   int flagall;
   MPI_Allreduce(&flag,&flagall,1,MPI_INT,MPI_MAX,world);
@@ -2072,7 +2092,10 @@ void Neighbor::build(int topoflag)
       }
     }
   }
-
+  
+  //set hold properties for atomvec styles that require their own neighbor rebuild check
+  if(atomvec_check_flag&&dist_check)
+  atom->avec->set_hold_properties();
   // bin atoms for all NBin instances
   // not just NBin associated with perpetual lists, also occasional lists
   // b/c cannot wait to bin occasional lists in build_one() call

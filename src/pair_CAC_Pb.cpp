@@ -31,8 +31,8 @@
 #include "domain.h"
 #include "asa_user.h"
 
-#define MAXNEIGH1  500
-#define MAXNEIGH2  400
+#define MAXNEIGH1  200
+#define MAXNEIGH2  40
 //#include "math_extra.h"
 
 

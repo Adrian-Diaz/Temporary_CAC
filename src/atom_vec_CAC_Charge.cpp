@@ -27,7 +27,7 @@ using namespace LAMMPS_NS;
 
 /* ---------------------------------------------------------------------- */
 
-AtomVecCAC_Charge::AtomVecCAC_Charge(LAMMPS *lmp) : AtomVec(lmp)
+AtomVecCAC_Charge::AtomVecCAC_Charge(LAMMPS *lmp) : AtomVecCAC(lmp)
 {
   molecular = 0;
   mass_type = 1;
@@ -46,6 +46,7 @@ AtomVecCAC_Charge::AtomVecCAC_Charge(LAMMPS *lmp) : AtomVec(lmp)
   atom->q_flag = 1;
   search_range_max = 0;
   initial_size=0;
+	check_distance_flag=1;
 }
 
 
@@ -91,7 +92,27 @@ void AtomVecCAC_Charge::process_args(int narg, char **arg)
 		atom->nodes_per_element_list[1] = 8;
 	}	
 
+   //minimization algorithm parameters
+  //asacg_parm scgParm;
+  //asa_parm sasaParm;
 
+  memory->create(cgParm, 1, "AtomVecCAC:cgParm");
+
+  memory->create(asaParm, 1, "AtomVecCAC:asaParm");
+
+  memory->create(Objective, 1, "AtomVecCAC:Objective");
+
+  // if you want to change parameter value, initialize strucs with default 
+  asa_cg_default(cgParm);
+  asa_default(asaParm);
+
+  // if you want to change parameters, change them here: 
+  cgParm->PrintParms = FALSE;
+  cgParm->PrintLevel = 0;
+
+  asaParm->PrintParms = FALSE;
+  asaParm->PrintLevel = 0;
+  asaParm->PrintFinal = 0;
    
 
 }
@@ -1689,3 +1710,5 @@ void AtomVecCAC_Charge::force_clear(int a, size_t) {
 		}
 	}
 }
+
+
