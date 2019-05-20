@@ -95,7 +95,7 @@ void ComputeCACQuadCount::compute_peratom()
   double interior_scales[3];
   int n1, n2, n3;
   //enable passing quadrature rank that is not 2
-  int  quad = force->pair->quadrature_node_count;
+  int  quad = atom->quadrature_node_count;
 	if(nlocal!=atom->weight_count&&atom->neigh_weight_flag!=0)
 	error->one(FLERR, "weight_counts don't match nlocal");
   for (int i = 0; i < nlocal; i++) {

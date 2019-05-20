@@ -20,11 +20,11 @@ AtomStyle(CAC/charge,AtomVecCAC_Charge)
 #ifndef LMP_ATOM_VEC_CAC_CHARGE_H
 #define LMP_ATOM_VEC_CAC_CHARGE_H
 
-#include "atom_vec.h"
+#include "atom_vec_CAC.h"
 
 namespace LAMMPS_NS {
 
-class AtomVecCAC_Charge : public AtomVec {
+class AtomVecCAC_Charge : public AtomVecCAC {
  public:
   AtomVecCAC_Charge(class LAMMPS *);
   virtual ~AtomVecCAC_Charge() {}
@@ -53,11 +53,12 @@ class AtomVecCAC_Charge : public AtomVec {
   void write_data(FILE *, int, double **);
   bigint memory_usage();
   virtual void force_clear(int, size_t);
+  
  protected:
   tagint *tag;
   int *type,*mask;
   imageint *image;
-   int nodes_per_element, maxpoly; //maximum number of nodes and atoms per unit cell per element in model
+   
   double **x,**v,**f;
   double ****nodal_positions,****nodal_velocities,****nodal_forces,
   ****nodal_gradients, **node_charges, ****initial_nodal_positions, *scale_search_range;

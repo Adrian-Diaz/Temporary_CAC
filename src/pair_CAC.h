@@ -20,19 +20,23 @@ PairStyle(CAC,PairCAC)
 #ifndef LMP_PAIR_CAC_H
 #define LMP_PAIR_CAC_H
 
-//#include "asa_user.h"
+
 #include "pair.h"
 #include <vector>
 #include <stdint.h>
 #include "memory.h"
+#include "asa_user.h"
 using namespace std;
 
 namespace LAMMPS_NS {
 
 class PairCAC : public Pair {
  public:
-	 double cutmax;                // max cutoff for all elements
-
+	double cutmax;                // max cutoff for all elements
+  asacg_parm *cgParm;
+  asa_parm *asaParm;
+  asa_objective *Objective;
+   
   PairCAC(class LAMMPS *);
   virtual ~PairCAC();
   virtual void compute(int, int);
@@ -50,39 +54,43 @@ class PairCAC : public Pair {
  double quad_shape_six(double s, double t, double w){ return (1+s)*(1-t)*(1+w)/8;}
  double quad_shape_seven(double s, double t, double w){ return (1+s)*(1+t)*(1+w)/8;}
  double quad_shape_eight(double s, double t, double w){ return (1-s)*(1+t)*(1+w)/8;}
-
+ 
  //end of shape function declarations
+  double myvalue(asa_objective *asa);
+  void mygrad(asa_objective *asa);
 
 
 
  protected:
-	 double cutforcesq;
-	 double **scale;
-    double *quadrature_weights2;
-    double *quadrature_abcissae2;
-    double unit_cell_mass;
-    double density;
-    double mapped_density;
+  int outer_neighflag;
+	double cutforcesq;
+	double **scale;
+  double *quadrature_weights2;
+  double *quadrature_abcissae2;
+  double unit_cell_mass;
+  double density;
+  double mapped_density;
 	int *current_element_scale;
 	int *neighbor_element_scale;
-    double mapped_volume;
-    int dof_surf_list[4];
-    double quad_r[3];
+  double mapped_volume;
+  int dof_surf_list[4];
+  double quad_r[3];
 	int reneighbor_time;
-    int max_nodes_per_element, neigh_nodes_per_element, neigh_surf_node_count
-		, neigh_poly_count;
+  int max_nodes_per_element, neigh_nodes_per_element, neigh_surf_node_count
+	, neigh_poly_count;
 	
-    double cut_global;
+  double cut_global_s;
+  int   quadrature_node_count;
 	double cutoff_skin;
-    double cell_vectors[3][3];
-    double interior_scale[3];
-    double cell_vector_norms[3];
-    double surf_args[3];
+  double cell_vectors[3][3];
+  double interior_scale[3];
+  double cell_vector_norms[3];
+  double surf_args[3];
 	int **surf_set;
 	int **dof_set;
 	int **sort_surf_set;
 	int **sort_dof_set;
-    double shape_args[3];
+  double shape_args[3];
 	int quad_allocated;
 	int warning_flag;
 	int warned_flag;
@@ -91,7 +99,7 @@ class PairCAC : public Pair {
   typedef double(PairCAC::*Shape_Functions)(double s, double t, double w);
   Shape_Functions *shape_functions;
 
-    int surf_select[2];
+  int surf_select[2];
   double **cut;
   double element_energy;
   int quad_eflag;
@@ -104,13 +112,13 @@ class PairCAC : public Pair {
   double *current_force_column;
   double *current_x;
   int   *pivot;
-    double *quad_node,quad_weight;
+  double *quad_node,quad_weight;
     
-    double *quadrature_weights;
-    double *quadrature_abcissae;
-    double *quadrature_result;
-    double **shape_quad_result;
-    double **shape_quad_interior;
+  double *quadrature_weights;
+  double *quadrature_abcissae;
+  double *quadrature_result;
+  double **shape_quad_result;
+  double **shape_quad_interior;
 	double ***current_nodal_positions;
 	double ***current_nodal_gradients;
 	double ***neighbor_element_positions;
@@ -165,8 +173,7 @@ class PairCAC : public Pair {
   void allocate_surface_counts();
   void compute_mass_matrix();
   void compute_forcev(int);
-  double myvalue(asa_objective *asa);
-  void mygrad(asa_objective *asa);
+ 
   void neigh_list_cord(double& coordx, double& coordy, double& coordz, int, int, double, double, double);
   void set_shape_functions();
   double shape_function(double, double, double,int,int);

@@ -6,7 +6,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include "pair.h"
+
 #define INT long int
 #define INT_INF LONG_MAX
 #define INF DBL_MAX
@@ -23,11 +23,15 @@
 #define NULL 0
 #endif
 
+namespace LAMMPS_NS {
+class PairCAC; //forward declaration
+class AtomVecCAC; //forward declaration
+}
 
 /*============================================================================
    structure which is passed to the user's evaluation routines when
    either the objective function or gradient must be evaluated                */
-typedef struct LAMMPS_NS::Pair::asa_objective_struct
+typedef struct asa_objective_struct
 {
     double      *x ; /* current iterate */
     double      *g ; /* user will store the gradient at x in g */
@@ -39,7 +43,7 @@ typedef struct LAMMPS_NS::Pair::asa_objective_struct
 /*============================================================================
    user controlled parameters for gradient projection algorithm
                (default values in asa_default)                                */
-typedef struct LAMMPS_NS::Pair::asa_parm_struct
+typedef struct asa_parm_struct
 {
     /* parameters values that the user may wish to modify */
 /*----------------------------------------------------------------------------*/
@@ -146,7 +150,7 @@ typedef struct LAMMPS_NS::Pair::asa_parm_struct
 /*============================================================================
    user controlled parameters for the conjugate gradient algorithm
                (default values in asa_cg_default)                             */
-typedef struct LAMMPS_NS::Pair::asacg_parm_struct
+typedef struct asacg_parm_struct
 {
     /* parameters values that the user may wish to modify */
 /*----------------------------------------------------------------------------*/
@@ -367,17 +371,18 @@ int asa_cg /*  return:
                             if DynamicMemory = TRUE, need  5n + m */
     INT          *iWork,  /* NULL => allocate integer work space
                             otherwise provide space to n integers */
-    LAMMPS_NS::Pair* objpoint
+    LAMMPS_NS::PairCAC* objpoint,
+    LAMMPS_NS::AtomVecCAC* avec_objpoint
 ) ;
 
 void asa_default /* set default parameter values for asa */
 (
-	LAMMPS_NS::Pair::asa_parm   *Parm
+	asa_parm   *Parm
 ) ;
 
 void asa_cg_default /* set parameter values for cg_descent */
 (
-	LAMMPS_NS::Pair::asacg_parm   *Parm
+	asacg_parm   *Parm
 ) ;
 
 #endif

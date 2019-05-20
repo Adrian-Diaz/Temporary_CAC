@@ -25,7 +25,9 @@ using namespace LAMMPS_NS;
 
 /* ---------------------------------------------------------------------- */
 
-AtomVecHybrid::AtomVecHybrid(LAMMPS *lmp) : AtomVec(lmp) {}
+AtomVecHybrid::AtomVecHybrid(LAMMPS *lmp) : AtomVec(lmp) {
+  check_distance_flag=0;
+}
 
 /* ---------------------------------------------------------------------- */
 
@@ -123,6 +125,12 @@ void AtomVecHybrid::process_args(int narg, char **arg)
   size_velocity = 3;
   if (atom->omega_flag) size_velocity += 3;
   if (atom->angmom_flag) size_velocity += 3;
+  int current_flag;
+  //determine if the set of substyles requires a specific neighbor rebuild check
+  for (int k = 0; k < nstyles; k++){
+      current_flag = styles[k]->check_distance_flag;
+      if(current_flag!=0) check_distance_flag=1;
+  }
 }
 
 /* ---------------------------------------------------------------------- */
@@ -1072,6 +1080,32 @@ int AtomVecHybrid::known_style(char *str)
 }
 
 /* ----------------------------------------------------------------------
+   set a hold value for atomvec properties used to compare with current property values
+------------------------------------------------------------------------- */
+
+void AtomVecHybrid::set_hold_properties(){
+	for (int k = 0; k < nstyles; k++)
+       styles[k]->set_hold_properties();
+}
+
+/* ----------------------------------------------------------------------
+   check whether substyle reneighbor checks require reneighboring on the current timestep
+------------------------------------------------------------------------- */
+
+int AtomVecHybrid::check_distance_function(double deltasq){
+	int flag=0;
+  int current_flag=0;
+	for (int k = 0; k < nstyles; k++){
+      current_flag = styles[k]->check_distance_function(deltasq);
+      if(current_flag!=0) {
+        flag=1;
+        break;
+        }
+  }
+	return flag;
+}
+
+/* ----------------------------------------------------------------------
    return # of bytes of allocated memory
 ------------------------------------------------------------------------- */
 
@@ -1081,3 +1115,5 @@ bigint AtomVecHybrid::memory_usage()
   for (int k = 0; k < nstyles; k++) bytes += styles[k]->memory_usage();
   return bytes;
 }
+
+

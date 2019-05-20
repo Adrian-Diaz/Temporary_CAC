@@ -101,22 +101,16 @@ class Pair : protected Pointers {
   ExecutionSpace execution_space;
   unsigned int datamask_read,datamask_modify;
   // structures for minimization algorithm for CAC pair styles
-  struct asa_objective_struct;
-  typedef asa_objective_struct asa_objective;
+  //struct asa_objective_struct;
+  //typedef asa_objective_struct asa_objective;
 
-  struct asacg_parm_struct;
-  typedef asacg_parm_struct asacg_parm;
+  //struct asacg_parm_struct;
+  //typedef asacg_parm_struct asacg_parm;
 
-  struct asa_parm_struct;
-  typedef asa_parm_struct asa_parm;
+  //struct asa_parm_struct;
+  //typedef asa_parm_struct asa_parm;
 
-  // args for CAC algorithm
-  asacg_parm *cgParm;
-  asa_parm *asaParm;
-  asa_objective *Objective;
-  double cut_global_s;
-  int   quadrature_node_count;
-  int outer_neighflag;
+  
   //////
 
   Pair(class LAMMPS *);
@@ -197,10 +191,7 @@ class Pair : protected Pointers {
   virtual void min_xf_get(int) {}
   virtual void min_x_set(int) {}
 
-  // minimization algorithm routines for certain pair styles
-  virtual double myvalue(asa_objective *asa) { return 0; }
-  virtual void mygrad(asa_objective *asa) {}
-  virtual double valgrad(asa_objective *asa) { return 0; }
+
 
   // management of callbacks to be run from ev_tally()
 

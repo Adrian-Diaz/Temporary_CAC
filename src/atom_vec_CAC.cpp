@@ -23,6 +23,7 @@
 #include "memory.h"
 #include "error.h"
 #include <string.h>
+#include "asa_user.h"
 
 using namespace LAMMPS_NS;
 
@@ -46,9 +47,26 @@ AtomVecCAC::AtomVecCAC(LAMMPS *lmp) : AtomVec(lmp)
   atom->CAC_flag=1;
   search_range_max = 0;
    initial_size=0;
+	 check_distance_flag=1;
+	 cgParm=NULL;
+  asaParm=NULL;
+  Objective=NULL;
+	hold_nodal_positions=NULL;
+	max_old=0;
  
 }
 
+//--------------------------------------------------------------------------
+
+AtomVecCAC::~AtomVecCAC() {
+
+	memory->destroy(cgParm);
+
+  memory->destroy(asaParm);
+
+  memory->destroy(Objective);
+
+}
 
 /* ----------------------------------------------------------------------
    process user input
@@ -86,6 +104,28 @@ void AtomVecCAC::process_args(int narg, char **arg)
 		atom->nodes_per_element_list[0] = 1;
 		atom->nodes_per_element_list[1] = 8;
 	}	
+
+	  //minimization algorithm parameters
+  //asacg_parm scgParm;
+  //asa_parm sasaParm;
+
+  memory->create(cgParm, 1, "AtomVecCAC:cgParm");
+
+  memory->create(asaParm, 1, "AtomVecCAC:asaParm");
+
+  memory->create(Objective, 1, "AtomVecCAC:Objective");
+
+  // if you want to change parameter value, initialize strucs with default 
+  asa_cg_default(cgParm);
+  asa_default(asaParm);
+
+  // if you want to change parameters, change them here: 
+  cgParm->PrintParms = FALSE;
+  cgParm->PrintLevel = 0;
+
+  asaParm->PrintParms = FALSE;
+  asaParm->PrintLevel = 0;
+  asaParm->PrintFinal = 0;
 
 	
 }
@@ -1645,6 +1685,10 @@ bigint AtomVecCAC::memory_usage()
   return bytes;
 }
 
+/* ----------------------------------------------------------------------
+   clear nodal forces and gradients
+------------------------------------------------------------------------- */
+
 void AtomVecCAC::force_clear(int a, size_t) {
 
 	for (int i = 0; i < atom->nlocal; i++) {
@@ -1665,4 +1709,422 @@ void AtomVecCAC::force_clear(int a, size_t) {
 			}
 		}
 	}
+}
+
+//-------------------------------------------------------------------------
+
+double AtomVecCAC::shape_function(double s, double t, double w, int flag, int index){
+double shape_function=0;
+if(flag==2){
+
+    if(index==1){
+    shape_function=(1-s)*(1-t)*(1-w)/8;
+    }
+    else if(index==2){
+    shape_function=(1+s)*(1-t)*(1-w)/8;
+    }
+    else if(index==3){
+    shape_function=(1+s)*(1+t)*(1-w)/8;
+    }
+    else if(index==4){
+    shape_function=(1-s)*(1+t)*(1-w)/8;
+    }
+    else if(index==5){
+    shape_function=(1-s)*(1-t)*(1+w)/8;
+    }
+    else if(index==6){
+    shape_function=(1+s)*(1-t)*(1+w)/8;
+    }
+    else if(index==7){
+    shape_function=(1+s)*(1+t)*(1+w)/8;
+    }
+    else if(index==8){
+    shape_function=(1-s)*(1+t)*(1+w)/8;
+    }
+
+
+}
+return shape_function;
+
+
+}
+
+
+
+double AtomVecCAC::shape_function_derivative(double s, double t, double w, int flag, int index, int derivative){
+double shape_function=0;
+//flag determines the element type and corresponding basis/shape functions
+if(flag==2){
+
+ if(derivative==1){
+    if(index==1){
+    shape_function=-(1-t)*(1-w)/8;
+    }
+    else if(index==2){
+    shape_function=(1-t)*(1-w)/8;
+    }
+    else if(index==3){
+    shape_function=(1+t)*(1-w)/8;
+    }
+    else if(index==4){
+    shape_function=-(1+t)*(1-w)/8;
+    }
+    else if(index==5){
+    shape_function=-(1-t)*(1+w)/8;
+    }
+    else if(index==6){
+    shape_function=(1-t)*(1+w)/8;
+    }
+    else if(index==7){
+    shape_function=(1+t)*(1+w)/8;
+    }
+    else if(index==8){
+    shape_function=-(1+t)*(1+w)/8;
+    }
+ }
+ else if(derivative==2){
+            if(index==1){
+    shape_function=-(1-s)*(1-w)/8;
+    }
+    else if(index==2){
+    shape_function=-(1+s)*(1-w)/8;
+    }
+    else if(index==3){
+    shape_function=(1+s)*(1-w)/8;
+    }
+    else if(index==4){
+    shape_function=(1-s)*(1-w)/8;
+    }
+    else if(index==5){
+    shape_function=-(1-s)*(1+w)/8;
+    }
+    else if(index==6){
+    shape_function=-(1+s)*(1+w)/8;
+    }
+    else if(index==7){
+    shape_function=(1+s)*(1+w)/8;
+    }
+    else if(index==8){
+    shape_function=(1-s)*(1+w)/8;
+    }
+
+ }
+ else if(derivative==3){
+
+
+        if(index==1){
+    shape_function=-(1-s)*(1-t)/8;
+    }
+    else if(index==2){
+    shape_function=-(1+s)*(1-t)/8;
+    }
+    else if(index==3){
+    shape_function=-(1+s)*(1+t)/8;
+    }
+    else if(index==4){
+    shape_function=-(1-s)*(1+t)/8;
+    }
+    else if(index==5){
+    shape_function=(1-s)*(1-t)/8;
+    }
+    else if(index==6){
+    shape_function=(1+s)*(1-t)/8;
+    }
+    else if(index==7){
+    shape_function=(1+s)*(1+t)/8;
+    }
+    else if(index==8){
+    shape_function=(1-s)*(1+t)/8;
+    }
+
+
+ }
+    
+
+}
+
+return shape_function;
+
+}
+
+/* ----------------------------------------------------------------------
+   set hold nodal properties for reneighbor checks
+------------------------------------------------------------------------- */
+
+void AtomVecCAC::set_hold_properties(){
+
+int element_index;
+int *nodes_count_list = atom->nodes_per_element_list;
+int *check_element_type = atom->element_type;
+int *check_poly_count = atom->poly_count;
+double ****check_nodal_positions = atom->nodal_positions;
+if(atom->nlocal>max_old){
+    memory->grow(hold_nodal_positions, atom->nlocal, nodes_per_element, maxpoly,3, "atom:hold_nodal_positions");
+		max_old=atom->nlocal;
+}
+for (element_index=0; element_index < atom->nlocal; element_index++){
+		
+		for (int nodecount = 0; nodecount < nodes_count_list[check_element_type[element_index]]; nodecount++) {
+			for (int poly_index = 0; poly_index < check_poly_count[element_index]; poly_index++)
+			{
+
+				hold_nodal_positions[element_index][nodecount][poly_index][0] = check_nodal_positions[element_index][nodecount][poly_index][0];
+				hold_nodal_positions[element_index][nodecount][poly_index][1] = check_nodal_positions[element_index][nodecount][poly_index][1];
+				hold_nodal_positions[element_index][nodecount][poly_index][2] = check_nodal_positions[element_index][nodecount][poly_index][2];
+				
+			}
+		}
+}
+
+}
+
+/* ----------------------------------------------------------------------
+   check if reneighboring is required
+------------------------------------------------------------------------- */
+
+int AtomVecCAC::check_distance_function(double deltasq){
+	int flag=0;
+	double Work[105];
+	long iWork[3];
+	double xm[3], lo[3], hi[3] ;
+	double unit_cell_mapped[3];
+	int i, element_index;
+  int *nodes_count_list = atom->nodes_per_element_list;
+	int *check_element_type = atom->element_type;
+	int **check_element_scale = atom->element_scale;
+  int *check_poly_count = atom->poly_count;
+	double ****check_nodal_positions = atom->nodal_positions;
+  int n = 3;
+	double delx, dely, delz;
+	double distancesq;
+	for (element_index=0; element_index < atom->nlocal; element_index++){
+		if(check_element_type[element_index]){
+	min_nodes_per_element=nodes_count_list[check_element_type[element_index]];
+	min_element_index=element_index;
+  unit_cell_mapped[0] = 2 / double(check_element_scale[element_index][0]);
+	unit_cell_mapped[1] = 2 / double(check_element_scale[element_index][1]);
+	unit_cell_mapped[2] = 2 / double(check_element_scale[element_index][2]);
+	deltasq_trigger = deltasq; //make squared trigger distance visible to the min obj and grad functions
+	/* allocate arrays for problem solution and bounds */
+
+
+	xm[0] = 0;
+	xm[1] = 0;
+	xm[2] = 0;
+	for (i = 0; i < n; i++) lo[i] = (double)-1;
+  for (i = 0; i < n; i++) hi[i] = (double)1;
+
+	//clock_t tforce_density_min_e = clock();
+  iWork[0] = 0;
+	iWork[1] = 0;
+	iWork[2] = 0;
+	for (int Workcounter = 0; Workcounter < 105; Workcounter++) {
+			Work[Workcounter] = 0;
+	}
+
+	double unit_cell_min = unit_cell_mapped[0];
+  if (unit_cell_min > unit_cell_mapped[1]) unit_cell_min = unit_cell_mapped[1];
+	if (unit_cell_min > unit_cell_mapped[2]) unit_cell_min = unit_cell_mapped[2];
+	//loop minimum for every poly DOF to ensure minimum
+	// run the minimization code
+  for (poly_min = 0; poly_min < check_poly_count[element_index]; poly_min++) {
+	asa_cg(xm, lo, hi, n, NULL, cgParm, asaParm,
+							1.e-2*unit_cell_min, NULL, Work, iWork, NULL, this);
+	if(-myvalue(Objective)>deltasq){
+		flag=1;
+		break;
+	}
+
+	}
+	if(flag) break;
+	}
+	else{
+		delx=check_nodal_positions[element_index][0][0][0]-hold_nodal_positions[element_index][0][0][0];
+		dely=check_nodal_positions[element_index][0][0][1]-hold_nodal_positions[element_index][0][0][1];
+		delz=check_nodal_positions[element_index][0][0][2]-hold_nodal_positions[element_index][0][0][2];
+    distancesq = delx*delx + dely*dely + delz*delz;
+		if (distancesq>deltasq){
+			flag=1;
+			break;
+		}
+	}
+	}
+	
+	return flag;
+}
+
+///////////////////////////////////////////////////
+
+
+
+double AtomVecCAC::myvalue /* evaluate the objective function */
+(
+	asa_objective *asa
+)
+{
+	double f, xi, t, *g, *x;
+	double px, py, pz;
+	double px1, px2, py1, py2, pz1, pz2;
+
+	double unit_cell_mapped[3];
+	double shape_func2;
+	double ***current_nodal_positions = atom->nodal_positions[min_element_index];
+	double ***current_hold_positions = hold_nodal_positions[min_element_index];
+	unit_cell_mapped[0] = 2 / double(atom->element_scale[min_element_index][0]);
+	unit_cell_mapped[1] = 2 / double(atom->element_scale[min_element_index][1]);
+	unit_cell_mapped[2] = 2 / double(atom->element_scale[min_element_index][2]);
+	INT i, n;
+	x = asa->x;
+	g = asa->g;
+	n = asa->n;
+	f = 0;
+  
+
+
+	/*
+	px= nodal_positions[n1][0]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n1+1)
+	+nodal_positions[n2][0]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n2+1)
+	+nodal_positions[n3][0]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n3+1)
+	+nodal_positions[n4][0]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n4+1);
+
+	py= nodal_positions[n1][1]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n1+1)
+	+nodal_positions[n2][1]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n2+1)
+	+nodal_positions[n3][1]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n3+1)
+	+nodal_positions[n4][1]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n4+1);
+
+	pz= nodal_positions[n1][2]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n1+1)
+	+nodal_positions[n2][2]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n2+1)
+	+nodal_positions[n3][2]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n3+1)
+	+nodal_positions[n4][2]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n4+1);
+	*/
+	px = 0;
+	py = 0;
+	pz = 0;
+	for (int kk = 0; kk < min_nodes_per_element; kk++) {
+		shape_func2 = shape_function(x[0], x[1], x[2], 2, kk + 1);
+		px += (current_nodal_positions[kk][poly_min][0]-current_hold_positions[kk][poly_min][0]) * shape_func2;
+		py += (current_nodal_positions[kk][poly_min][1]-current_hold_positions[kk][poly_min][1]) * shape_func2;
+		pz += (current_nodal_positions[kk][poly_min][2]-current_hold_positions[kk][poly_min][2]) * shape_func2;
+	}
+
+
+	f = -(px*px +  py*py +  pz*pz);
+
+
+	return (f);
+}
+
+void AtomVecCAC::mygrad /* evaluate the gradient of the objective function */
+(
+	asa_objective *asa
+)
+{
+	double f, xi, t, *g, *x;
+	double px, py, pz;
+	double px1, px2, px3, py1, py2, py3, pz1, pz2, pz3;
+	double unit_cell_mapped[3];
+	double shape_func3,shape_func2, shape_func1;
+	double ***current_nodal_positions = atom->nodal_positions[min_element_index];
+	double ***current_hold_positions = hold_nodal_positions[min_element_index];
+	unit_cell_mapped[0] = 2 / double(atom->element_scale[min_element_index][0]);
+	unit_cell_mapped[1] = 2 / double(atom->element_scale[min_element_index][1]);
+	unit_cell_mapped[2] = 2 / double(atom->element_scale[min_element_index][2]);
+
+	INT i, n;
+	x = asa->x;
+	g = asa->g;
+	n = asa->n;
+	f = 0;
+	
+
+	/*
+	px= nodal_positions[n1][0]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n1+1)
+	+nodal_positions[n2][0]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n2+1)
+	+nodal_positions[n3][0]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n3+1)
+	+nodal_positions[n4][0]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n4+1);
+
+	py= nodal_positions[n1][1]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n1+1)
+	+nodal_positions[n2][1]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n2+1)
+	+nodal_positions[n3][1]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n3+1)
+	+nodal_positions[n4][1]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n4+1);
+
+	pz= nodal_positions[n1][2]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n1+1)
+	+nodal_positions[n2][2]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n2+1)
+	+nodal_positions[n3][2]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n3+1)
+	+nodal_positions[n4][2]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n4+1);
+	*/
+
+	px = 0;
+	py = 0;
+	pz = 0;
+	for (int kk = 0; kk < min_nodes_per_element; kk++) {
+		shape_func2 = shape_function(x[0], x[1], x[2], 2, kk + 1);
+		px += (current_nodal_positions[kk][poly_min][0]-current_hold_positions[kk][poly_min][0]) * shape_func2;
+		py += (current_nodal_positions[kk][poly_min][1]-current_hold_positions[kk][poly_min][1]) * shape_func2;
+		pz += (current_nodal_positions[kk][poly_min][2]-current_hold_positions[kk][poly_min][2]) * shape_func2;
+	}
+	/*
+	px1= nodal_positions[n1][0]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n1+1, deriv_select[0])
+	+nodal_positions[n2][0]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n2+1, deriv_select[0])
+	+nodal_positions[n3][0]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n3+1, deriv_select[0])
+	+nodal_positions[n4][0]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n4+1, deriv_select[0]);
+
+	py1= nodal_positions[n1][1]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n1+1, deriv_select[0])
+	+nodal_positions[n2][1]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n2+1, deriv_select[0])
+	+nodal_positions[n3][1]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n3+1, deriv_select[0])
+	+nodal_positions[n4][1]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n4+1, deriv_select[0]);
+
+	pz1= nodal_positions[n1][2]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n1+1, deriv_select[0])
+	+nodal_positions[n2][2]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n2+1, deriv_select[0])
+	+nodal_positions[n3][2]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n3+1, deriv_select[0])
+	+nodal_positions[n4][2]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n4+1, deriv_select[0]);
+
+	px2= nodal_positions[n1][0]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n1+1, deriv_select[1])
+	+nodal_positions[n2][0]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n2+1, deriv_select[1])
+	+nodal_positions[n3][0]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n3+1, deriv_select[1])
+	+nodal_positions[n4][0]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n4+1, deriv_select[1]);
+
+	py2 = nodal_positions[n1][1] * shape_function_derivative(surf_args[0], surf_args[1], surf_args[2], 2, n1 + 1, deriv_select[1])
+	+ nodal_positions[n2][1] * shape_function_derivative(surf_args[0], surf_args[1], surf_args[2], 2, n2 + 1, deriv_select[1])
+	+ nodal_positions[n3][1] * shape_function_derivative(surf_args[0], surf_args[1], surf_args[2], 2, n3 + 1, deriv_select[1])
+	+ nodal_positions[n4][1] * shape_function_derivative(surf_args[0], surf_args[1], surf_args[2], 2, n4 + 1, deriv_select[1]);
+
+	pz2= nodal_positions[n1][2]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n1+1, deriv_select[1])
+	+nodal_positions[n2][2]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n2+1, deriv_select[1])
+	+nodal_positions[n3][2]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n3+1, deriv_select[1])
+	+nodal_positions[n4][2]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n4+1, deriv_select[1]);
+	*/
+	px1 = 0;
+	py1 = 0;
+	pz1 = 0;
+	px2 = 0;
+	py2 = 0;
+	pz2 = 0;
+	px3 = 0;
+	py3 = 0;
+	pz3 = 0;
+	for (int kk = 0; kk < min_nodes_per_element; kk++) {
+		shape_func1 = shape_function_derivative(x[0], x[1], x[2], 2, kk + 1, 1);
+		shape_func2 = shape_function_derivative(x[0], x[1], x[2], 2, kk + 1, 2);
+		shape_func3 = shape_function_derivative(x[0], x[1], x[2], 2, kk + 1, 3);
+		px1 += (current_nodal_positions[kk][poly_min][0]-current_hold_positions[kk][poly_min][0]) * shape_func1;
+		py1 += (current_nodal_positions[kk][poly_min][1]-current_hold_positions[kk][poly_min][1]) * shape_func1;
+		pz1 += (current_nodal_positions[kk][poly_min][2]-current_hold_positions[kk][poly_min][2]) * shape_func1;
+		px2 += (current_nodal_positions[kk][poly_min][0]-current_hold_positions[kk][poly_min][0]) * shape_func2;
+		py2 += (current_nodal_positions[kk][poly_min][1]-current_hold_positions[kk][poly_min][1]) * shape_func2;
+		pz2 += (current_nodal_positions[kk][poly_min][2]-current_hold_positions[kk][poly_min][2]) * shape_func2;
+		px3 += (current_nodal_positions[kk][poly_min][0]-current_hold_positions[kk][poly_min][0]) * shape_func3;
+		py3 += (current_nodal_positions[kk][poly_min][1]-current_hold_positions[kk][poly_min][1]) * shape_func3;
+		pz3 += (current_nodal_positions[kk][poly_min][2]-current_hold_positions[kk][poly_min][2]) * shape_func3;
+	}
+
+
+	g[0] = -(2 * px*px1 + 2 * py*py1 + 2 *  pz*pz1);
+	g[1] = -(2 * px*px2 + 2 * py*py2 + 2 *  pz*pz2);
+	g[2] = -(2 * px*px3 + 2 * py*py3 + 2 *  pz*pz3);
+
+	//g [0] = 4 * (x[0] - 0.5) *(x[0] - 0.5)*(x[0] - 0.5) ;
+	//g [1] = 4 * (x[1] - 0.3)* (x[1] - 0.3)*(x[1] - 0.3);
+
+	return;
 }

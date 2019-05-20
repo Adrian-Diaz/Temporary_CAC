@@ -567,7 +567,7 @@ void PairCAC::quadrature_init(int quadrature_rank){
 
 
 if(quadrature_rank==1){
-quadrature_node_count=1;
+atom->quadrature_node_count=quadrature_node_count=1;
 memory->create(quadrature_weights,quadrature_node_count,"pairCAC:quadrature_weights");
 memory->create(quadrature_abcissae,quadrature_node_count,"pairCAC:quadrature_abcissae");
 quadrature_weights[0]=2;
@@ -577,7 +577,7 @@ if(quadrature_rank==2){
 
 
 
-quadrature_node_count=2;
+atom->quadrature_node_count=quadrature_node_count=2;
 memory->create(quadrature_weights,quadrature_node_count,"pairCAC:quadrature_weights");
 memory->create(quadrature_abcissae,quadrature_node_count,"pairCAC:quadrature_abcissae");
 quadrature_weights[0]=1;
@@ -1891,13 +1891,13 @@ void PairCAC::neighbor_accumulate(double x,double y,double z,int iii,int inner_n
 					double unit_cell_min = unit_cell_mapped[0];
 					if (unit_cell_min > unit_cell_mapped[1]) unit_cell_min = unit_cell_mapped[1];
 					if (unit_cell_min > unit_cell_mapped[2]) unit_cell_min = unit_cell_mapped[2];
-					//loop minimum for every poly DOF to avoid mistake
+					//loop minimum for every poly DOF to ensure minimum
 					// run the minimization code
 					for (poly_min = 0; poly_min < neigh_poly_count; poly_min++) {
 
 
 						asa_cg(xm, lo, hi, n, NULL, cgParm, asaParm,
-							1.e-2*unit_cell_min, NULL, Work, iWork, this);
+							1.e-2*unit_cell_min, NULL, Work, iWork, this, NULL);
 
 						double tol = 0.00001*unit_cell_min;
 						if (xm[0] > 1 + tol || xm[1] > 1 + tol || xm[0] < -1 - tol || xm[1] < -1 - tol) {
