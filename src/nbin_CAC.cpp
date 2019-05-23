@@ -986,6 +986,7 @@ if (x[2] > bsubboxhi[2])
     iz = -1;
 	}
   
+
   int decision_flag;
 	if (foreign_boxes) decision_flag=1;
 	else decision_flag=element_type[element_index];

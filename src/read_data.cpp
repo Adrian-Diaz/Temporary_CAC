@@ -1849,8 +1849,10 @@ void ReadData::CAC_elements()
 		if (logfile) fprintf(logfile, "  " BIGINT_FORMAT " CAC_Elements\n", nCAC_elements);
 	}
 	*/
+
 	free (element_type);
 	free (CAC_buffer);
+
 }
 
 //----------------------------------------------------

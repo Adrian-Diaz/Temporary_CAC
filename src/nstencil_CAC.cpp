@@ -31,6 +31,14 @@ NStencilCAC::NStencilCAC(LAMMPS *lmp) : NStencil(lmp) {
 /*empty create setup */
 void NStencilCAC::create_setup() {}
 
+/* empty setup routine */
+
+void NStencilCAC::create_setup()
+{
+ 
+
+}
+
 /* ----------------------------------------------------------------------
    create stencil based on bin geometry and cutoff
 ------------------------------------------------------------------------- */

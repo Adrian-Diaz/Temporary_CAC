@@ -259,15 +259,16 @@ for (int iquad = 0; iquad < quadrature_count; iquad++) {
 			if(ibin + stencil[k]<0) error->one(FLERR," negative bin index");
 			if(ibin + stencil[k]>=mbins) error->one(FLERR," excessive bin index");
 			j = bin_content[ibin + stencil[k]][jj];
+			jtype = type[j];
+			
+			neighbor_element_type = element_type[j];
 			if (i == j) continue;
       if(neighbor_element_type!=0){
 				if(scan_flags[j]) continue;
 			}
 				
 			
-			jtype = type[j];
 			
-			neighbor_element_type = element_type[j];
 		  //check if this element is already in the neighborlist
 			/*
 			
