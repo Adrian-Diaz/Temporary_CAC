@@ -32,7 +32,7 @@
 #include "asa_user.h"
 
 #define MAXNEIGH1  200
-#define MAXNEIGH2  40
+#define MAXNEIGH2  300
 //#include "math_extra.h"
 
 

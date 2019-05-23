@@ -32,6 +32,7 @@ class NStencilCAC : public NStencil {
   NStencilCAC(class LAMMPS *);
   ~NStencilCAC() {}
   void create();
+  void create_setup();
   void post_create();
   void post_create_setup();
 };

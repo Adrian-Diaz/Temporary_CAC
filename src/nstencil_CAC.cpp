@@ -24,7 +24,12 @@ enum{NSQ,BIN,MULTI};     // also in Neighbor
 
 /* ---------------------------------------------------------------------- */
 
-NStencilCAC::NStencilCAC(LAMMPS *lmp) : NStencil(lmp) {}
+NStencilCAC::NStencilCAC(LAMMPS *lmp) : NStencil(lmp) {
+  post_create_flag=1;
+}
+
+/*empty create setup */
+void NStencilCAC::create_setup() {}
 
 /* ----------------------------------------------------------------------
    create stencil based on bin geometry and cutoff

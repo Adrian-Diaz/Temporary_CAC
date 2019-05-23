@@ -13,7 +13,7 @@
 
 #ifdef DUMP_CLASS
 
-DumpStyle(CACinitialnodes,DumpCACInitialNodes)
+DumpStyle(CAC_initial_nodes,DumpCACInitialNodes)
 
 #else
 

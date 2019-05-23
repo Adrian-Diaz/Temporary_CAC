@@ -13,7 +13,7 @@
 
 #ifdef DUMP_CLASS
 
-DumpStyle(CACtecplot,DumpCACtecplot)
+DumpStyle(CAC_tecplot,DumpCACtecplot)
 
 #else
 

@@ -100,6 +100,7 @@ void ComputeCACQuadCount::compute_peratom()
 	error->one(FLERR, "weight_counts don't match nlocal");
   for (int i = 0; i < nlocal; i++) {
 	  if(atom->neigh_weight_flag==0){
+			//if(1){
 	  current_element_scale = element_scale[i];
 	  current_nodal_positions = nodal_positions[i];
 	  current_element_type = element_type[i];

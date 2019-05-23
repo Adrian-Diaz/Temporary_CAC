@@ -281,9 +281,7 @@ void NBinCAC::CAC_setup_bins(int style)
 	double xtmp, ytmp, ztmp, delx, dely, delz, rsq;
 	double ebounding_boxlo[3];
 	double ebounding_boxhi[3];
-  //double CAC_cut= atom->CAC_cut;
-  double CAC_skin= atom->CAC_skin;
-  //CAC_cut=CAC_cut+CAC_skin;
+ 
 	int *nodes_per_element_list = atom->nodes_per_element_list;
 	double max_search_range=atom->max_search_range;
 	double cut_max=neighbor->cutneighmax;
@@ -940,7 +938,7 @@ void NBinCAC::bin_atoms()
 	double bounding_boxhi[3];
 	double *cutghost = comm->cutghost;
   //double CAC_cut= atom->CAC_cut;
-  double CAC_skin= atom->CAC_skin;
+  
 	double **eboxes=atom->eboxes;
 	double **foreign_eboxes=atom->foreign_eboxes;
 	int *ebox_ref=atom->ebox_ref;
@@ -948,7 +946,7 @@ void NBinCAC::bin_atoms()
 	double ***nodal_positions;
 	int current_poly_count;
 	int nodes_per_element;
-  //CAC_cut=CAC_cut+CAC_skin;
+  
 	int *nodes_per_element_list = atom->nodes_per_element_list;
   int ix,iy,iz;
   int ixl,iyl,izl,ixh,iyh,izh;
@@ -988,10 +986,12 @@ if (x[2] > bsubboxhi[2])
     iz = -1;
 	}
   
-  
+  int decision_flag;
+	if (foreign_boxes) decision_flag=1;
+	else decision_flag=element_type[element_index];
 
   //calculate the set of bins this element's bounding box overlaps
-  if(element_type[element_index]||foreign_boxes){
+  if(decision_flag){
     
 	//int current_poly_count = poly_count[element_index];
     

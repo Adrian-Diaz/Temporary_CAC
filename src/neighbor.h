@@ -31,6 +31,7 @@ class Neighbor : protected Pointers {
   int includegroup;                // only build pairwise lists for this group
   int build_once;                  // 1 if only build lists once per run
   int atomvec_check_flag;          // 1 if atomvec style invokes its own check function for rebuilds
+  int stencil_post_create_flag;    // 1 if atomvec style invokes its own check function for rebuilds
 
   double skin;                     // skin distance
   double cutneighmin;              // min neighbor cutoff for all type pairs
