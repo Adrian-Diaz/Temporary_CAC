@@ -96,6 +96,7 @@ pairclass(NULL), pairnames(NULL), pairmasks(NULL)
   cluster_check = 0;
   ago = -1;
   atomvec_check_flag=0;
+  stencil_post_create_flag=0;
 
   cutneighmax = 0.0;
   cutneighsq = NULL;
@@ -901,6 +902,13 @@ int Neighbor::init_pair()
   if(atom->avec->check_distance_flag!=0)
   atomvec_check_flag=1;
     
+  //check if stencil types require set up after their creation due to updating data
+  for (int i = 0; i < nstencil_perpetual; i++) {
+    if(neigh_stencil[slist[i]]->post_create_flag){
+      stencil_post_create_flag=1;
+      break;
+    }
+  }
     
   
 
@@ -2111,10 +2119,13 @@ void Neighbor::build(int topoflag)
   
   //call stencils in case new data introduced since setup has to be used
   //if not empty void function is called
-
+  if(stencil_post_create_flag){
   for (int i = 0; i < nstencil_perpetual; i++) {
+    if(neigh_stencil[slist[i]]->post_create_flag){
     neigh_stencil[slist[i]]->post_create_setup();
     neigh_stencil[slist[i]]->post_create();
+    }
+  }
   }
 
   // build pairwise lists for all perpetual NPair/NeighList

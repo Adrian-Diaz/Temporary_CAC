@@ -1184,13 +1184,15 @@ void CommCAC::exchange()
     x = atom->x;
     lo = sublo[dim];
     hi = subhi[dim];
-    lo_ep = sublo[dim]-BOXEPSILON;
-    hi_ep = subhi[dim]+BOXEPSILON;
+    //lo_ep = sublo[dim] - BOXEPSILON;
+    //hi_ep = subhi[dim] + BOXEPSILON;
+    lo_ep = sublo[dim] - 0.00000001;
+    hi_ep = subhi[dim] + 0.00000001;
     nlocal = atom->nlocal;
     i = nsend = 0;
 
     while (i < nlocal) {
-      if (x[i][dim] < lo || x[i][dim] >= hi) {
+      if (x[i][dim] < lo_ep || x[i][dim] >= hi_ep) {
         if (nsend > maxsend) grow_send(nsend,1);
         proc = (this->*point_drop)(dim,x[i]);
         if (proc != me) {
@@ -2690,53 +2692,64 @@ int CommCAC::point_drop_brick(int idim, double *x)
 int CommCAC::point_drop_tiled(int idim, double *x)
 {
   double xnew[3];
+  int dim1_other, dim2_other;
   xnew[0] = x[0]; xnew[1] = x[1]; xnew[2] = x[2];
 
-  if (idim == 0) {
-    if (xnew[1] < sublo[1] || xnew[1] > subhi[1]) {
-      if (closer_subbox_edge(1,x)) xnew[1] = subhi[1];
-      else xnew[1] = sublo[1];
-    }
+  if (idim==0) {
+    dim1_other=1;
+    dim2_other=2;
   }
-  if (idim <= 1) {
-    if (xnew[2] < sublo[2] || xnew[2] > subhi[2]) {
-      if (closer_subbox_edge(2,x)) xnew[2] = subhi[2];
-      else xnew[2] = sublo[2];
-    }
+  if (idim==1) {
+    dim1_other=0;
+    dim2_other=2;
+  }
+  if (idim==2) {
+    dim1_other=0;
+    dim2_other=1;
   }
 
-  int proc = point_drop_tiled_recurse(xnew,0,nprocs-1);
+    if (xnew[dim1_other] < sublo[dim1_other] || xnew[dim1_other] > subhi[dim1_other]) {
+      if (closer_subbox_edge(dim1_other,x)) xnew[dim1_other] = subhi[dim1_other];
+      else xnew[dim1_other] = sublo[dim1_other];
+    }
+    if (xnew[dim2_other] < sublo[dim2_other] || xnew[dim2_other] > subhi[dim2_other]) {
+      if (closer_subbox_edge(dim2_other,x)) xnew[dim2_other] = subhi[dim2_other];
+      else xnew[dim2_other] = sublo[dim2_other];
+    }
+  
+
+
+  int proc = point_drop_tiled_recurse(xnew,0,nprocs-1);//set to 6 here
   if (proc == me) return me;
 
-  if (idim == 0) {
+    /*since point tiled recurse includes the closure of the split interval (i.e an == case)
+    //perturb the particle in that dimension lower to bring it out of the closure that normally returns an adjacent proc
+    to that which is intended */
     int done = 1;
-    if (rcbinfo[proc].mysplit[1][0] == rcbinfo[me].mysplit[1][1]) {
-      xnew[1] -= EPSILON * (subhi[1]-sublo[1]);
+    if (rcbinfo[proc].mysplit[dim1_other][0] == rcbinfo[me].mysplit[dim1_other][1]) {
+      xnew[dim1_other] -= EPSILON * (subhi[dim1_other]-sublo[dim1_other]);
       done = 0;
     }
-    if (rcbinfo[proc].mysplit[2][0] == rcbinfo[me].mysplit[2][1]) {
-      xnew[2] -= EPSILON * (subhi[2]-sublo[2]);
+    if (rcbinfo[proc].mysplit[dim2_other][0] == rcbinfo[me].mysplit[dim2_other][1]) {
+      xnew[dim2_other] -= EPSILON * (subhi[dim2_other]-sublo[dim2_other]);
       done = 0;
     }
+    
     if (!done) {
       proc = point_drop_tiled_recurse(xnew,0,nprocs-1);
       done = 1;
-      if (rcbinfo[proc].mysplit[1][0] == rcbinfo[me].mysplit[1][1]) {
-        xnew[1] -= EPSILON * (subhi[1]-sublo[1]);
+      //sanity catch in case epsilon wasn't enough and floating point precision still catches an adjacent proc
+      if (rcbinfo[proc].mysplit[dim1_other][0] == rcbinfo[me].mysplit[dim1_other][1]) {
+        xnew[dim1_other] -= EPSILON * (subhi[dim1_other]-sublo[dim1_other]);
         done = 0;
       }
-      if (rcbinfo[proc].mysplit[2][0] == rcbinfo[me].mysplit[2][1]) {
-        xnew[2] -= EPSILON * (subhi[2]-sublo[2]);
+      if (rcbinfo[proc].mysplit[dim2_other][0] == rcbinfo[me].mysplit[dim2_other][1]) {
+        xnew[dim2_other] -= EPSILON * (subhi[dim2_other]-sublo[dim2_other]);
         done = 0;
       }
       if (!done) proc = point_drop_tiled_recurse(xnew,0,nprocs-1);
     }
-  } else if (idim == 1) {
-    if (rcbinfo[proc].mysplit[2][0] == rcbinfo[me].mysplit[2][1]) {
-      xnew[2] -= EPSILON * (subhi[2]-sublo[2]);
-      proc = point_drop_tiled_recurse(xnew,0,nprocs-1);
-    }
-  }
+  
 
   return proc;
 }
