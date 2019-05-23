@@ -13,21 +13,21 @@
 
 #ifdef DUMP_CLASS
 
-DumpStyle(CAC_tecplot,DumpCACtecplot)
+DumpStyle(CAC_nodal_positions,DumpCACNodalPositions)
 
 #else
 
-#ifndef LMP_DUMP_CACTECPLOT_H
-#define LMP_DUMP_CACTECPLOT_H
+#ifndef LMP_DUMP_CACNODALPOSITIONS_H
+#define LMP_DUMP_CACNODALPOSITIONS_H
 
 #include "dump.h"
 
 namespace LAMMPS_NS {
 
-class DumpCACtecplot : public Dump {
+class DumpCACNodalPositions : public Dump {
  public:
-  DumpCACtecplot(class LAMMPS *, int, char**);
-  virtual ~DumpCACtecplot();
+  DumpCACNodalPositions(class LAMMPS *, int, char**);
+  virtual ~DumpCACNodalPositions();
 
  protected:
   int ntypes;
@@ -43,7 +43,7 @@ class DumpCACtecplot : public Dump {
   int count();
   int modify_param(int, char **);
 
-  typedef void (DumpCACtecplot::*FnPtrWrite)(int, double *);
+  typedef void (DumpCACNodalPositions::*FnPtrWrite)(int, double *);
   FnPtrWrite write_choice;              // ptr to write data functions
   void write_string(int, double *);
   void write_lines(int, double *);

@@ -12,7 +12,7 @@
 ------------------------------------------------------------------------- */
 #include <mpi.h>
 #include <string.h>
-#include "dump_CACtecplot.h"
+#include "dump_CAC_nodal_positions.h"
 #include "atom.h"
 #include "group.h"
 #include "error.h"
@@ -26,7 +26,7 @@ using namespace LAMMPS_NS;
 
 /* ---------------------------------------------------------------------- */
 
-DumpCACtecplot::DumpCACtecplot(LAMMPS *lmp, int narg, char **arg) : Dump(lmp, narg, arg)
+DumpCACNodalPositions::DumpCACNodalPositions(LAMMPS *lmp, int narg, char **arg) : Dump(lmp, narg, arg)
 {
   if (narg != 5) error->all(FLERR,"Illegal dump xyz command");
   if (binary || multiproc) error->all(FLERR,"Invalid dump xyz filename");
@@ -51,7 +51,7 @@ DumpCACtecplot::DumpCACtecplot(LAMMPS *lmp, int narg, char **arg) : Dump(lmp, na
 
 /* ---------------------------------------------------------------------- */
 
-DumpCACtecplot::~DumpCACtecplot()
+DumpCACNodalPositions::~DumpCACNodalPositions()
 {
   delete[] format_default;
   format_default = NULL;
@@ -66,7 +66,7 @@ DumpCACtecplot::~DumpCACtecplot()
 
 /* ---------------------------------------------------------------------- */
 
-void DumpCACtecplot::init_style()
+void DumpCACNodalPositions::init_style()
 {
   delete [] format;
   char *str;
@@ -93,8 +93,8 @@ void DumpCACtecplot::init_style()
 
   // setup function ptr
 
-  if (buffer_flag == 1) write_choice = &DumpCACtecplot::write_string;
-  else write_choice = &DumpCACtecplot::write_lines;
+  if (buffer_flag == 1) write_choice = &DumpCACNodalPositions::write_string;
+  else write_choice = &DumpCACNodalPositions::write_lines;
 
   // open single file, one time only
 
@@ -104,7 +104,7 @@ void DumpCACtecplot::init_style()
 
 /* ---------------------------------------------------------------------- */
 
-int DumpCACtecplot::modify_param(int narg, char **arg)
+int DumpCACNodalPositions::modify_param(int narg, char **arg)
 {
   if (strcmp(arg[0],"element") == 0) {
     if (narg < ntypes+1)
@@ -133,7 +133,7 @@ int DumpCACtecplot::modify_param(int narg, char **arg)
 
 
 /*------------------------------------------------------------------------*/
-int DumpCACtecplot::count()
+int DumpCACNodalPositions::count()
 {
 	//if (igroup == 0) return (poly_count[i] + 1)*nodes_per_element*atom->nlocal;
   
@@ -167,7 +167,7 @@ int DumpCACtecplot::count()
 }
 /* ---------------------------------------------------------------------- */
 
-void DumpCACtecplot::write_header(bigint n)
+void DumpCACNodalPositions::write_header(bigint n)
 {
  
   if (me == 0) {
@@ -188,7 +188,7 @@ zone t="load step 0",n=    3200 e=     400 datapacking=point,zonetype=febric*/
 
 /* ---------------------------------------------------------------------- */
 
-void DumpCACtecplot::pack(tagint *ids)
+void DumpCACNodalPositions::pack(tagint *ids)
 {
   int m,n;
 
@@ -233,7 +233,7 @@ void DumpCACtecplot::pack(tagint *ids)
    return -1 if strlen exceeds an int, since used as arg in MPI calls in Dump
 ------------------------------------------------------------------------- */
 
-int DumpCACtecplot::convert_string(int n, double *mybuf)
+int DumpCACNodalPositions::convert_string(int n, double *mybuf)
 {
   int offset = 0;
   int m = 0;
@@ -256,21 +256,21 @@ int DumpCACtecplot::convert_string(int n, double *mybuf)
 
 /* ---------------------------------------------------------------------- */
 
-void DumpCACtecplot::write_data(int n, double *mybuf)
+void DumpCACNodalPositions::write_data(int n, double *mybuf)
 {
   (this->*write_choice)(n,mybuf);
 }
 
 /* ---------------------------------------------------------------------- */
 
-void DumpCACtecplot::write_string(int n, double *mybuf)
+void DumpCACNodalPositions::write_string(int n, double *mybuf)
 {
   fwrite(mybuf,sizeof(char),n,fp);
 }
 
 /* ---------------------------------------------------------------------- */
 
-void DumpCACtecplot::write_lines(int n, double *mybuf)
+void DumpCACNodalPositions::write_lines(int n, double *mybuf)
 {
   int m = 0;
   for (int i = 0; i < n; i++) {
