@@ -262,21 +262,8 @@ if (setflag[i][j] == 0) {
     ptail_ij = 16.0*MY_PI*all[0]*all[1]*epsilon[i][j] *
       sig6 * (2.0*sig6 - 3.0*rc6) / (9.0*rc9);
   }
- 	atom->scale_search_range[0]=atom->CAC_cut = cut_global_s+cutoff_skin;
-	
-	
-	for(int i=0; i<=atom->scale_count; i++) {
-		if(atom->scale_search_range[i]>atom->max_search_range) atom->max_search_range=atom->scale_search_range[i];
-	}
-	
- atom->CAC_skin=cutoff_skin;
-  int scale_count=0;
-	double max_search_range=0;
-	MPI_Allreduce(&atom->scale_count,&scale_count,1,MPI_INT,MPI_MAX,world);
-	MPI_Allreduce(&atom->max_search_range,&max_search_range,1,MPI_DOUBLE,MPI_MAX,world);
-	atom->max_search_range=max_search_range;
-	atom->scale_count=scale_count;
-	return atom->max_search_range;
+ 	
+	return cut_global_s;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -499,9 +486,13 @@ int distanceflag=0;
 			firstneigh = list->firstneigh;
 			jlist = firstneigh[iii];
 			double ****nodal_positions = atom->nodal_positions;
+			
+      if(neigh_max>local_inner_max){
 			memory->grow(inner_neighbor_coords, neigh_max, 3, "Pair_CAC_lj:inner_neighbor_coords");
 
 			memory->grow(inner_neighbor_types, neigh_max, "Pair_CAC_lj:inner_neighbor_types");
+	     local_inner_max=neigh_max;
+	     }
 			for (int l = 0; l < neigh_max; l++) {
 				scanning_unit_cell[0] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][0];
 		    scanning_unit_cell[1] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][1];

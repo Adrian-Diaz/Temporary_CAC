@@ -21,39 +21,57 @@ AtomStyle(CAC,AtomVecCAC)
 #define LMP_ATOM_VEC_CAC_H
 
 #include "atom_vec.h"
+#include "asa_user.h"
 
 namespace LAMMPS_NS {
 
 class AtomVecCAC : public AtomVec {
  public:
+  //minimization algorithm structs for neighbor rebuild checks
+  asacg_parm *cgParm;
+  asa_parm *asaParm;
+  asa_objective *Objective;
+
+
   AtomVecCAC(class LAMMPS *);
-  virtual ~AtomVecCAC() {}
-  virtual void init();
-  void grow(int);
-  void grow_reset();
-  void copy(int, int, int);
-  void process_args(int, char **);
+  virtual ~AtomVecCAC();
+  virtual void grow(int);
+  virtual void grow_reset();
+  virtual void copy(int, int, int);
+  virtual void process_args(int, char **);
   virtual int pack_comm(int, int *, double *, int, int *);
   virtual int pack_comm_vel(int, int *, double *, int, int *);
   virtual void unpack_comm(int, int, double *);
   virtual void unpack_comm_vel(int, int, double *);
-  int pack_reverse(int, int, double *);
-  void unpack_reverse(int, int *, double *);
+  virtual int pack_reverse(int, int, double *);
+  virtual void unpack_reverse(int, int *, double *);
   virtual int pack_border(int, int *, double *, int, int *);
   virtual int pack_border_vel(int, int *, double *, int, int *);
   virtual void unpack_border(int, int, double *);
   virtual void unpack_border_vel(int, int, double *);
   virtual int pack_exchange(int, double *);
   virtual int unpack_exchange(double *);
-  int size_restart();
-  int pack_restart(int, double *);
-  int unpack_restart(double *);
-  void create_atom(int, double *);
-  void data_atom(double *, imageint, char **);
-  void pack_data(double **);
-  void write_data(FILE *, int, double **);
-  bigint memory_usage();
+  virtual int size_restart();
+  virtual int pack_restart(int, double *);
+  virtual int unpack_restart(double *);
+  virtual void create_atom(int, double *);
+  virtual void data_atom(double *, imageint, char **);
+  virtual void pack_data(double **);
+  virtual void write_data(FILE *, int, double **);
+  virtual bigint memory_usage();
   virtual void force_clear(int, size_t);
+  virtual int check_distance_function(double deltasq); //specific neighbor rebuild check function 
+  virtual void set_hold_properties(); //sets nodal positions at reneighboring step for comparison
+    //CAC min objective functions for neighbor rebuild
+  virtual double myvalue(asa_objective *asa);
+  virtual void mygrad(asa_objective *asa);
+  virtual double shape_function(double, double, double,int,int);
+  virtual double shape_function_derivative(double, double, double,int,int,int);
+
+
+
+
+
  protected:
   tagint *tag;
   int *type,*mask;
@@ -67,6 +85,12 @@ class AtomVecCAC : public AtomVec {
   int element_type_count;
   int search_range_max;
   int initial_size;
+  int poly_min;
+  int min_nodes_per_element;
+  int min_element_index;
+  double deltasq_trigger;
+  double ****hold_nodal_positions;
+  int max_old;
 };
 
 }

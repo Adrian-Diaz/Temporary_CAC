@@ -121,12 +121,21 @@ Atom::Atom(LAMMPS *lmp) : Pointers(lmp)
   nodes_per_element_list = NULL;
   scale_search_range = NULL;
   scale_list = NULL;
+  eboxes = NULL;
+  ebox_ref = NULL;
   scale_count=0;
-  oneflag=0;
   CAC_cut=0;
   max_search_range=0;
   initial_size=0;
   one_layer_flag=0;
+  neboxes=0;
+  local_neboxes=0;
+  CAC_comm_flag=0;
+  bin_foreign=0;
+  neigh_weight_flag=0;
+  neighbor_weights=NULL;
+  weight_count=0;
+  
   // USER-MESO
 
   cc = cc_flux = NULL;

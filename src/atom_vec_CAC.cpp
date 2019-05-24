@@ -23,6 +23,7 @@
 #include "memory.h"
 #include "error.h"
 #include <string.h>
+#include "asa_user.h"
 
 using namespace LAMMPS_NS;
 
@@ -44,12 +45,28 @@ AtomVecCAC::AtomVecCAC(LAMMPS *lmp) : AtomVec(lmp)
   xcol_data = 3;
   forceclearflag = 1;
   atom->CAC_flag=1;
- atom->oneflag=0;
   search_range_max = 0;
    initial_size=0;
+	 check_distance_flag=1;
+	 cgParm=NULL;
+  asaParm=NULL;
+  Objective=NULL;
+	hold_nodal_positions=NULL;
+	max_old=0;
  
 }
 
+//--------------------------------------------------------------------------
+
+AtomVecCAC::~AtomVecCAC() {
+
+	memory->destroy(cgParm);
+
+  memory->destroy(asaParm);
+
+  memory->destroy(Objective);
+
+}
 
 /* ----------------------------------------------------------------------
    process user input
@@ -67,10 +84,7 @@ void AtomVecCAC::process_args(int narg, char **arg)
  atom->nodes_per_element=nodes_per_element;
  atom-> words_per_node = 6;
  atom->maxpoly = maxpoly;
- if(narg==3){
-	 if (strcmp(arg[2], "one") == 0) atom->oneflag = 1;
-	 else error->all(FLERR,"Invalid argument in atom_style CAC command");
- }
+ 
 
 
   size_forward = 12*nodes_per_element*maxpoly +8+ maxpoly;
@@ -91,35 +105,32 @@ void AtomVecCAC::process_args(int narg, char **arg)
 		atom->nodes_per_element_list[1] = 8;
 	}	
 
-	//place search range initialization here now for convenience
+	  //minimization algorithm parameters
+  //asacg_parm scgParm;
+  //asa_parm sasaParm;
 
-	atom->initial_size=10;
-		 memory->grow(atom->scale_search_range, atom->initial_size, "atom:scale_search_range");
-		memory->grow(atom->scale_list, atom->initial_size, "atom:scale_search_range");
-		atom->scale_search_range[0]=0;
-		atom->scale_list[0]=1;
-		for(int i=1; i<atom->initial_size; i++){ 
-			atom->scale_search_range[i]=0;
-			atom->scale_list[i]=0;
-			}
-		atom->scale_count=1;
-}
+  memory->create(cgParm, 1, "AtomVecCAC:cgParm");
 
-/* ----------------------------------------------------------------------
-  initialize arrays
-------------------------------------------------------------------------- */
-void AtomVecCAC::init()
-{
-  	
-    deform_vremap = domain->deform_vremap;
-  	deform_groupbit = domain->deform_groupbit;
-  	h_rate = domain->h_rate;
+  memory->create(asaParm, 1, "AtomVecCAC:asaParm");
 
-  	if (lmp->kokkos != NULL && !kokkosable)
-    error->all(FLERR,"KOKKOS package requires a kokkos enabled atom_style");
-    
+  memory->create(Objective, 1, "AtomVecCAC:Objective");
+
+  // if you want to change parameter value, initialize strucs with default 
+  asa_cg_default(cgParm);
+  asa_default(asaParm);
+
+  // if you want to change parameters, change them here: 
+  cgParm->PrintParms = FALSE;
+  cgParm->PrintLevel = 0;
+
+  asaParm->PrintParms = FALSE;
+  asaParm->PrintLevel = 0;
+  asaParm->PrintFinal = 0;
+
 	
 }
+
+
 
 /* ----------------------------------------------------------------------
    grow atom arrays
@@ -1372,129 +1383,7 @@ int AtomVecCAC::unpack_restart(double *buf)
   int error_scale=1.10; //essentially a fudge factor since  the search algorithm is not so rigorous
   int expand=0;
   int match[3];
-//edit scale search ranges and scale counts if necessary
-	if(!atom->oneflag){
-	
-		/*
-	if(scale_count==0&&element_type[nlocal]!=1){
-		
-		
-		scale_count=1;
-		scale_list[scale_count]=element_scale[nlocal][0];
-		if(element_scale[nlocal][0]!=element_scale[nlocal][1]){
-			scale_count++;
-			scale_list[scale_count]=element_scale[nlocal][1];
-		}
-		if(element_scale[nlocal][0]!=element_scale[nlocal][2]&&element_scale[nlocal][1]!=element_scale[nlocal][2]){
-			scale_count++;
-			scale_list[scale_count]=element_scale[nlocal][2];
-		}
 
-				 max_distancesq=0;
-	
-		//compute search radius using maximum distance between nodes an element;
-		//not the most rigorous approach; feel free to improve :).
-	
-		for(int ipoly=0; ipoly < poly_count[nlocal]; ipoly++)
-		for(int i=0; i<current_node_count; i++){
-			for (int j=i+1; j<current_node_count; j++){
-				dx=nodal_positions[nlocal][i][ipoly][0]-nodal_positions[nlocal][j][ipoly][0];
-				dy=nodal_positions[nlocal][i][ipoly][1]-nodal_positions[nlocal][j][ipoly][1];
-				dz=nodal_positions[nlocal][i][ipoly][2]-nodal_positions[nlocal][j][ipoly][2];
-				current_distancesq=dx*dx+dy*dy+dz*dz;
-				if(current_distancesq>max_distancesq) max_distancesq=current_distancesq;
-			}
-		}
-		search_radius=sqrt(max_distancesq);
-		search_radius*=error_scale;
-		scale_search_range[scale_count]=search_radius;
-		if(scale_count>1)
-		scale_search_range[scale_count-1]=search_radius;
-		if(scale_count>2)
-		scale_search_range[scale_count-2]=search_radius;
-	}
-	*/
-
-	match[0]=match[1]=match[2]=0;
-	for(int scalecheck=0; scalecheck<scale_count; scalecheck++){
-	if(element_scale[nlocal][0]==scale_list[scalecheck]){
-		match[0]=1;
-	}
-	if(element_scale[nlocal][1]==scale_list[scalecheck]){
-		match[1]=1;
-	}
-	if(element_scale[nlocal][2]==scale_list[scalecheck]){
-		match[2]=1;
-	}
-	}	
-	if(!match[0]){
-		expand++;
-	}
-	if(!match[1]&&element_scale[nlocal][0]!=element_scale[nlocal][1]){
-		expand++;
-	}
-	if(!match[2]&&element_scale[nlocal][0]!=element_scale[nlocal][2]&&element_scale[nlocal][1]!=element_scale[nlocal][2]){
-		expand++;
-	}
-	int element_max_scale;
-	element_max_scale=element_scale[nlocal][0];
-	if(element_max_scale<element_scale[nlocal][1])
-	element_max_scale=element_scale[nlocal][1];
-	if(element_max_scale<element_scale[nlocal][2])
-	element_max_scale=element_scale[nlocal][2];
-
-//expand the scale list and ranges if need be
-
-	if(expand)
-	{
-		 max_distancesq=0;
-	
-		//compute search radius using maximum distance between nodes of an element;
-		//not the most rigorous approach; feel free to improve :).
-	
-		for(int ipoly=0; ipoly < poly_count[nlocal]; ipoly++)
-		for(int i=0; i<current_node_count; i++){
-			for (int j=i+1; j<current_node_count; j++){
-				dx=nodal_positions[nlocal][i][ipoly][0]-nodal_positions[nlocal][j][ipoly][0];
-				dy=nodal_positions[nlocal][i][ipoly][1]-nodal_positions[nlocal][j][ipoly][1];
-				dz=nodal_positions[nlocal][i][ipoly][2]-nodal_positions[nlocal][j][ipoly][2];
-				current_distancesq=dx*dx+dy*dy+dz*dz;
-				if(current_distancesq>max_distancesq) max_distancesq=current_distancesq;
-			}
-		}
-		search_radius=sqrt(max_distancesq);
-		search_radius*=error_scale;
-		
-		if(scale_count+expand>initial_size){
-		initial_size+=grow_size;	
-		scale_search_range= memory->grow(atom->scale_search_range, initial_size, "atom:element_type");
-		scale_list= memory->grow(atom->scale_list, initial_size, "atom:scale_search_range");
-		for(int i=scale_count; i<initial_size; i++){
-			scale_search_range[i]=0;
-			scale_list[i]=0;
-			}
-		}
-		scale_count+=expand;
-		scale_search_range[scale_count-1]=search_radius;
-		scale_list[scale_count-1]=element_scale[nlocal][0];
-		if(expand>1){
-		scale_search_range[scale_count-2]=search_radius;
-		scale_list[scale_count-2]=element_scale[nlocal][0];
-		}
-		if(expand>2){
-		scale_search_range[scale_count-3]=search_radius;
-		scale_list[scale_count-3]=element_scale[nlocal][0];
-		}
-		
-		
-		
-	}
-	//compute maximum search range
-	for(int i=1; i<scale_count; i++) {
-		if(scale_search_range[i]>atom->max_search_range) atom->max_search_range=scale_search_range[i];
-	}
-	}
-	atom->scale_count=scale_count;
 
 
   double **extra = atom->extra;
@@ -1690,139 +1579,7 @@ void AtomVecCAC::data_atom(double *coord, imageint imagetmp, char **values)
 	}
 	}
 	
-  double max_distancesq;
-  double current_distancesq;
-  double search_radius;
-  double dx,dy,dz;
-  int current_node_count;
-  int search_range_delta_ratio = 4;
- 
-  int grow_size = 10;
-  int error_scale=1.10; //essentially a fudge factor since  the search algorithm is not so rigorous
-  int expand=0;
-  int match[3];
-	if(!atom->oneflag){
-	
-		/*
-	if(scale_count==0&&element_type[nlocal]!=1){
-		
-		
-		scale_count=1;
-		scale_list[scale_count]=element_scale[nlocal][0];
-		if(element_scale[nlocal][0]!=element_scale[nlocal][1]){
-			scale_count++;
-			scale_list[scale_count]=element_scale[nlocal][1];
-		}
-		if(element_scale[nlocal][0]!=element_scale[nlocal][2]&&element_scale[nlocal][1]!=element_scale[nlocal][2]){
-			scale_count++;
-			scale_list[scale_count]=element_scale[nlocal][2];
-		}
 
-				 max_distancesq=0;
-	
-		//compute search radius using maximum distance between nodes an element;
-		//not the most rigorous approach; feel free to improve :).
-	
-		for(int ipoly=0; ipoly < poly_count[nlocal]; ipoly++)
-		for(int i=0; i<current_node_count; i++){
-			for (int j=i+1; j<current_node_count; j++){
-				dx=nodal_positions[nlocal][i][ipoly][0]-nodal_positions[nlocal][j][ipoly][0];
-				dy=nodal_positions[nlocal][i][ipoly][1]-nodal_positions[nlocal][j][ipoly][1];
-				dz=nodal_positions[nlocal][i][ipoly][2]-nodal_positions[nlocal][j][ipoly][2];
-				current_distancesq=dx*dx+dy*dy+dz*dz;
-				if(current_distancesq>max_distancesq) max_distancesq=current_distancesq;
-			}
-		}
-		search_radius=sqrt(max_distancesq);
-		search_radius*=error_scale;
-		scale_search_range[scale_count]=search_radius;
-		if(scale_count>1)
-		scale_search_range[scale_count-1]=search_radius;
-		if(scale_count>2)
-		scale_search_range[scale_count-2]=search_radius;
-	}
-	*/
-
-	match[0]=match[1]=match[2]=0;
-	for(int scalecheck=0; scalecheck<scale_count; scalecheck++){
-	if(element_scale[nlocal][0]==scale_list[scalecheck]){
-		match[0]=1;
-	}
-	if(element_scale[nlocal][1]==scale_list[scalecheck]){
-		match[1]=1;
-	}
-	if(element_scale[nlocal][2]==scale_list[scalecheck]){
-		match[2]=1;
-	}
-	}	
-	if(!match[0]){
-		expand++;
-	}
-	if(!match[1]&&element_scale[nlocal][0]!=element_scale[nlocal][1]){
-		expand++;
-	}
-	if(!match[2]&&element_scale[nlocal][0]!=element_scale[nlocal][2]&&element_scale[nlocal][1]!=element_scale[nlocal][2]){
-		expand++;
-	}
-	int element_max_scale;
-	element_max_scale=element_scale[nlocal][0];
-	if(element_max_scale<element_scale[nlocal][1])
-	element_max_scale=element_scale[nlocal][1];
-	if(element_max_scale<element_scale[nlocal][2])
-	element_max_scale=element_scale[nlocal][2];
-
-//expand the scale list and ranges if need be
-
-	if(expand)
-	{
-		 max_distancesq=0;
-	
-		//compute search radius using maximum distance between nodes of an element;
-		//not the most rigorous approach; feel free to improve :).
-	
-		for(int ipoly=0; ipoly < poly_count[nlocal]; ipoly++)
-		for(int i=0; i<nodetotal; i++){
-			for (int j=i+1; j<nodetotal; j++){
-				dx=nodal_positions[nlocal][i][ipoly][0]-nodal_positions[nlocal][j][ipoly][0];
-				dy=nodal_positions[nlocal][i][ipoly][1]-nodal_positions[nlocal][j][ipoly][1];
-				dz=nodal_positions[nlocal][i][ipoly][2]-nodal_positions[nlocal][j][ipoly][2];
-				current_distancesq=dx*dx+dy*dy+dz*dz;
-				if(current_distancesq>max_distancesq) max_distancesq=current_distancesq;
-			}
-		}
-		search_radius=sqrt(max_distancesq);
-		search_radius*=error_scale;
-		
-		if(scale_count+expand>initial_size){
-		initial_size+=grow_size;	
-		scale_search_range= memory->grow(atom->scale_search_range, initial_size, "atom:element_type");
-		scale_list= memory->grow(atom->scale_list, initial_size, "atom:scale_search_range");
-		for(int i=scale_count; i<initial_size; i++){
-			scale_search_range[i]=0;
-			scale_list[i]=0;
-			}
-		}
-		scale_count+=expand;
-		scale_search_range[scale_count-1]=search_radius;
-		scale_list[scale_count-1]=element_scale[nlocal][0];
-		if(expand>1){
-		scale_search_range[scale_count-2]=search_radius;
-		scale_list[scale_count-2]=element_scale[nlocal][0];
-		}
-		if(expand>2){
-		scale_search_range[scale_count-3]=search_radius;
-		scale_list[scale_count-3]=element_scale[nlocal][0];
-		}
-		
-		
-		
-	}
-	//compute maximum search range
-	for(int i=0; i<scale_count; i++) {
-		if(scale_search_range[i]>atom->max_search_range) atom->max_search_range=scale_search_range[i];
-	}
-	}
-	atom->scale_count=scale_count;
   x[nlocal][0] = coord[0];
   x[nlocal][1] = coord[1];
   x[nlocal][2] = coord[2];
@@ -1928,6 +1685,10 @@ bigint AtomVecCAC::memory_usage()
   return bytes;
 }
 
+/* ----------------------------------------------------------------------
+   clear nodal forces and gradients
+------------------------------------------------------------------------- */
+
 void AtomVecCAC::force_clear(int a, size_t) {
 
 	for (int i = 0; i < atom->nlocal; i++) {
@@ -1948,4 +1709,422 @@ void AtomVecCAC::force_clear(int a, size_t) {
 			}
 		}
 	}
+}
+
+//-------------------------------------------------------------------------
+
+double AtomVecCAC::shape_function(double s, double t, double w, int flag, int index){
+double shape_function=0;
+if(flag==2){
+
+    if(index==1){
+    shape_function=(1-s)*(1-t)*(1-w)/8;
+    }
+    else if(index==2){
+    shape_function=(1+s)*(1-t)*(1-w)/8;
+    }
+    else if(index==3){
+    shape_function=(1+s)*(1+t)*(1-w)/8;
+    }
+    else if(index==4){
+    shape_function=(1-s)*(1+t)*(1-w)/8;
+    }
+    else if(index==5){
+    shape_function=(1-s)*(1-t)*(1+w)/8;
+    }
+    else if(index==6){
+    shape_function=(1+s)*(1-t)*(1+w)/8;
+    }
+    else if(index==7){
+    shape_function=(1+s)*(1+t)*(1+w)/8;
+    }
+    else if(index==8){
+    shape_function=(1-s)*(1+t)*(1+w)/8;
+    }
+
+
+}
+return shape_function;
+
+
+}
+
+
+
+double AtomVecCAC::shape_function_derivative(double s, double t, double w, int flag, int index, int derivative){
+double shape_function=0;
+//flag determines the element type and corresponding basis/shape functions
+if(flag==2){
+
+ if(derivative==1){
+    if(index==1){
+    shape_function=-(1-t)*(1-w)/8;
+    }
+    else if(index==2){
+    shape_function=(1-t)*(1-w)/8;
+    }
+    else if(index==3){
+    shape_function=(1+t)*(1-w)/8;
+    }
+    else if(index==4){
+    shape_function=-(1+t)*(1-w)/8;
+    }
+    else if(index==5){
+    shape_function=-(1-t)*(1+w)/8;
+    }
+    else if(index==6){
+    shape_function=(1-t)*(1+w)/8;
+    }
+    else if(index==7){
+    shape_function=(1+t)*(1+w)/8;
+    }
+    else if(index==8){
+    shape_function=-(1+t)*(1+w)/8;
+    }
+ }
+ else if(derivative==2){
+            if(index==1){
+    shape_function=-(1-s)*(1-w)/8;
+    }
+    else if(index==2){
+    shape_function=-(1+s)*(1-w)/8;
+    }
+    else if(index==3){
+    shape_function=(1+s)*(1-w)/8;
+    }
+    else if(index==4){
+    shape_function=(1-s)*(1-w)/8;
+    }
+    else if(index==5){
+    shape_function=-(1-s)*(1+w)/8;
+    }
+    else if(index==6){
+    shape_function=-(1+s)*(1+w)/8;
+    }
+    else if(index==7){
+    shape_function=(1+s)*(1+w)/8;
+    }
+    else if(index==8){
+    shape_function=(1-s)*(1+w)/8;
+    }
+
+ }
+ else if(derivative==3){
+
+
+        if(index==1){
+    shape_function=-(1-s)*(1-t)/8;
+    }
+    else if(index==2){
+    shape_function=-(1+s)*(1-t)/8;
+    }
+    else if(index==3){
+    shape_function=-(1+s)*(1+t)/8;
+    }
+    else if(index==4){
+    shape_function=-(1-s)*(1+t)/8;
+    }
+    else if(index==5){
+    shape_function=(1-s)*(1-t)/8;
+    }
+    else if(index==6){
+    shape_function=(1+s)*(1-t)/8;
+    }
+    else if(index==7){
+    shape_function=(1+s)*(1+t)/8;
+    }
+    else if(index==8){
+    shape_function=(1-s)*(1+t)/8;
+    }
+
+
+ }
+    
+
+}
+
+return shape_function;
+
+}
+
+/* ----------------------------------------------------------------------
+   set hold nodal properties for reneighbor checks
+------------------------------------------------------------------------- */
+
+void AtomVecCAC::set_hold_properties(){
+
+int element_index;
+int *nodes_count_list = atom->nodes_per_element_list;
+int *check_element_type = atom->element_type;
+int *check_poly_count = atom->poly_count;
+double ****check_nodal_positions = atom->nodal_positions;
+if(atom->nlocal>max_old){
+    memory->grow(hold_nodal_positions, atom->nlocal, nodes_per_element, maxpoly,3, "atom:hold_nodal_positions");
+		max_old=atom->nlocal;
+}
+for (element_index=0; element_index < atom->nlocal; element_index++){
+		
+		for (int nodecount = 0; nodecount < nodes_count_list[check_element_type[element_index]]; nodecount++) {
+			for (int poly_index = 0; poly_index < check_poly_count[element_index]; poly_index++)
+			{
+
+				hold_nodal_positions[element_index][nodecount][poly_index][0] = check_nodal_positions[element_index][nodecount][poly_index][0];
+				hold_nodal_positions[element_index][nodecount][poly_index][1] = check_nodal_positions[element_index][nodecount][poly_index][1];
+				hold_nodal_positions[element_index][nodecount][poly_index][2] = check_nodal_positions[element_index][nodecount][poly_index][2];
+				
+			}
+		}
+}
+
+}
+
+/* ----------------------------------------------------------------------
+   check if reneighboring is required
+------------------------------------------------------------------------- */
+
+int AtomVecCAC::check_distance_function(double deltasq){
+	int flag=0;
+	double Work[105];
+	long iWork[3];
+	double xm[3], lo[3], hi[3] ;
+	double unit_cell_mapped[3];
+	int i, element_index;
+  int *nodes_count_list = atom->nodes_per_element_list;
+	int *check_element_type = atom->element_type;
+	int **check_element_scale = atom->element_scale;
+  int *check_poly_count = atom->poly_count;
+	double ****check_nodal_positions = atom->nodal_positions;
+  int n = 3;
+	double delx, dely, delz;
+	double distancesq;
+	for (element_index=0; element_index < atom->nlocal; element_index++){
+		if(check_element_type[element_index]){
+	min_nodes_per_element=nodes_count_list[check_element_type[element_index]];
+	min_element_index=element_index;
+  unit_cell_mapped[0] = 2 / double(check_element_scale[element_index][0]);
+	unit_cell_mapped[1] = 2 / double(check_element_scale[element_index][1]);
+	unit_cell_mapped[2] = 2 / double(check_element_scale[element_index][2]);
+	deltasq_trigger = deltasq; //make squared trigger distance visible to the min obj and grad functions
+	/* allocate arrays for problem solution and bounds */
+
+
+	xm[0] = 0;
+	xm[1] = 0;
+	xm[2] = 0;
+	for (i = 0; i < n; i++) lo[i] = (double)-1;
+  for (i = 0; i < n; i++) hi[i] = (double)1;
+
+	//clock_t tforce_density_min_e = clock();
+  iWork[0] = 0;
+	iWork[1] = 0;
+	iWork[2] = 0;
+	for (int Workcounter = 0; Workcounter < 105; Workcounter++) {
+			Work[Workcounter] = 0;
+	}
+
+	double unit_cell_min = unit_cell_mapped[0];
+  if (unit_cell_min > unit_cell_mapped[1]) unit_cell_min = unit_cell_mapped[1];
+	if (unit_cell_min > unit_cell_mapped[2]) unit_cell_min = unit_cell_mapped[2];
+	//loop minimum for every poly DOF to ensure minimum
+	// run the minimization code
+  for (poly_min = 0; poly_min < check_poly_count[element_index]; poly_min++) {
+	asa_cg(xm, lo, hi, n, NULL, cgParm, asaParm,
+							1.e-2*unit_cell_min, NULL, Work, iWork, NULL, this);
+	if(-myvalue(Objective)>deltasq){
+		flag=1;
+		break;
+	}
+
+	}
+	if(flag) break;
+	}
+	else{
+		delx=check_nodal_positions[element_index][0][0][0]-hold_nodal_positions[element_index][0][0][0];
+		dely=check_nodal_positions[element_index][0][0][1]-hold_nodal_positions[element_index][0][0][1];
+		delz=check_nodal_positions[element_index][0][0][2]-hold_nodal_positions[element_index][0][0][2];
+    distancesq = delx*delx + dely*dely + delz*delz;
+		if (distancesq>deltasq){
+			flag=1;
+			break;
+		}
+	}
+	}
+	
+	return flag;
+}
+
+///////////////////////////////////////////////////
+
+
+
+double AtomVecCAC::myvalue /* evaluate the objective function */
+(
+	asa_objective *asa
+)
+{
+	double f, xi, t, *g, *x;
+	double px, py, pz;
+	double px1, px2, py1, py2, pz1, pz2;
+
+	double unit_cell_mapped[3];
+	double shape_func2;
+	double ***current_nodal_positions = atom->nodal_positions[min_element_index];
+	double ***current_hold_positions = hold_nodal_positions[min_element_index];
+	unit_cell_mapped[0] = 2 / double(atom->element_scale[min_element_index][0]);
+	unit_cell_mapped[1] = 2 / double(atom->element_scale[min_element_index][1]);
+	unit_cell_mapped[2] = 2 / double(atom->element_scale[min_element_index][2]);
+	INT i, n;
+	x = asa->x;
+	g = asa->g;
+	n = asa->n;
+	f = 0;
+  
+
+
+	/*
+	px= nodal_positions[n1][0]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n1+1)
+	+nodal_positions[n2][0]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n2+1)
+	+nodal_positions[n3][0]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n3+1)
+	+nodal_positions[n4][0]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n4+1);
+
+	py= nodal_positions[n1][1]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n1+1)
+	+nodal_positions[n2][1]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n2+1)
+	+nodal_positions[n3][1]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n3+1)
+	+nodal_positions[n4][1]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n4+1);
+
+	pz= nodal_positions[n1][2]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n1+1)
+	+nodal_positions[n2][2]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n2+1)
+	+nodal_positions[n3][2]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n3+1)
+	+nodal_positions[n4][2]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n4+1);
+	*/
+	px = 0;
+	py = 0;
+	pz = 0;
+	for (int kk = 0; kk < min_nodes_per_element; kk++) {
+		shape_func2 = shape_function(x[0], x[1], x[2], 2, kk + 1);
+		px += (current_nodal_positions[kk][poly_min][0]-current_hold_positions[kk][poly_min][0]) * shape_func2;
+		py += (current_nodal_positions[kk][poly_min][1]-current_hold_positions[kk][poly_min][1]) * shape_func2;
+		pz += (current_nodal_positions[kk][poly_min][2]-current_hold_positions[kk][poly_min][2]) * shape_func2;
+	}
+
+
+	f = -(px*px +  py*py +  pz*pz);
+
+
+	return (f);
+}
+
+void AtomVecCAC::mygrad /* evaluate the gradient of the objective function */
+(
+	asa_objective *asa
+)
+{
+	double f, xi, t, *g, *x;
+	double px, py, pz;
+	double px1, px2, px3, py1, py2, py3, pz1, pz2, pz3;
+	double unit_cell_mapped[3];
+	double shape_func3,shape_func2, shape_func1;
+	double ***current_nodal_positions = atom->nodal_positions[min_element_index];
+	double ***current_hold_positions = hold_nodal_positions[min_element_index];
+	unit_cell_mapped[0] = 2 / double(atom->element_scale[min_element_index][0]);
+	unit_cell_mapped[1] = 2 / double(atom->element_scale[min_element_index][1]);
+	unit_cell_mapped[2] = 2 / double(atom->element_scale[min_element_index][2]);
+
+	INT i, n;
+	x = asa->x;
+	g = asa->g;
+	n = asa->n;
+	f = 0;
+	
+
+	/*
+	px= nodal_positions[n1][0]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n1+1)
+	+nodal_positions[n2][0]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n2+1)
+	+nodal_positions[n3][0]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n3+1)
+	+nodal_positions[n4][0]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n4+1);
+
+	py= nodal_positions[n1][1]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n1+1)
+	+nodal_positions[n2][1]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n2+1)
+	+nodal_positions[n3][1]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n3+1)
+	+nodal_positions[n4][1]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n4+1);
+
+	pz= nodal_positions[n1][2]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n1+1)
+	+nodal_positions[n2][2]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n2+1)
+	+nodal_positions[n3][2]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n3+1)
+	+nodal_positions[n4][2]*shape_function(surf_args[0],surf_args[1],surf_args[2],2,n4+1);
+	*/
+
+	px = 0;
+	py = 0;
+	pz = 0;
+	for (int kk = 0; kk < min_nodes_per_element; kk++) {
+		shape_func2 = shape_function(x[0], x[1], x[2], 2, kk + 1);
+		px += (current_nodal_positions[kk][poly_min][0]-current_hold_positions[kk][poly_min][0]) * shape_func2;
+		py += (current_nodal_positions[kk][poly_min][1]-current_hold_positions[kk][poly_min][1]) * shape_func2;
+		pz += (current_nodal_positions[kk][poly_min][2]-current_hold_positions[kk][poly_min][2]) * shape_func2;
+	}
+	/*
+	px1= nodal_positions[n1][0]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n1+1, deriv_select[0])
+	+nodal_positions[n2][0]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n2+1, deriv_select[0])
+	+nodal_positions[n3][0]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n3+1, deriv_select[0])
+	+nodal_positions[n4][0]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n4+1, deriv_select[0]);
+
+	py1= nodal_positions[n1][1]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n1+1, deriv_select[0])
+	+nodal_positions[n2][1]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n2+1, deriv_select[0])
+	+nodal_positions[n3][1]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n3+1, deriv_select[0])
+	+nodal_positions[n4][1]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n4+1, deriv_select[0]);
+
+	pz1= nodal_positions[n1][2]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n1+1, deriv_select[0])
+	+nodal_positions[n2][2]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n2+1, deriv_select[0])
+	+nodal_positions[n3][2]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n3+1, deriv_select[0])
+	+nodal_positions[n4][2]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n4+1, deriv_select[0]);
+
+	px2= nodal_positions[n1][0]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n1+1, deriv_select[1])
+	+nodal_positions[n2][0]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n2+1, deriv_select[1])
+	+nodal_positions[n3][0]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n3+1, deriv_select[1])
+	+nodal_positions[n4][0]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n4+1, deriv_select[1]);
+
+	py2 = nodal_positions[n1][1] * shape_function_derivative(surf_args[0], surf_args[1], surf_args[2], 2, n1 + 1, deriv_select[1])
+	+ nodal_positions[n2][1] * shape_function_derivative(surf_args[0], surf_args[1], surf_args[2], 2, n2 + 1, deriv_select[1])
+	+ nodal_positions[n3][1] * shape_function_derivative(surf_args[0], surf_args[1], surf_args[2], 2, n3 + 1, deriv_select[1])
+	+ nodal_positions[n4][1] * shape_function_derivative(surf_args[0], surf_args[1], surf_args[2], 2, n4 + 1, deriv_select[1]);
+
+	pz2= nodal_positions[n1][2]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n1+1, deriv_select[1])
+	+nodal_positions[n2][2]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n2+1, deriv_select[1])
+	+nodal_positions[n3][2]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n3+1, deriv_select[1])
+	+nodal_positions[n4][2]*shape_function_derivative(surf_args[0],surf_args[1],surf_args[2],2,n4+1, deriv_select[1]);
+	*/
+	px1 = 0;
+	py1 = 0;
+	pz1 = 0;
+	px2 = 0;
+	py2 = 0;
+	pz2 = 0;
+	px3 = 0;
+	py3 = 0;
+	pz3 = 0;
+	for (int kk = 0; kk < min_nodes_per_element; kk++) {
+		shape_func1 = shape_function_derivative(x[0], x[1], x[2], 2, kk + 1, 1);
+		shape_func2 = shape_function_derivative(x[0], x[1], x[2], 2, kk + 1, 2);
+		shape_func3 = shape_function_derivative(x[0], x[1], x[2], 2, kk + 1, 3);
+		px1 += (current_nodal_positions[kk][poly_min][0]-current_hold_positions[kk][poly_min][0]) * shape_func1;
+		py1 += (current_nodal_positions[kk][poly_min][1]-current_hold_positions[kk][poly_min][1]) * shape_func1;
+		pz1 += (current_nodal_positions[kk][poly_min][2]-current_hold_positions[kk][poly_min][2]) * shape_func1;
+		px2 += (current_nodal_positions[kk][poly_min][0]-current_hold_positions[kk][poly_min][0]) * shape_func2;
+		py2 += (current_nodal_positions[kk][poly_min][1]-current_hold_positions[kk][poly_min][1]) * shape_func2;
+		pz2 += (current_nodal_positions[kk][poly_min][2]-current_hold_positions[kk][poly_min][2]) * shape_func2;
+		px3 += (current_nodal_positions[kk][poly_min][0]-current_hold_positions[kk][poly_min][0]) * shape_func3;
+		py3 += (current_nodal_positions[kk][poly_min][1]-current_hold_positions[kk][poly_min][1]) * shape_func3;
+		pz3 += (current_nodal_positions[kk][poly_min][2]-current_hold_positions[kk][poly_min][2]) * shape_func3;
+	}
+
+
+	g[0] = -(2 * px*px1 + 2 * py*py1 + 2 *  pz*pz1);
+	g[1] = -(2 * px*px2 + 2 * py*py2 + 2 *  pz*pz2);
+	g[2] = -(2 * px*px3 + 2 * py*py3 + 2 *  pz*pz3);
+
+	//g [0] = 4 * (x[0] - 0.5) *(x[0] - 0.5)*(x[0] - 0.5) ;
+	//g [1] = 4 * (x[1] - 0.3)* (x[1] - 0.3)*(x[1] - 0.3);
+
+	return;
 }

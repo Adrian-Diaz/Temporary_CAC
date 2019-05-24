@@ -95,6 +95,8 @@ pairclass(NULL), pairnames(NULL), pairmasks(NULL)
   build_once = 0;
   cluster_check = 0;
   ago = -1;
+  atomvec_check_flag=0;
+  stencil_post_create_flag=0;
 
   cutneighmax = 0.0;
   cutneighsq = NULL;
@@ -895,6 +897,20 @@ int Neighbor::init_pair()
       if (!done) break;
     }
   }
+  
+  //check if special neighbor check function is needed by the atom style
+  if(atom->avec->check_distance_flag!=0)
+  atomvec_check_flag=1;
+    
+  //check if stencil types require set up after their creation due to updating data
+  for (int i = 0; i < nstencil_perpetual; i++) {
+    if(neigh_stencil[slist[i]]->post_create_flag){
+      stencil_post_create_flag=1;
+      break;
+    }
+  }
+    
+  
 
   // debug output
 
@@ -1676,11 +1692,11 @@ int Neighbor::choose_stencil(NeighRequest *rq)
     } else if (rq->full) {
       if (!(mask & NS_FULL)) continue;
     }
-	/*
+	
 	if (rq->CAC) {
 		if (!(mask & NS_CAC)) continue;
 	}
-	*/
+	
     // newtflag is on or off and must match
 
     if (newtflag) {
@@ -1968,7 +1984,7 @@ int Neighbor::check_distance()
 {
   double delx,dely,delz,rsq;
   double delta,deltasq,delta1,delta2;
-
+  
   if (boxcheck) {
     if (triclinic == 0) {
       delx = bboxlo[0] - boxlo_hold[0];
@@ -1996,7 +2012,7 @@ int Neighbor::check_distance()
       deltasq = delta*delta;
     }
   } else deltasq = triggersq;
-
+  
   double **x = atom->x;
   int nlocal = atom->nlocal;
   if (includegroup) nlocal = atom->nfirst;
@@ -2009,6 +2025,18 @@ int Neighbor::check_distance()
     rsq = delx*delx + dely*dely + delz*delz;
     if (rsq > deltasq) flag = 1;
   }
+
+  //check if npair style requires its own neighbor list rebuild check
+  if(atomvec_check_flag){
+    int m;
+    int current_flag;
+    if(atom->avec->check_distance_flag!=0)
+    current_flag=atom->avec->check_distance_function(deltasq);
+    if(current_flag!=0) flag=1;
+    else flag=0;
+  }
+
+  
 
   int flagall;
   MPI_Allreduce(&flag,&flagall,1,MPI_INT,MPI_MAX,world);
@@ -2072,7 +2100,10 @@ void Neighbor::build(int topoflag)
       }
     }
   }
-
+  
+  //set hold properties for atomvec styles that require their own neighbor rebuild check
+  if(atomvec_check_flag&&dist_check)
+  atom->avec->set_hold_properties();
   // bin atoms for all NBin instances
   // not just NBin associated with perpetual lists, also occasional lists
   // b/c cannot wait to bin occasional lists in build_one() call
@@ -2084,6 +2115,17 @@ void Neighbor::build(int topoflag)
       neigh_bin[i]->bin_atoms_setup(nall);
       neigh_bin[i]->bin_atoms();
     }
+  }
+  
+  //call stencils in case new data introduced since setup has to be used
+  //if not empty void function is called
+  if(stencil_post_create_flag){
+  for (int i = 0; i < nstencil_perpetual; i++) {
+    if(neigh_stencil[slist[i]]->post_create_flag){
+    neigh_stencil[slist[i]]->post_create_setup();
+    neigh_stencil[slist[i]]->post_create();
+    }
+  }
   }
 
   // build pairwise lists for all perpetual NPair/NeighList

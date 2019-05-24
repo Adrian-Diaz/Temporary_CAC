@@ -216,22 +216,11 @@ double PairCACSW::init_one(int i, int j) {
 	if (setflag[i][j] == 0) error->all(FLERR, "All pair coeffs are not set");
 
 	
-	atom->scale_search_range[0]=atom->CAC_cut = cut_global_s+cutoff_skin;
-	if (outer_neighflag) { atom->scale_search_range[0]=atom->CAC_cut = 2 * cut_global_s+cutoff_skin; }
-	
-	for(int i=0; i<=atom->scale_count; i++) {
-		if(atom->scale_search_range[i]>atom->max_search_range) atom->max_search_range=atom->scale_search_range[i];
-	}
-	
-    atom->CAC_skin=cutoff_skin;
-  int scale_count=0;
-	double max_search_range=0;
-	MPI_Allreduce(&atom->scale_count,&scale_count,1,MPI_INT,MPI_MAX,world);
-	MPI_Allreduce(&atom->max_search_range,&max_search_range,1,MPI_DOUBLE,MPI_MAX,world);
-	atom->max_search_range=max_search_range;
-	atom->scale_count=scale_count;
-	return atom->max_search_range;
-	//return cutmax;
+ 
+	if (outer_neighflag)
+	return 2*cutmax;
+	else
+	return cutmax;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -530,12 +519,12 @@ void PairCACSW::setup_params()
 
 	// set cutmax to max of all params
 
-	cut_global_s = 0.0;
+	cutmax = 0.0;
 	for (m = 0; m < nparams; m++) {
 		rtmp = sqrt(params[m].cutsq);
-		if (rtmp > cut_global_s) cut_global_s = rtmp;
+		if (rtmp > cutmax) cutmax = rtmp;
 	}
-	
+	cut_global_s=cutmax;
 }
 
 void PairCACSW::twobody(Param *param, double rsq, double &fforce,
@@ -726,10 +715,17 @@ int distanceflag=0;
 	int dummy1;
 	double dummy2;
 	dummy1 = dummy2 = 0;
-	memory->grow(inner_neighbor_coords, neigh_max_inner,3 ,"Pair_CAC_sw:inner_neighbor_coords");
+
+	if(neigh_max_inner>local_inner_max){
+	memory->grow(inner_neighbor_types, neigh_max_inner, "Pair_CAC_sw:inner_neighbor_types");
+	memory->grow(inner_neighbor_coords, neigh_max_inner, 3, "Pair_CAC_sw:inner_neighbor_coords");
+	local_inner_max=neigh_max_inner;
+	}
+	if(neigh_max_outer>local_outer_max){
 	memory->grow(outer_neighbor_coords, neigh_max_outer, 3, "Pair_CAC_sw:outer_neighbor_coords");
-	memory->grow(inner_neighbor_types, neigh_max_inner,  "Pair_CAC_sw:inner_neighbor_types");
-	memory->grow(outer_neighbor_types, neigh_max_outer,  "Pair_CAC_sw:outer_neighbor_types");
+	memory->grow(outer_neighbor_types, neigh_max_outer, "Pair_CAC_sw:outer_neighbor_types");
+	local_outer_max=neigh_max_outer;
+	}
 
 	tagint itag, jtag;
 	double rsq, rsq1, rsq2;

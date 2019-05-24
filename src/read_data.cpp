@@ -1728,12 +1728,13 @@ read all CAC element definitions
 
 void ReadData::CAC_elements()
 {
-	int nchunk, eof;
+	int m, nchunk, nline, nlineinner, nmax, npoly, tmp, nodecount;
 
+	char *eof;
+	char *element_type = (char*)memory->smalloc(sizeof(char) * 20, "read_data: element type string");
 	int chunk = 20;
 	int mapflag = 0;
-
-	char *CAC_buffer = new char[chunk*MAXLINE*MAXELEMENT];
+	char *CAC_buffer = (char*)memory->smalloc(sizeof(char) *(chunk*MAXLINE*(MAXELEMENT+1)+1), "read_data: CAC_buffer");
 	//std::ofstream myfile;
 
 	// nmax = max # of bodies to read in this chunk
@@ -1743,8 +1744,79 @@ void ReadData::CAC_elements()
 
 
 	while (nread < nCAC_elements) {
-    nchunk = MIN(nCAC_elements - nread, chunk); 
-    eof = comm->read_lines_from_CAC(fp, nchunk, MAXLINE, MAXELEMENT, CAC_buffer);
+		if (nCAC_elements - nread > chunk) nmax = chunk;
+		else nmax = nCAC_elements - nread;
+
+		if (me == 0) {
+
+
+			nchunk = 0;
+			nline = 0;
+			m = 0;
+
+			while (nchunk < nmax) {
+				eof = fgets(&CAC_buffer[m], MAXLINE, fp);
+
+				if (eof == NULL) error->one(FLERR, "Unexpected end of data file");
+				sscanf(&CAC_buffer[m], "%d %s %d", &tmp, element_type, &npoly);
+				m += strlen(&CAC_buffer[m]);
+				element_type = strtok(element_type, " \t\n\r\f");
+				if (strcmp(element_type, "Eight_Node") == 0) {
+					nodecount = 8;
+				}
+				else if (strcmp(element_type, "Atom") == 0) {
+					nodecount = 1;
+					npoly = 1;
+				}
+				else {
+					error->one(FLERR, "Unexpected element type in data file");
+				}
+				// read lines one at a time into buffer and count words
+				// count to ninteger and ndouble until have enough lines
+				//comm->size_forward = 9 * nodecount*npoly + 8 + npoly;
+
+
+
+				for (nlineinner = 0; nlineinner < nodecount*npoly; nlineinner++) {
+					eof = fgets(&CAC_buffer[m], MAXLINE, fp);
+					// fflush(fp);
+					if (eof == NULL) error->one(FLERR, "Unexpected end of data file");
+
+					m += strlen(&CAC_buffer[m]);
+					if (nlineinner + 1 >= MAXELEMENT)
+						error->one(FLERR,
+							"Too many lines in one element in data file - increase MAXELEMENT in read_data.cpp");
+
+
+
+				}
+
+
+
+
+
+
+
+
+				nchunk += 1;
+
+			}
+
+    if (m) {
+      if (CAC_buffer[m-1] != '\n') strcpy(&CAC_buffer[m++],"\n");
+      m++;
+    }
+
+		}
+
+
+		MPI_Bcast(&nchunk, 1, MPI_INT, 0, world);
+		MPI_Bcast(&m, 1, MPI_INT, 0, world);
+    
+		MPI_Bcast(CAC_buffer, m, MPI_CHAR, 0, world);
+
+
+
 		atom->data_CAC(nchunk, CAC_buffer, id_offset, toffset, shiftflag, shift);
 		nread += nchunk;
 	}
@@ -1777,7 +1849,10 @@ void ReadData::CAC_elements()
 		if (logfile) fprintf(logfile, "  " BIGINT_FORMAT " CAC_Elements\n", nCAC_elements);
 	}
 	*/
-	delete[] CAC_buffer;
+
+	free (element_type);
+	free (CAC_buffer);
+
 }
 
 //----------------------------------------------------

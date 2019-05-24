@@ -32,10 +32,12 @@
 #include "asa_user.h"
 #include <stdint.h>
 #include <vector>
+#include "timer.h"
 //#include "math_extra.h"
+#define MAXESHAPE  30 //maximum number of shape functions per element
 #define MAXNEIGH1  500
-#define MAXNEIGH2  100
-#define EXPAND 10
+#define MAXNEIGH2  10
+#define EXPAND 20
 #define MAXLINE 1024
 #define DELTA 4
 using namespace LAMMPS_NS;
@@ -67,14 +69,14 @@ PairCAC::PairCAC(LAMMPS *lmp) : Pair(lmp)
   atomic_counter_map = NULL;
   old_atom_etype = NULL;
   quad_allocated = 0;
-  surface_counts_max[0] = 0;
-  surface_counts_max[1] = 0;
-  surface_counts_max[2] = 0;
-  surface_counts_max_old[0] = 0;
-  surface_counts_max_old[1] = 0;
-  surface_counts_max_old[2] = 0;
-  old_atom_count=0;
-  old_quad_count=0;
+  surface_counts_max[0] = 1;
+  surface_counts_max[1] = 1;
+  surface_counts_max[2] = 1;
+  surface_counts_max_old[0] = 1;
+  surface_counts_max_old[1] = 1;
+  surface_counts_max_old[2] = 1;
+	local_inner_max=0;
+	local_outer_max=0;
   one_layer_flag = 0;
   old_quad_minima= NULL;
   old_minima_neighbors= NULL;
@@ -83,6 +85,10 @@ PairCAC::PairCAC(LAMMPS *lmp) : Pair(lmp)
   Objective=NULL;
 	neighbor->pgsize=10;
 	neighbor->oneatom=1;
+	old_atom_count=0;
+	//allocate shape function pointers
+	shape_functions= (Shape_Functions *) memory->smalloc(sizeof(Shape_Functions)*MAXESHAPE, "Pair CAC:shape_functions");
+	set_shape_functions();
 }
 
 /* ---------------------------------------------------------------------- */
@@ -191,7 +197,7 @@ void PairCAC::compute(int eflag, int vflag) {
     int i,j,ii,jj,inum,jnum,itype,jtype;
   double xtmp,ytmp,ztmp,delx,dely,delz,evdwl,fpair;
   double rsq,r2inv,r6inv,forcelj,factor_lj;
-  int *ilist,*jlist,*numneigh,**firstneigh;
+  //int *ilist,*jlist,*numneigh,**firstneigh;
   int mi;
   int mj;
   
@@ -215,14 +221,19 @@ void PairCAC::compute(int eflag, int vflag) {
   double *special_lj = force->special_lj;
   int newton_pair = force->newton_pair;
   int nodes_per_element;
+	
 	int *nodes_count_list = atom->nodes_per_element_list;	
   quad_eflag = eflag;
+  cutoff_skin = neighbor->skin;
   
-  inum = list->inum;
-  ilist = list->ilist;
-  numneigh = list->numneigh;
-  firstneigh = list->firstneigh;
+  
+
+  
   reneighbor_time = neighbor->lastcall;
+	if (update->ntimestep == reneighbor_time||update->whichflag==2){
+	atom->neigh_weight_flag=1;
+	atom->weight_count=atom->nlocal;
+	}
   //quadrature warning
   /*
   if (warning_flag && !warned_flag) {
@@ -275,7 +286,9 @@ void PairCAC::compute(int eflag, int vflag) {
 			// along with interior scaling for the quadrature domain
 			if (atom->nlocal  > nmax) {
 				allocate_surface_counts();
+				memory->grow(atom->neighbor_weights, atom->nlocal,3, "Pair CAC:neighbor_weights");
 			}
+			
 			surface_counts_max_old[0] = surface_counts_max[0];
 			surface_counts_max_old[1] = surface_counts_max[1];
 			surface_counts_max_old[2] = surface_counts_max[2];
@@ -324,6 +337,7 @@ void PairCAC::compute(int eflag, int vflag) {
 			allocate_quad_neigh_list(surface_counts_max[0], surface_counts_max[1], surface_counts_max[2], quadrature_node_count);
 		}
 		atomic_counter = 0;
+		int **neighbor_weights = atom-> neighbor_weights;
 		for (i = 0; i < atom->nlocal; i++) {
 			
 			atomic_flag = 0;
@@ -333,8 +347,6 @@ void PairCAC::compute(int eflag, int vflag) {
 			ytmp = x[i][1];
 			ztmp = x[i][2];
 			itype = type[i];
-			jlist = firstneigh[i];
-			jnum = numneigh[i];
 			current_element_type = element_type[i];
 			current_element_scale = element_scale[i];
 			current_poly_count = poly_count[i];
@@ -342,6 +354,11 @@ void PairCAC::compute(int eflag, int vflag) {
 			current_nodal_positions = nodal_positions[i];
 			current_nodal_gradients = nodal_gradients[i];
 			current_x = x[i];
+			if (update->ntimestep == reneighbor_time||update->whichflag==2){
+	    neighbor_weights[i][0]=0;
+	    neighbor_weights[i][1]=0;
+	    neighbor_weights[i][2]=0;
+	    }
 			if (eflag) {
 				element_energy = 0;
 		
@@ -418,6 +435,7 @@ void PairCAC::allocate()
   memory->create(sort_surf_set, 6, 2, "pairCAC:surf_set");
   memory->create(sort_dof_set, 6, 4, "pairCAC:surf_set");
   quadrature_init(2);
+	
 }
 
 /* ----------------------------------------------------------------------
@@ -535,7 +553,8 @@ void PairCAC::init_style()
   asaParm->PrintParms = FALSE;
   asaParm->PrintLevel = 0;
   asaParm->PrintFinal = 0;
-
+  
+	
 
 }
 
@@ -548,7 +567,7 @@ void PairCAC::quadrature_init(int quadrature_rank){
 
 
 if(quadrature_rank==1){
-quadrature_node_count=1;
+atom->quadrature_node_count=quadrature_node_count=1;
 memory->create(quadrature_weights,quadrature_node_count,"pairCAC:quadrature_weights");
 memory->create(quadrature_abcissae,quadrature_node_count,"pairCAC:quadrature_abcissae");
 quadrature_weights[0]=2;
@@ -558,7 +577,7 @@ if(quadrature_rank==2){
 
 
 
-quadrature_node_count=2;
+atom->quadrature_node_count=quadrature_node_count=2;
 memory->create(quadrature_weights,quadrature_node_count,"pairCAC:quadrature_weights");
 memory->create(quadrature_abcissae,quadrature_node_count,"pairCAC:quadrature_abcissae");
 quadrature_weights[0]=1;
@@ -664,7 +683,11 @@ void PairCAC::compute_forcev(int iii){
 	
 	double unit_cell_mapped[3];
 	int nodes_per_element;
+	  
 	int *nodes_count_list = atom->nodes_per_element_list;	
+	//stores neighbor information for computational weight assignment
+	
+	
 	unit_cell_mapped[0] = 2 / double(current_element_scale[0]);
 	unit_cell_mapped[1] = 2 / double(current_element_scale[1]);
 	unit_cell_mapped[2] = 2 / double(current_element_scale[2]);
@@ -1225,6 +1248,15 @@ void PairCAC::compute_forcev(int iii){
 			element_energy += coefficients*quadrature_energy;
 		}
 	}
+	/*
+  if (update->ntimestep == reneighbor_time||update->whichflag==2){
+	
+	}
+	else{
+		timer->stamp(Timer::CAC_FD);
+	}
+	*/
+
 }
 
 //--------------------------------------------------------------------
@@ -1285,7 +1317,7 @@ void PairCAC::quad_list_build(int iii, double s, double t, double w) {
 	double scan_position[3];
 	double rcut;
 	int current_type = poly_counter;
-
+  int **neighbor_weights = atom-> neighbor_weights;
 	double cbox_positions[3];
 
 	int flagm;
@@ -1435,7 +1467,7 @@ void PairCAC::quad_list_build(int iii, double s, double t, double w) {
 		b_orth[1] = b[1] - proj_b2a*a[1] / norm_a;
 		b_orth[2] = b[2] - proj_b2a*a[2] / norm_a;
 
-		double proj_c2a = (b[0] * a[0] + b[1] * a[1] + b[2] * a[2]) / norm_a;
+		double proj_c2a = (c[0] * a[0] + c[1] * a[1] + c[2] * a[2]) / norm_a;
 		double proj_c2b = (b[0] * c[0] + b[1] * c[1] + b[2] * c[2]) / norm_b;
 		double norm_b_orth = sqrt(b_orth[0] * b_orth[0] + b_orth[1] * b_orth[1]
 			+ b_orth[2] * b_orth[2]);
@@ -1539,7 +1571,7 @@ void PairCAC::quad_list_build(int iii, double s, double t, double w) {
 
 
 								inner_quad_lists_counts[iii][neigh_quad_counter] = inner_neigh_index;
-
+                neighbor_weights[iii][1]++;
 
 							}
 
@@ -1563,6 +1595,7 @@ void PairCAC::quad_list_build(int iii, double s, double t, double w) {
 
 
 									outer_quad_lists_counts[iii][neigh_quad_counter] = outer_neigh_index;
+									neighbor_weights[iii][1]++;
 								}
 							}
 						}
@@ -1616,7 +1649,7 @@ void PairCAC::neighbor_accumulate(double x,double y,double z,int iii,int inner_n
     int timestep=update->ntimestep;
     double boxmap_matrix[3][3];
     int outofbounds=0;
-
+    int **neighbor_weights = atom-> neighbor_weights;
     double unit_cell_mapped[3];
     double scanning_unit_cell[3];
     double box_positions[8][3];
@@ -1694,7 +1727,7 @@ void PairCAC::neighbor_accumulate(double x,double y,double z,int iii,int inner_n
 			unit_cell_mapped[0] = 2 / double(neighbor_element_scale[0]);
 			unit_cell_mapped[1] = 2 / double(neighbor_element_scale[1]);
 			unit_cell_mapped[2] = 2 / double(neighbor_element_scale[2]);
-
+      neighbor_weights[iii][2]+=neigh_poly_count;
 			neigh_nodes_per_element=nodes_count_list[neighbor_element_type];
 
 			xm[0] = 0;
@@ -1858,17 +1891,17 @@ void PairCAC::neighbor_accumulate(double x,double y,double z,int iii,int inner_n
 					double unit_cell_min = unit_cell_mapped[0];
 					if (unit_cell_min > unit_cell_mapped[1]) unit_cell_min = unit_cell_mapped[1];
 					if (unit_cell_min > unit_cell_mapped[2]) unit_cell_min = unit_cell_mapped[2];
-					//loop minimum for every poly DOF to avoid mistake
+					//loop minimum for every poly DOF to ensure minimum
 					// run the minimization code
 					for (poly_min = 0; poly_min < neigh_poly_count; poly_min++) {
 
 
 						asa_cg(xm, lo, hi, n, NULL, cgParm, asaParm,
-							1.e-2*unit_cell_min, NULL, Work, iWork, this);
+							1.e-2*unit_cell_min, NULL, Work, iWork, this, NULL);
 
 						double tol = 0.00001*unit_cell_min;
 						if (xm[0] > 1 + tol || xm[1] > 1 + tol || xm[0] < -1 - tol || xm[1] < -1 - tol) {
-							error->one(FLERR, "minimum points exceed element domain");;
+							error->one(FLERR, "minimum points exceed element domain");
 						}
 						if (surf_select[0] == 1 && surf_select[1] == -1) {
 
@@ -2348,7 +2381,7 @@ void PairCAC::neighbor_accumulate(double x,double y,double z,int iii,int inner_n
 
 
 								inner_quad_lists_counts[iii][neigh_quad_counter] = inner_neigh_index;
-
+                neighbor_weights[iii][1]++;
 
 								}
 
@@ -2370,9 +2403,10 @@ void PairCAC::neighbor_accumulate(double x,double y,double z,int iii,int inner_n
 									outer_quad_lists_index[iii][neigh_quad_counter][outer_neigh_index][1] = polyscan;
 
 									outer_neigh_index++;
-
+                 
 
 									outer_quad_lists_counts[iii][neigh_quad_counter] = outer_neigh_index;
+									neighbor_weights[iii][1]++;
 									}
 								}
 							}
@@ -2419,6 +2453,7 @@ void PairCAC::neighbor_accumulate(double x,double y,double z,int iii,int inner_n
 
 
 								inner_quad_lists_counts[iii][neigh_quad_counter] = inner_neigh_index;
+								neighbor_weights[iii][0]++;
 
 
 			}
@@ -2443,6 +2478,7 @@ void PairCAC::neighbor_accumulate(double x,double y,double z,int iii,int inner_n
 
 
 									outer_quad_lists_counts[iii][neigh_quad_counter] = outer_neigh_index;
+									neighbor_weights[iii][0]++;
 				}
 			}
 		}
@@ -2464,6 +2500,7 @@ void PairCAC::neigh_list_cord(double& coordx, double& coordy, double& coordz, in
 			list_nodes_per_element = nodes_count_list[etype];
 			for (int kk = 0; kk < list_nodes_per_element; kk++) {
 				shape_func = shape_function(ucells, ucellt, ucellw, 2, kk + 1);
+				//shape_func=(this->*shape_functions[kk])(ucells, ucellt, ucellw);
 				coordx += nodal_positions[e_index][kk][p_index][0] * shape_func;
 				coordy += nodal_positions[e_index][kk][p_index][1] * shape_func;
 				coordz += nodal_positions[e_index][kk][p_index][2] * shape_func;
@@ -2495,7 +2532,7 @@ int PairCAC::mldivide3(const double m[3][3], const double *v, double *ans)
       if (fabs(aug[j][i]) > fabs(aug[i][i])) {
         double tempv[4];
         memcpy(tempv,aug[i],4*sizeof(double));
-        memcpy(aug[i],aug[j],4*sizeof(double));
+        memmove(aug[i],aug[j],4*sizeof(double));
         memcpy(aug[j],tempv,4*sizeof(double));
       }
     }
@@ -2507,7 +2544,7 @@ int PairCAC::mldivide3(const double m[3][3], const double *v, double *ans)
       if (p != i) {
         double tempv[4];
         memcpy(tempv,aug[i],4*sizeof(double));
-        memcpy(aug[i],aug[p],4*sizeof(double));
+        memmove(aug[i],aug[p],4*sizeof(double));
         memcpy(aug[p],tempv,4*sizeof(double));
       }
 
@@ -2537,7 +2574,17 @@ int PairCAC::mldivide3(const double m[3][3], const double *v, double *ans)
 
 
 //--------------------------------------------------------------------------
-
+//populate array of shape functions
+void PairCAC::set_shape_functions(){
+shape_functions[0]=&PairCAC::quad_shape_one;
+shape_functions[1]=&PairCAC::quad_shape_two;
+shape_functions[2]=&PairCAC::quad_shape_three;
+shape_functions[3]=&PairCAC::quad_shape_four;
+shape_functions[4]=&PairCAC::quad_shape_five;
+shape_functions[5]=&PairCAC::quad_shape_six;
+shape_functions[6]=&PairCAC::quad_shape_seven;
+shape_functions[7]=&PairCAC::quad_shape_eight;
+}
 
 
 
@@ -2898,7 +2945,9 @@ unit_cell_mapped[2] = 2 / double(current_element_scale[2]);
 	countx = (int)(ds_surf / unit_cell_mapped[0]);
 	county = (int)(dt_surf / unit_cell_mapped[1]);
 	countz = (int)(dw_surf / unit_cell_mapped[2]);
-
+  if(countx==0) countx=1;
+	if(county==0) county=1;
+	if(countz==0) countz=1;
 
 
 
@@ -3160,7 +3209,6 @@ void PairCAC::allocate_quad_neigh_list(int n1,int n2,int n3,int quad) {
 	int quad_count = quad*quad*quad + 2 * n1*quad*quad + 2 * n2*quad*quad +
 		+2 * n3*quad*quad + 4 * n1*n2*quad + 4 * n3*n2*quad + 4 * n1*n3*quad
 		+ 8 * n1*n2*n3;
-
 	
 		//(surface_counts_max_old[0] != n1 || surface_counts_max_old[1] != n2 || surface_counts_max_old[2] != n3)
 
@@ -3213,7 +3261,7 @@ void PairCAC::allocate_quad_neigh_list(int n1,int n2,int n3,int quad) {
 		}
 
 		
-        memory->sfree(inner_quad_lists_ucell);
+    memory->sfree(inner_quad_lists_ucell);
 		memory->sfree(inner_quad_lists_index);
 		memory->sfree(inner_quad_lists_counts);
 		memory->sfree(outer_quad_lists_ucell);
@@ -3228,12 +3276,12 @@ void PairCAC::allocate_quad_neigh_list(int n1,int n2,int n3,int quad) {
 	//memory->create(quadrature_neighbor_list, atom->nlocal, quad_count*atom->maxpoly, MAXNEIGH2, "Pair CAC/LJ: quadrature_neighbor_lists");
 	
 	
-		inner_quad_lists_ucell= (double ****) memory->smalloc(sizeof(double ****)*atom->nlocal, "Pair CAC:inner_quad_lists_ucell");
-		inner_quad_lists_index= (int ****) memory->smalloc(sizeof(int ****)*atom->nlocal, "Pair CAC:inner_quad_lists_index");
-		inner_quad_lists_counts= (int **) memory->smalloc(sizeof(int **)*atom->nlocal, "Pair CAC:inner_quad_lists_counts");
-		outer_quad_lists_ucell= (double ****) memory->smalloc(sizeof(double ****)*atom->nlocal, "Pair CAC:outer_quad_lists_ucell");
-		outer_quad_lists_index= (int ****) memory->smalloc(sizeof(int ****)*atom->nlocal, "Pair CAC:outer_quad_lists_index");
-		outer_quad_lists_counts= (int **) memory->smalloc(sizeof(int **)*atom->nlocal, "Pair CAC:outer_quad_lists_counts");
+		inner_quad_lists_ucell= (double ****) memory->smalloc(sizeof(double ***)*atom->nlocal, "Pair CAC:inner_quad_lists_ucell");
+		inner_quad_lists_index= (int ****) memory->smalloc(sizeof(int ***)*atom->nlocal, "Pair CAC:inner_quad_lists_index");
+		inner_quad_lists_counts= (int **) memory->smalloc(sizeof(int *)*atom->nlocal, "Pair CAC:inner_quad_lists_counts");
+		outer_quad_lists_ucell= (double ****) memory->smalloc(sizeof(double ***)*atom->nlocal, "Pair CAC:outer_quad_lists_ucell");
+		outer_quad_lists_index= (int ****) memory->smalloc(sizeof(int ***)*atom->nlocal, "Pair CAC:outer_quad_lists_index");
+		outer_quad_lists_counts= (int **) memory->smalloc(sizeof(int *)*atom->nlocal, "Pair CAC:outer_quad_lists_counts");
 		for (int init = 0; init < atom->nlocal; init++) {
 			
 			if (element_type[init] == 0) {
@@ -3243,30 +3291,30 @@ void PairCAC::allocate_quad_neigh_list(int n1,int n2,int n3,int quad) {
 				
 				
 				memory->create(inner_quad_lists_counts[init],1, "Pair CAC:inner_quad_lists_counts");
-				inner_quad_lists_ucell[init]= (double ***) memory->smalloc(sizeof(double ***), "Pair CAC:inner_quad_lists_ucell");
-		    inner_quad_lists_index[init]= (int ***) memory->smalloc(sizeof(int ***), "Pair CAC:inner_quad_lists_index");
+				inner_quad_lists_ucell[init]= (double ***) memory->smalloc(sizeof(double **), "Pair CAC:inner_quad_lists_ucell");
+		    inner_quad_lists_index[init]= (int ***) memory->smalloc(sizeof(int **), "Pair CAC:inner_quad_lists_index");
         memory->create(inner_quad_lists_ucell[init][0], maxneigh_quad_inner, 3, "Pair CAC:inner_quad_lists_ucell");
 				memory->create(inner_quad_lists_index[init][0], maxneigh_quad_inner, 2, "Pair CAC:inner_quad_lists_index");
 				if (outer_neighflag) {
 				memory->create(outer_quad_lists_counts[init],1, "Pair CAC:outer_quad_lists_counts");
-				outer_quad_lists_ucell[init]= (double ***) memory->smalloc(sizeof(double ***), "Pair CAC:outer_quad_lists_ucell");
-		    outer_quad_lists_index[init]= (int ***) memory->smalloc(sizeof(int ***), "Pair CAC:outer_quad_lists_index");
+				outer_quad_lists_ucell[init]= (double ***) memory->smalloc(sizeof(double **), "Pair CAC:outer_quad_lists_ucell");
+		    outer_quad_lists_index[init]= (int ***) memory->smalloc(sizeof(int **), "Pair CAC:outer_quad_lists_index");
         memory->create(outer_quad_lists_ucell[init][0], maxneigh_quad_outer, 3, "Pair CAC:outer_quad_lists_ucell");
 				memory->create(outer_quad_lists_index[init][0], maxneigh_quad_outer, 2, "Pair CAC:outer_quad_lists_index");
 				}
 			}
 			else {
 				memory->create(inner_quad_lists_counts[init],quad_count*atom->maxpoly, "Pair CAC:inner_quad_lists_counts");
-				inner_quad_lists_ucell[init]= (double ***) memory->smalloc(sizeof(double ***)*quad_count*atom->maxpoly, "Pair CAC:inner_quad_lists_ucell");
-		    inner_quad_lists_index[init]= (int ***) memory->smalloc(sizeof(int ***)*quad_count*atom->maxpoly, "Pair CAC:inner_quad_lists_index");
+				inner_quad_lists_ucell[init]= (double ***) memory->smalloc(sizeof(double **)*quad_count*atom->maxpoly, "Pair CAC:inner_quad_lists_ucell");
+		    inner_quad_lists_index[init]= (int ***) memory->smalloc(sizeof(int **)*quad_count*atom->maxpoly, "Pair CAC:inner_quad_lists_index");
 				 for (int neigh_loop = 0; neigh_loop < quad_count*atom->maxpoly; neigh_loop++) {
 				   memory->create(inner_quad_lists_ucell[init][neigh_loop], maxneigh_quad_inner, 3, "Pair CAC:inner_quad_lists_ucell");
 				   memory->create(inner_quad_lists_index[init][neigh_loop], maxneigh_quad_inner, 2, "Pair CAC:inner_quad_lists_index");
 				}
 				if (outer_neighflag) {
 				 memory->create(outer_quad_lists_counts[init],quad_count*atom->maxpoly, "Pair CAC:inner_quad_lists_counts");
-				 outer_quad_lists_ucell[init]= (double ***) memory->smalloc(sizeof(double ***)*quad_count*atom->maxpoly, "Pair CAC:inner_quad_lists_ucell");
-		     outer_quad_lists_index[init]= (int ***) memory->smalloc(sizeof(int ***)*quad_count*atom->maxpoly, "Pair CAC:inner_quad_lists_index");
+				 outer_quad_lists_ucell[init]= (double ***) memory->smalloc(sizeof(double **)*quad_count*atom->maxpoly, "Pair CAC:inner_quad_lists_ucell");
+		     outer_quad_lists_index[init]= (int ***) memory->smalloc(sizeof(int **)*quad_count*atom->maxpoly, "Pair CAC:inner_quad_lists_index");
 				 for (int neigh_loop = 0; neigh_loop < quad_count*atom->maxpoly; neigh_loop++) {
 				   memory->create(outer_quad_lists_ucell[init][neigh_loop], maxneigh_quad_outer, 3, "Pair CAC:outer_quad_lists_ucell");
 				   memory->create(outer_quad_lists_index[init][neigh_loop], maxneigh_quad_outer, 2, "Pair CAC:outer_quad_lists_index");
