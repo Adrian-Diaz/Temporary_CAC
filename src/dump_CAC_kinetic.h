@@ -13,7 +13,7 @@
 
 #ifdef DUMP_CLASS
 
-DumpStyle(CAC_kinetic,DumpCAC_Kinetic)
+DumpStyle(CAC/kinetic_energy,DumpCAC_Kinetic)
 
 #else
 

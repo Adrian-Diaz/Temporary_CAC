@@ -38,15 +38,13 @@ enum{NONE,CONSTANT,EQUAL,ATOM};
 FixCAC_Set_Velocity::FixCAC_Set_Velocity(LAMMPS *lmp, int narg, char **arg) :
   Fix(lmp, narg, arg)
 {
-  if (narg < 6) error->all(FLERR,"Illegal fix CAC_setvelocity command");
+  if (narg < 6) error->all(FLERR,"Illegal fix CAC/setvelocity command");
 
   dynamic_group_allow = 1;
   vector_flag = 1;
   size_vector = 3;
   global_freq = 1;
   extvector = 1;
-  respa_level_support = 1;
-  ilevel_respa = nlevels_respa = 0;
   xstr = ystr = zstr = NULL;
 
   if (strstr(arg[3],"v_") == arg[3]) {
@@ -96,14 +94,14 @@ FixCAC_Set_Velocity::FixCAC_Set_Velocity(LAMMPS *lmp, int narg, char **arg) :
       idregion = new char[n];
       strcpy(idregion,arg[iarg+1]);
       iarg += 2;
-    } else error->all(FLERR,"Illegal fix CAC_setvelocity command");
+    } else error->all(FLERR,"Illegal fix CAC/setvelocity command");
   }
 
   force_flag = 0;
-  foriginal[0] = foriginal[1] = foriginal[2] = 0.0;
+  voriginal[0] = voriginal[1] = voriginal[2] = 0.0;
 
   maxatom = 1;
-  memory->create(sforce,maxatom,3,"CAC_setvelocity:sforce");
+  memory->create(svelocity,maxatom,3,"CAC_setvelocity:sforce");
 }
 
 /* ---------------------------------------------------------------------- */
@@ -116,7 +114,7 @@ FixCAC_Set_Velocity::~FixCAC_Set_Velocity()
   delete [] ystr;
   delete [] zstr;
   delete [] idregion;
-  memory->destroy(sforce);
+  memory->destroy(svelocity);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -125,7 +123,6 @@ int FixCAC_Set_Velocity::setmask()
 {
 	int mask = 0;
 	mask |= INITIAL_INTEGRATE;
-	mask |= INITIAL_INTEGRATE_RESPA;
 
 	return mask;
 }
@@ -135,30 +132,30 @@ int FixCAC_Set_Velocity::setmask()
 void FixCAC_Set_Velocity::init()
 {
 	// check variables
-
+  if (!atom->CAC_flag) error->all(FLERR,"fix CAC/setvelocity requires a CAC atom style");
 	if (xstr) {
 		xvar = input->variable->find(xstr);
 		if (xvar < 0)
-			error->all(FLERR, "Variable name for fix CAC_setvelocity does not exist");
+			error->all(FLERR, "Variable name for fix CAC/setvelocity does not exist");
 		if (input->variable->equalstyle(xvar)) xstyle = EQUAL;
 		else if (input->variable->atomstyle(xvar)) xstyle = ATOM;
-		else error->all(FLERR, "Variable for fix CAC_setvelocity is invalid style");
+		else error->all(FLERR, "Variable for fix CAC/setvelocity is invalid style");
 	}
 	if (ystr) {
 		yvar = input->variable->find(ystr);
 		if (yvar < 0)
-			error->all(FLERR, "Variable name for fix CAC_setvelocity does not exist");
+			error->all(FLERR, "Variable name for fix CAC/setvelocity does not exist");
 		if (input->variable->equalstyle(yvar)) ystyle = EQUAL;
 		else if (input->variable->atomstyle(yvar)) ystyle = ATOM;
-		else error->all(FLERR, "Variable for fix CAC_setvelocity is invalid style");
+		else error->all(FLERR, "Variable for fix CAC/setvelocity is invalid style");
 	}
 	if (zstr) {
 		zvar = input->variable->find(zstr);
 		if (zvar < 0)
-			error->all(FLERR, "Variable name for fix CAC_setvelocity does not exist");
+			error->all(FLERR, "Variable name for fix CAC/setvelocity does not exist");
 		if (input->variable->equalstyle(zvar)) zstyle = EQUAL;
 		else if (input->variable->atomstyle(zvar)) zstyle = ATOM;
-		else error->all(FLERR, "Variable for fix CAC_setvelocity is invalid style");
+		else error->all(FLERR, "Variable for fix CAC/setvelocity is invalid style");
 	}
 
 	// set index and check validity of region
@@ -175,11 +172,7 @@ void FixCAC_Set_Velocity::init()
 		varflag = EQUAL;
 	else varflag = CONSTANT;
 
-	if (strstr(update->integrate_style, "respa")) {
-		nlevels_respa = ((Respa *)update->integrate)->nlevels;
-		if (respa_level >= 0) ilevel_respa = MIN(respa_level, nlevels_respa - 1);
-		else ilevel_respa = nlevels_respa - 1;
-	}
+	
 
 	// cannot use non-zero forces for a minimization since no energy is integrated
 	// use fix addforce instead
@@ -195,68 +188,6 @@ void FixCAC_Set_Velocity::init()
 	}
 	if (flag)
 		error->all(FLERR, "Cannot use non-zero forces in an energy minimization");
-
-	double ****nodal_positions = atom->nodal_positions;
-	double ****nodal_velocities = atom->nodal_velocities;
-	int nodes_per_element;
-	int *nodes_count_list = atom->nodes_per_element_list;	
-	//double ****initial_nodal_positions = atom->initial_nodal_positions;
-	int *element_type = atom->element_type;
-	int *poly_count = atom->poly_count;
-	int **node_types = atom->node_types;
-	int *mask = atom->mask;
-	int nlocal = atom->nlocal;
-	double *boxlo = domain->boxlo;
-	double *boxhi = domain->boxhi;
-	double origin[3];
-	double distance;
-	double delr[3];
-	double center_radius_sq;
-	double wave_vector;
-	double Amplitude = 0.003;
-	double cell = 10 * 5.430950;
-	double omega;
-
-	omega = 43 * wave_vector;
-	double unit_vector[2];
-	center_radius_sq = 56.25 * 4*cell * cell;
-	wave_vector = 2 * PI / (6 * cell);
-	origin[0] = (boxhi[0] + boxlo[0]) / 2;
-	origin[1] = (boxhi[1] + boxlo[1]) / 2;
-	origin[2] = (boxhi[2] + boxlo[2]) / 2;
-	
-	for (int i = 0; i < nlocal; i++) {
-		if (mask[i] & groupbit) {
-			nodes_per_element = nodes_count_list[element_type[i]];
-			for (int j = 0; j < nodes_per_element; j++) {
-				for (int l = 0; l < poly_count[i]; l++) {
-
-					delr[0] = (nodal_positions[i][j][l][0] - origin[0]);
-					delr[1] = (nodal_positions[i][j][l][1] - origin[1]);
-					delr[2] = (nodal_positions[i][j][l][2] - origin[2]);
-					distance = delr[0] * delr[0] + delr[1] * delr[1];
-					if (delr[0] == 0 && delr[1] == 0) {
-						unit_vector[0] = sqrt(2) / 2;
-						unit_vector[1] = sqrt(2) / 2;
-					}
-					else {
-						unit_vector[0] = delr[0] / sqrt(distance);
-						unit_vector[1] = delr[1] / sqrt(distance);
-					}
-					if (distance <= center_radius_sq) {
-						//nodal_positions[i][j][l][0] = initial_nodal_positions[i][j][l][0] + Amplitude * cos(sqrt(distance)*wave_vector )*unit_vector[0];
-						//nodal_positions[i][j][l][1] = initial_nodal_positions[i][j][l][1] + Amplitude * cos(sqrt(distance)*wave_vector )*unit_vector[1];
-						//nodal_velocities[i][j][l][0] = Amplitude * omega * sin(sqrt(distance)*wave_vector )*unit_vector[0];
-						//nodal_velocities[i][j][l][1] = Amplitude * omega * sin(sqrt(distance)*wave_vector )*unit_vector[1];
-						//n1z += Amplitude*cos(sqrt(distance)*wave_vector)*delr[2]/ distance;
-					//if (region && !region->match(x[i][0], x[i][1], x[i][2])) continue;
-
-						nodal_velocities[i][j][l][2] += 0;
-					}
-				}
-			}
-		}
-	}
 	
 }
 
@@ -267,11 +198,7 @@ void FixCAC_Set_Velocity::setup(int vflag)
   if (strstr(update->integrate_style,"verlet"))
     post_force(vflag);
   else
-    for (int ilevel = 0; ilevel < nlevels_respa; ilevel++) {
-      ((Respa *) update->integrate)->copy_flevel_f(ilevel);
-      post_force_respa(vflag,ilevel,0);
-      ((Respa *) update->integrate)->copy_f_flevel(ilevel);
-    }
+    error->all(FLERR, "Cannot use respa with CAC/setvelocity");
 }
 
 /* ---------------------------------------------------------------------- */
@@ -306,11 +233,11 @@ void FixCAC_Set_Velocity::initial_integrate(int vflag)
 
   if (varflag == ATOM && atom->nmax > maxatom) {
     maxatom = atom->nmax;
-    memory->destroy(sforce);
-    memory->create(sforce,maxatom,3,"CAC_setvelocity:sforce");
+    memory->destroy(svelocity);
+    memory->create(svelocity,maxatom,3,"CAC_setvelocity:sforce");
   }
 
-  foriginal[0] = foriginal[1] = foriginal[2] = 0.0;
+  voriginal[0] = voriginal[1] = voriginal[2] = 0.0;
   force_flag = 0;
   double ****nodal_positions = atom->nodal_positions;
   //double ****initial_nodal_positions = atom->initial_nodal_positions;
@@ -320,84 +247,6 @@ void FixCAC_Set_Velocity::initial_integrate(int vflag)
   int *element_type = atom->element_type;
   int *poly_count = atom->poly_count;
   int **node_types = atom->node_types;
-
-  double *boxlo = domain->boxlo;
-  double *boxhi = domain->boxhi;
-  double origin[3];
-  double distance;
-  double distancex;
-  double delr[3];
-  double delrx[3];
-  double center_radius_sq;
-  double wave_vector;
-  double Amplitude = 0.01;
-  double cell = 10 * 5.430950;
-  double unit_vector[2];
-  double omega;
-  double current_time = update->dt*update->ntimestep;
-  center_radius_sq = 56.25 * 4*cell * cell;
-  wave_vector = 2 * PI / (6 * cell);
-  omega = 43 * wave_vector;
-  origin[0] = (boxhi[0] + boxlo[0]) / 2;
-  origin[1] = (boxhi[1] + boxlo[1]) / 2;
-  origin[2] = (boxhi[2] + boxlo[2]) / 2;
-  /*
-  for (int i = 0; i < nlocal; i++) {
-	  if (mask[i] & groupbit) {
-		  x[i][0] = 0;
-		  x[i][1] = 0;
-		  x[i][2] = 0;
-		  v[i][0] = 0;
-		  v[i][1] = 0;
-		  v[i][2] = 0;
-		  for (int j = 0; j < nodes_per_element; j++) {
-			  for (int l = 0; l < poly_count[i]; l++) {
-
-				  delr[0] = (nodal_positions[i][j][l][0] - origin[0]);
-				  delr[1] = (nodal_positions[i][j][l][1] - origin[1]);
-				  delr[2] = (nodal_positions[i][j][l][2] - origin[2]);
-				  delrx[0] = (x[i][0] - origin[0]);
-				  delrx[1] = (x[i][1] - origin[1]);
-				  delrx[2] = (x[i][2] - origin[2]);
-
-				  distance = delr[0] * delr[0] + delr[1] * delr[1];
-				  distancex = delrx[0] * delrx[0] + delrx[1] * delrx[1];
-				  if (delr[0] == 0 && delr[1] == 0) {
-					  unit_vector[0] = -sqrt(2) / 2;
-					  unit_vector[1] = sqrt(2) / 2;
-				  }
-				  else {
-					  unit_vector[0] = -delr[1] / sqrt(distance);
-					  unit_vector[1] = delr[0] / sqrt(distance);
-				  }
-				 
-
-					  //Amplitude = 0.01*exp(-2*distance / center_radius_sq);
-					  nodal_positions[i][j][l][0] = initial_nodal_positions[i][j][l][0]+Amplitude * cos(sqrt(distance)*wave_vector- omega*current_time)*unit_vector[0];
-					  nodal_positions[i][j][l][1] = initial_nodal_positions[i][j][l][1]+Amplitude * cos(sqrt(distance)*wave_vector - omega*current_time)*unit_vector[1];
-					  nodal_velocities[i][j][l][0] = Amplitude *  omega * sin(sqrt(distance)*wave_vector - omega*current_time)*unit_vector[0];
-					  nodal_velocities[i][j][l][1] = Amplitude *  omega * sin(sqrt(distance)*wave_vector - omega*current_time)*unit_vector[1];
-					  //n1z += Amplitude*cos(sqrt(distance)*wave_vector)*delr[2]/ distance;
-					  //if (region && !region->match(x[i][0], x[i][1], x[i][2])) continue;
-
-					  //nodal_velocities[i][j][l][2] += 0;
-					  x[i][0] += nodal_positions[i][j][l][0];
-					  x[i][1] += nodal_positions[i][j][l][1];
-					  x[i][2] += nodal_positions[i][j][l][2];
-					  v[i][0] += nodal_velocities[i][j][l][0];
-					  v[i][1] += nodal_velocities[i][j][l][1];
-					  v[i][2] += nodal_velocities[i][j][l][2];
-			  }
-		  }
-		  x[i][0] = x[i][0] / nodes_per_element / poly_count[i];
-		  x[i][1] = x[i][1] / nodes_per_element / poly_count[i];
-		  x[i][2] = x[i][2] / nodes_per_element / poly_count[i];
-		  v[i][0] = v[i][0] / nodes_per_element / poly_count[i];
-		  v[i][1] = v[i][1] / nodes_per_element / poly_count[i];
-		  v[i][2] = v[i][2] / nodes_per_element / poly_count[i];
-	  }
-  }
-  */
   
   
   if (varflag == CONSTANT) {
@@ -414,21 +263,21 @@ void FixCAC_Set_Velocity::initial_integrate(int vflag)
 			  for (int j = 0; j < nodes_per_element; j++) {
 				  for (int l = 0; l < poly_count[i]; l++) {
 					  if (region && !region->match(x[i][0], x[i][1], x[i][2])) continue;
-					  foriginal[0] += f[i][0];
-					  foriginal[1] += f[i][1];
-					  foriginal[2] += f[i][2];
+					  voriginal[0] += nodal_velocities[i][j][l][0];
+					  voriginal[1] += nodal_velocities[i][j][l][1];
+					  voriginal[2] += nodal_velocities[i][j][l][2];
 					  if (xstyle) nodal_velocities[i][j][l][0] = xvalue;
 					  if (ystyle) nodal_velocities[i][j][l][1] = yvalue;
 					  if (zstyle) nodal_velocities[i][j][l][2] = zvalue;
 					  if (xstyle) nodal_positions[i][j][l][0] += xvalue*dt;
 					  if (ystyle) nodal_positions[i][j][l][1] += yvalue*dt;
 					  if (zstyle) nodal_positions[i][j][l][2] += zvalue*dt;
-					  x[i][0] += nodal_positions[i][j][l][0];
-					  x[i][1] += nodal_positions[i][j][l][1];
-					  x[i][2] += nodal_positions[i][j][l][2];
-					  v[i][0] += nodal_velocities[i][j][l][0];
-					  v[i][1] += nodal_velocities[i][j][l][1];
-					  v[i][2] += nodal_velocities[i][j][l][2];
+					  if (xstyle) x[i][0] += nodal_positions[i][j][l][0];
+					  if (ystyle) x[i][1] += nodal_positions[i][j][l][1];
+					  if (zstyle) x[i][2] += nodal_positions[i][j][l][2];
+					  if (xstyle) v[i][0] += nodal_velocities[i][j][l][0];
+					  if (ystyle) v[i][1] += nodal_velocities[i][j][l][1];
+					  if (zstyle) v[i][2] += nodal_velocities[i][j][l][2];
 				  }
 			  }
 			  x[i][0] = x[i][0] / nodes_per_element / poly_count[i];
@@ -443,66 +292,43 @@ void FixCAC_Set_Velocity::initial_integrate(int vflag)
 
   } else {
 
-    modify->clearstep_compute();
+   modify->clearstep_compute();
 
     if (xstyle == EQUAL) xvalue = input->variable->compute_equal(xvar);
     else if (xstyle == ATOM)
-      input->variable->compute_atom(xvar,igroup,&sforce[0][0],3,0);
+      input->variable->compute_atom(xvar,igroup,&svelocity[0][0],3,0);
     if (ystyle == EQUAL) yvalue = input->variable->compute_equal(yvar);
     else if (ystyle == ATOM)
-      input->variable->compute_atom(yvar,igroup,&sforce[0][1],3,0);
+      input->variable->compute_atom(yvar,igroup,&svelocity[0][1],3,0);
     if (zstyle == EQUAL) zvalue = input->variable->compute_equal(zvar);
     else if (zstyle == ATOM)
-      input->variable->compute_atom(zvar,igroup,&sforce[0][2],3,0);
+      input->variable->compute_atom(zvar,igroup,&svelocity[0][2],3,0);
 
     modify->addstep_compute(update->ntimestep + 1);
 
-    for (int i = 0; i < nlocal; i++)
+    for (int i = 0; i < nlocal; i++){
       if (mask[i] & groupbit) {
+        nodes_per_element = nodes_count_list[element_type[i]];
+			  for (int j = 0; j < nodes_per_element; j++) {
+				 for (int l = 0; l < poly_count[i]; l++) {
         if (region && !region->match(x[i][0],x[i][1],x[i][2])) continue;
-        foriginal[0] += f[i][0];
-        foriginal[1] += f[i][1];
-        foriginal[2] += f[i][2];
-        if (xstyle == ATOM) f[i][0] = sforce[i][0];
-        else if (xstyle) f[i][0] = xvalue;
-        if (ystyle == ATOM) f[i][1] = sforce[i][1];
-        else if (ystyle) f[i][1] = yvalue;
-        if (zstyle == ATOM) f[i][2] = sforce[i][2];
-        else if (zstyle) f[i][2] = zvalue;
+        voriginal[0] += nodal_velocities[i][j][l][0];
+				voriginal[1] += nodal_velocities[i][j][l][1];
+				voriginal[2] += nodal_velocities[i][j][l][2];
+        if (xstyle == ATOM) nodal_velocities[i][j][l][0] = svelocity[i][0];
+        else if (xstyle) nodal_velocities[i][j][l][0] = xvalue;
+        if (ystyle == ATOM) nodal_velocities[i][j][l][1] = svelocity[i][1];
+        else if (ystyle) nodal_velocities[i][j][l][1] = yvalue;
+        if (zstyle == ATOM) nodal_velocities[i][j][l][2] = svelocity[i][2];
+        else if (zstyle) nodal_velocities[i][j][l][2] = zvalue;
+         }
+        }
       }
+    }
   }
   
 }
 
-/* ---------------------------------------------------------------------- */
-
-void FixCAC_Set_Velocity::post_force_respa(int vflag, int ilevel, int iloop)
-{
-  // set force to desired value on requested level, 0.0 on other levels
-
-  if (ilevel == ilevel_respa) post_force(vflag);
-  else {
-    Region *region = NULL;
-    if (iregion >= 0) {
-      region = domain->regions[iregion];
-      region->prematch();
-    }
-
-    double **x = atom->x;
-    double **f = atom->f;
-	
-    int *mask = atom->mask;
-    int nlocal = atom->nlocal;
-
-    for (int i = 0; i < nlocal; i++)
-      if (mask[i] & groupbit) {
-        if (region && !region->match(x[i][0],x[i][1],x[i][2])) continue;
-        if (xstyle) f[i][0] = 0.0;
-        if (ystyle) f[i][1] = 0.0;
-        if (zstyle) f[i][2] = 0.0;
-      }
-  }
-}
 
 /* ---------------------------------------------------------------------- */
 
@@ -512,7 +338,7 @@ void FixCAC_Set_Velocity::min_post_force(int vflag)
 }
 
 /* ----------------------------------------------------------------------
-   return components of total force on fix group before force was changed
+   return components of total velocity on fix group before force was changed
 ------------------------------------------------------------------------- */
 
 double FixCAC_Set_Velocity::compute_vector(int n)
@@ -520,10 +346,10 @@ double FixCAC_Set_Velocity::compute_vector(int n)
   // only sum across procs one time
 
   if (force_flag == 0) {
-    MPI_Allreduce(foriginal,foriginal_all,3,MPI_DOUBLE,MPI_SUM,world);
+    MPI_Allreduce(voriginal,voriginal_all,3,MPI_DOUBLE,MPI_SUM,world);
     force_flag = 1;
   }
-  return foriginal_all[n];
+  return voriginal_all[n];
 }
 
 /* ----------------------------------------------------------------------

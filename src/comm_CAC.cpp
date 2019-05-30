@@ -233,6 +233,10 @@ void CommCAC::setup()
     error->all(FLERR,"Can only use comm style CAC with brick and rcb decompositions");
     
   int *periodicity = domain->periodicity;
+  
+  //check if CAC_pair style was invoked
+  if(!atom->CAC_pair_flag)
+  error->one(FLERR,"Cannot use the CAC comm style without a CAC pair style");
 
   // set function pointers
 
@@ -1184,10 +1188,8 @@ void CommCAC::exchange()
     x = atom->x;
     lo = sublo[dim];
     hi = subhi[dim];
-    //lo_ep = sublo[dim] - BOXEPSILON;
-    //hi_ep = subhi[dim] + BOXEPSILON;
-    lo_ep = sublo[dim] - 0.00000001;
-    hi_ep = subhi[dim] + 0.00000001;
+    lo_ep = sublo[dim] - BOXEPSILON;
+    hi_ep = subhi[dim] + BOXEPSILON;
     nlocal = atom->nlocal;
     i = nsend = 0;
 

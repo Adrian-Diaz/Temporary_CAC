@@ -23,6 +23,7 @@
 #include "neigh_request.h"
 #include "update.h"
 #include "neigh_list.h"
+#include "timer.h"
 #include "integrate.h"
 #include "respa.h"
 #include "math_const.h"
@@ -135,7 +136,7 @@ void PairCACLJ::allocate()
 global settings
 ------------------------------------------------------------------------- */
 void PairCACLJ::settings(int narg, char **arg) {
-	if (narg <1 || narg>3) error->all(FLERR, "Illegal pair_style command");
+	if (narg <1 || narg>2) error->all(FLERR, "Illegal pair_style command");
 
 	//cutmax = force->numeric(FLERR, arg[0]);
 	
@@ -147,14 +148,8 @@ void PairCACLJ::settings(int narg, char **arg) {
 	force->newton_pair = 0;
 	cut_global_s = force->numeric(FLERR, arg[0]);
 	if (narg == 2) {
-
-		cutoff_skin = force->numeric(FLERR, arg[1]);
-	}
-	else if (narg == 3) {
-		cutoff_skin = force->numeric(FLERR, arg[1]);
-		if (strcmp(arg[2], "one") == 0) atom->one_layer_flag=one_layer_flag = 1;
-		else error->all(FLERR, "Unexpected argument in PairCAC invocation");
-
+		if (strcmp(arg[1], "one") == 0) atom->one_layer_flag=one_layer_flag = 1;
+		else error->all(FLERR, "Unexpected argument in pair style CAC/lj invocation; only accepts cutoff and the 'one' keyword");
 	}
 
 	if (allocated) {
@@ -271,6 +266,7 @@ if (setflag[i][j] == 0) {
 
 void PairCACLJ::init_style()
 {
+  check_existence_flags();
   if (atom->tag_enable == 0)
     error->all(FLERR,"Pair style CAC_LJ requires atom IDs");
 
@@ -379,14 +375,14 @@ double delx,dely,delz;
 double r2inv;
 double r6inv;
 double shape_func;
-double shape_func2;
-double boxmap_matrix[3][3];
+
+
 int neighborflag=0;
 int outofbounds=0;
 int timestep=update->ntimestep;
 double unit_cell_mapped[3];
 double scanning_unit_cell[3];
-double box_positions[8][3];
+double ****nodal_gradients=atom->nodal_gradients;
 double *special_lj = force->special_lj;
 double forcelj,factor_lj,fpair;
 int *type = atom->type;
@@ -395,19 +391,16 @@ double distancesq;
 double current_position[3];
 double scan_position[3];
 double rcut;
-int current_type = poly_counter;
+
 int nodes_per_element;
 int *nodes_count_list = atom->nodes_per_element_list;	
-double cbox_positions[3];
+
 
 int flagm;
-int neigh_count=0;
-int neigh_index=0;
-double cds[3];
-double maxds=0;
-double maxdt=0;
-double maxdw=0;
-int neighbor_cell_count[3];
+
+
+
+
 
 
 //equivalent isoparametric cutoff range for a cube of rcut
@@ -486,13 +479,15 @@ int distanceflag=0;
 			firstneigh = list->firstneigh;
 			jlist = firstneigh[iii];
 			double ****nodal_positions = atom->nodal_positions;
-			
+				//if(update->ntimestep==1)
+      
       if(neigh_max>local_inner_max){
 			memory->grow(inner_neighbor_coords, neigh_max, 3, "Pair_CAC_lj:inner_neighbor_coords");
 
 			memory->grow(inner_neighbor_types, neigh_max, "Pair_CAC_lj:inner_neighbor_types");
 	     local_inner_max=neigh_max;
 	     }
+      
 			for (int l = 0; l < neigh_max; l++) {
 				scanning_unit_cell[0] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][0];
 		    scanning_unit_cell[1] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][1];
@@ -508,7 +503,7 @@ int distanceflag=0;
 
 			}
 			
-			
+		  
 			for (int l = 0; l < neigh_max; l++) {
 
 				scan_type = inner_neighbor_types[l];
@@ -527,15 +522,16 @@ int distanceflag=0;
 					* r6inv - lj2[scan_type][origin_type]);
 				fpair = factor_lj*forcelj*r2inv;
 
-
+        //timer->stamp(Timer::CAC_INIT);
 				force_densityx += delx*fpair;
 				force_densityy += dely*fpair;
 				force_densityz += delz*fpair;
 				force_contribution[0] = delx*fpair;
 				force_contribution[1] = dely*fpair;
 				force_contribution[2] = delz*fpair;
-				//portion that computes the energy and gradients of energy
-				if (quad_eflag) {
+				//timer->stamp(Timer::CAC_FD);
+				//if (0) {
+        if (quad_eflag) {
 
 				scanning_unit_cell[0] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][0];
 			  scanning_unit_cell[1] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][1];
@@ -553,29 +549,41 @@ int distanceflag=0;
 					//added for every internal degree of freedom i.e. u=u1+u2+u3..upoly defines the total unit cell energy density to integrate
 					//differentiating with nodal positions leaves terms of force contributions times shape function at the particle locations
 					//corresponding to the force contributions at that quadrature point
-
+          /*
+          if(update->whichflag==2){
+          if (!atomic_flag){
 					for (int js = 0; js < nodes_per_element; js++) {
 						for (int jj = 0; jj < 3; jj++) {
-							current_nodal_gradients[js][poly_counter][jj] += coefficients*force_contribution[jj] *
-								shape_function(s, t, w, 2, js + 1)/2;
-							//listtype determines if the neighbor virtual atom belongs to the current element or a neighboring element
-							//derivative contributions are zero for jth virtual atoms in other elements that depend on other nodal variables
 							if (listindex == iii) {
-								current_nodal_gradients[js][poly_grad_scan][jj] -= coefficients*force_contribution[jj] *
-									shape_function(scanning_unit_cell[0], scanning_unit_cell[1], scanning_unit_cell[2], 2, js + 1)/2;
+    					current_nodal_gradients[js][poly_counter][jj] += coefficients*force_contribution[jj] *
+    						shape_function(s, t, w, 2, js + 1)/2;
 							}
+    					//listindex determines if the neighbor virtual atom belongs to the current element or a neighboring element
+    					//derivative contributions are zero for jth virtual atoms in other elements that depend on other nodal variables
+    					if (listindex <atom->nlocal) {
+    						nodal_gradients[listindex][js][poly_grad_scan][jj] -= coefficients*force_contribution[jj] *
+    							shape_function(scanning_unit_cell[0], scanning_unit_cell[1], scanning_unit_cell[2], 2, js + 1)/2;
+    					}
 
 						}
 					}
-
+          }
+          else{
+            for (int jj = 0; jj < 3; jj++){
+                    current_nodal_gradients[0][poly_counter][jj] += coefficients*force_contribution[jj];
+                }
+          }
+        }
+        */
 				}
 				//end of energy portion
 			}
 
-		
+		  //portion that computes the energy and gradients of energy
+         
 
 
-
+    
 
 
 //end of scanning loop

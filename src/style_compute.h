@@ -1,3 +1,4 @@
+#include "compute_CAC_nodal_temp.h"
 #include "compute_CAC_quad_count.h"
 #include "compute_aggregate_atom.h"
 #include "compute_angle.h"
@@ -33,7 +34,6 @@
 #include "compute_ke_atom.h"
 #include "compute_msd.h"
 #include "compute_msd_chunk.h"
-#include "compute_nodal_temp.h"
 #include "compute_omega_chunk.h"
 #include "compute_orientorder_atom.h"
 #include "compute_pair.h"

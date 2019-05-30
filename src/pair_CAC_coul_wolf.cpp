@@ -120,7 +120,7 @@ void PairCACCoulWolf::allocate()
 global settings
 ------------------------------------------------------------------------- */
 void PairCACCoulWolf::settings(int narg, char **arg) {
-	if (narg <2 || narg>4) error->all(FLERR, "Illegal pair_style command");
+	if (narg <2 || narg>3) error->all(FLERR, "Illegal pair_style command");
 
 	//cutmax = force->numeric(FLERR, arg[0]);
 
@@ -133,14 +133,8 @@ void PairCACCoulWolf::settings(int narg, char **arg) {
 	alf = force->numeric(FLERR, arg[0]);
 	cut_global_s = force->numeric(FLERR, arg[1]);
 	if (narg == 3) {
-
-		cutoff_skin = force->numeric(FLERR, arg[2]);
-	}
-	else if (narg == 4) {
-		cutoff_skin = force->numeric(FLERR, arg[2]);
-		if (strcmp(arg[3], "one") == 0) atom->one_layer_flag=one_layer_flag = 1;
-		else error->all(FLERR, "Unexpected argument in PairCAC invocation");
-
+		if (strcmp(arg[2], "one") == 0) atom->one_layer_flag=one_layer_flag = 1;
+		else error->all(FLERR, "Unexpected argument in CAC/coul/wolf invocation");
 	}
 	cut_coul = cut_global_s;
 	// reset cutoffs that have been explicitly set
@@ -188,12 +182,13 @@ double PairCACCoulWolf::init_one(int i, int j) {
 
 void PairCACCoulWolf::init_style()
 {
+	check_existence_flags();
   if (atom->tag_enable == 0)
     error->all(FLERR,"Pair style CAC_Buck requires atom IDs");
   maxneigh_quad_inner = MAXNEIGH2;
   maxneigh_quad_outer = MAXNEIGH1;
   if (!atom->q_flag)
-	  error->all(FLERR, "Pair coul/wolf requires atom attribute q");
+	  error->all(FLERR, "Pair coul/wolf requires atom attribute q for charges");
   // need a full neighbor list
 
   int irequest = neighbor->request(this,instance_me);

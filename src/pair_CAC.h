@@ -169,6 +169,7 @@ class PairCAC : public Pair {
   //further CAC functions 
   //double density_map(double);
   void quadrature_init(int degree);
+  void check_existence_flags();
   void allocate_quad_neigh_list(int,int,int,int);
   void allocate_surface_counts();
   void compute_mass_matrix();

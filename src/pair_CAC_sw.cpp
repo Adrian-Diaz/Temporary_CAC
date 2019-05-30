@@ -228,7 +228,7 @@ double PairCACSW::init_one(int i, int j) {
 
 void PairCACSW::init_style()
 {
-
+  check_existence_flags();
 	maxneigh_quad_inner = MAXNEIGH2;
 	maxneigh_quad_outer = MAXNEIGH1;
   if (atom->tag_enable == 0)

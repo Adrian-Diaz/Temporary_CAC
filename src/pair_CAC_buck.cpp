@@ -133,7 +133,7 @@ void PairCACBuck::allocate()
 global settings
 ------------------------------------------------------------------------- */
 void PairCACBuck::settings(int narg, char **arg) {
-	if (narg <1 || narg>3) error->all(FLERR, "Illegal pair_style command");
+	if (narg <1 || narg>2) error->all(FLERR, "Illegal pair_style CAC/buck command");
 
 	//cutmax = force->numeric(FLERR, arg[0]);
 
@@ -143,15 +143,10 @@ void PairCACBuck::settings(int narg, char **arg) {
 	
 	force->newton_pair = 0;
 	cut_global_s = force->numeric(FLERR, arg[0]);
-	if (narg == 2) {
-
-		cutoff_skin = force->numeric(FLERR, arg[1]);
-	}
-	else if (narg == 3) {
-		cutoff_skin = force->numeric(FLERR, arg[1]);
-		if (strcmp(arg[2], "one") == 0) atom->one_layer_flag=one_layer_flag = 1;
-		else error->all(FLERR, "Unexpected argument in PairCAC invocation");
-
+	
+	 if (narg == 2) {
+		if (strcmp(arg[1], "one") == 0) atom->one_layer_flag=one_layer_flag = 1;
+		else error->all(FLERR, "Unexpected argument in pair CAC/buck invocation; only accepts cutoff and the 'one' keyword");
 	}
 	if (allocated) {
 		int i, j;
@@ -263,6 +258,8 @@ double PairCACBuck::init_one(int i, int j) {
 
 void PairCACBuck::init_style()
 {
+  check_existence_flags();
+
   if (atom->tag_enable == 0)
     error->all(FLERR,"Pair style CAC_Buck requires atom IDs");
 
