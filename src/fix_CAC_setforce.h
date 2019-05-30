@@ -33,7 +33,6 @@ class FixCAC_Set_Force : public Fix {
   void setup(int);
   void min_setup(int);
   virtual void post_force(int);
-  void post_force_respa(int, int, int);
   void min_post_force(int);
   double compute_vector(int);
 
@@ -47,7 +46,7 @@ class FixCAC_Set_Force : public Fix {
   int xvar,yvar,zvar,xstyle,ystyle,zstyle;
   double foriginal[3],foriginal_all[3];
   int force_flag;
-  int nlevels_respa,ilevel_respa;
+  
 
   int maxatom;
   double **sforce;

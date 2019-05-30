@@ -135,7 +135,7 @@ void PairCACPb::allocate()
 global settings
 ------------------------------------------------------------------------- */
 void PairCACPb::settings(int narg, char **arg) {
-	if (narg <3 || narg>5) error->all(FLERR, "Illegal pair_style command");
+	if (narg <3 || narg>4) error->all(FLERR, "Illegal pair_style command");
 
 	//cutmax = force->numeric(FLERR, arg[0]);
 
@@ -150,14 +150,9 @@ void PairCACPb::settings(int narg, char **arg) {
 	cut_buck = force->numeric(FLERR, arg[0]);
 	alf = force->numeric(FLERR, arg[1]);
 	cut_coul = force->numeric(FLERR, arg[2]);
-	if (narg == 4) {
-
-		cutoff_skin = force->numeric(FLERR, arg[3]);
-	}
-	else if (narg == 5) {
-		cutoff_skin = force->numeric(FLERR, arg[3]);
-		if (strcmp(arg[4], "one") == 0) atom->one_layer_flag=one_layer_flag = 1;
-		else error->all(FLERR, "Unexpected argument in PairCAC invocation");
+	 if (narg == 4) {
+		if (strcmp(arg[3], "one") == 0) atom->one_layer_flag=one_layer_flag = 1;
+		else error->all(FLERR, "Unexpected argument in CAC/Pb pair style invocation");
 
 	}
 	cut_global_s = cut_buck;
@@ -275,6 +270,7 @@ double PairCACPb::init_one(int i, int j) {
 
 void PairCACPb::init_style()
 {
+	check_existence_flags();
   if (atom->tag_enable == 0)
     error->all(FLERR,"Pair style CAC_Buck requires atom IDs");
 

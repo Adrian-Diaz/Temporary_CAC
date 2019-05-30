@@ -86,6 +86,7 @@ PairCAC::PairCAC(LAMMPS *lmp) : Pair(lmp)
 	neighbor->pgsize=10;
 	neighbor->oneatom=1;
 	old_atom_count=0;
+	atom->CAC_pair_flag=1;
 	//allocate shape function pointers
 	shape_functions= (Shape_Functions *) memory->smalloc(sizeof(Shape_Functions)*MAXESHAPE, "Pair CAC:shape_functions");
 	set_shape_functions();
@@ -443,19 +444,15 @@ void PairCAC::allocate()
  ------------------------------------------------------------------------- */
 
 void PairCAC::settings(int narg, char **arg) {
-  if (narg <0||narg>2) error->all(FLERR,"Illegal pair_style command");
+  if (narg>1) error->all(FLERR,"Illegal pair_style CAC command");
  
   //cutmax = force->numeric(FLERR,arg[0]);
-  if (narg == 1) {
-	  
-	  cutoff_skin = force->numeric(FLERR, arg[0]);
-  }
-  else if (narg == 2) {
-	  cutoff_skin = force->numeric(FLERR, arg[0]);
-	  if (strcmp(arg[1], "one") == 0) atom->one_layer_flag=one_layer_flag = 1;
-	  else error->all(FLERR, "Unexpected argument in PairCAC invocation");
+ 
+  
+	  if (strcmp(arg[0], "one") == 0) atom->one_layer_flag=one_layer_flag = 1;
+	  else error->all(FLERR, "Unexpected argument in CAC pair style invocation");
 
-  }
+  
     //cut_global_s = force->numeric(FLERR,arg[1]);
 	//neighrefresh = force->numeric(FLERR, arg[1]);
 	//maxneigh_setting = force->numeric(FLERR, arg[2]);
@@ -478,7 +475,7 @@ void PairCAC::init_style()
 {
 	// convert read-in file(s) to arrays and spline them
 
-
+  check_existence_flags();
 	maxneigh_quad_inner = MAXNEIGH2;
 	maxneigh_quad_outer = MAXNEIGH1;
 	int irequest = neighbor->request(this, instance_me);
@@ -558,13 +555,18 @@ void PairCAC::init_style()
 
 }
 
-
+void PairCAC::check_existence_flags(){
+//check existence of CAC atomvec here for convenience since children implement init_style
+//but all implementations call this routine
+if(!atom->CAC_flag)
+error->all(FLERR,"Pair CAC style requires a CAC atom style");
+//check if hybrid pair style is invoked
+if(force->pair_match("hybrid",0,0)!=NULL)
+error->all(FLERR,"Pair CAC styles cannot be invoked with hybrid; also don't use the word hybrid in your style name to avoid this error");
+}
 
 //-----------------------------------------------------------------------
 void PairCAC::quadrature_init(int quadrature_rank){
-
-
-
 
 if(quadrature_rank==1){
 atom->quadrature_node_count=quadrature_node_count=1;

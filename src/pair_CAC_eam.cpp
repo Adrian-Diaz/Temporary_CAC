@@ -316,6 +316,7 @@ double PairCACEAM::init_one(int i, int j) {
 
 void PairCACEAM::init_style()
 {
+	check_existence_flags();
 	// convert read-in file(s) to arrays and spline them
 	maxneigh_quad_inner = MAXNEIGH2;
 	maxneigh_quad_outer = MAXNEIGH1;
@@ -793,7 +794,7 @@ int timestep=update->ntimestep;
 double unit_cell_mapped[3];
 double scanning_unit_cell[3];
 double box_positions[8][3];
-
+double ****nodal_gradients=atom->nodal_gradients;
 double forcelj,factor_lj,fpair;
 int *type = atom->type;
 double unit_cell[3];
@@ -1165,6 +1166,7 @@ int distanceflag=0;
 			scanning_unit_cell[0] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][0];
 			scanning_unit_cell[1] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][1];
 			scanning_unit_cell[2] = inner_quad_lists_ucell[iii][neigh_quad_counter][l][2];
+			
 			listindex = inner_quad_lists_index[iii][neigh_quad_counter][l][0];
 			poly_grad_scan = inner_quad_lists_index[iii][neigh_quad_counter][l][1];
 			
@@ -1176,15 +1178,19 @@ int distanceflag=0;
 			//added for every internal degree of freedom i.e. u=u1+u2+u3..upoly defines the total unit cell energy density to integrate
 			//differentiating with nodal positions leaves terms of force contributions times shape function at the particle locations
 			//corresponding to the force contributions at that quadrature point
+			/*
+			if(update->whichflag==2){
             if (!atomic_flag){
     			for (int js = 0; js < nodes_per_element; js++) {
     				for (int jj = 0; jj < 3; jj++) {
+							if (listindex == iii) {
     					current_nodal_gradients[js][poly_counter][jj] += coefficients*force_contribution[jj] *
     						shape_function(s, t, w, 2, js + 1)/2;
+							}
     					//listindex determines if the neighbor virtual atom belongs to the current element or a neighboring element
     					//derivative contributions are zero for jth virtual atoms in other elements that depend on other nodal variables
-    					if (listindex == iii) {
-    						current_nodal_gradients[js][poly_grad_scan][jj] -= coefficients*force_contribution[jj] *
+    					if (listindex <atom->nlocal) {
+    						nodal_gradients[listindex][js][poly_grad_scan][jj] -= coefficients*force_contribution[jj] *
     							shape_function(scanning_unit_cell[0], scanning_unit_cell[1], scanning_unit_cell[2], 2, js + 1)/2;
     					}
 
@@ -1196,8 +1202,11 @@ int distanceflag=0;
                     current_nodal_gradients[0][poly_counter][jj] += coefficients*force_contribution[jj];
                 }
             }
+		    }
+				*/
         }
 	}
+	
   //if(update->ntimestep==1)
   //timer->stamp(Timer::CAC_FD);
    

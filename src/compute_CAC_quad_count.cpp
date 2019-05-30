@@ -58,6 +58,9 @@ ComputeCACQuadCount::~ComputeCACQuadCount()
 void ComputeCACQuadCount::init()
 {
   int count = 0;
+	if(!atom->CAC_flag){
+		error->all(FLERR,"compute CAC/quad_count requires a CAC atom style");
+	}
   for (int i = 0; i < modify->ncompute; i++)
     if (strcmp(modify->compute[i]->style,"CAC/quad_count") == 0) count++;
   if (count > 1 && comm->me == 0)

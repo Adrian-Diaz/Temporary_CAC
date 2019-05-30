@@ -67,7 +67,11 @@ DumpCACNodalPositions::~DumpCACNodalPositions()
 /* ---------------------------------------------------------------------- */
 
 void DumpCACNodalPositions::init_style()
-{
+{ 
+  //check if CAC atom style is defined
+  if(!atom->CAC_flag)
+  error->all(FLERR, "CAC dump styles require a CAC atom style");
+
   delete [] format;
   char *str;
   if (format_line_user) str = format_line_user;

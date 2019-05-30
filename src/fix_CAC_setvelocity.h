@@ -33,7 +33,6 @@ class FixCAC_Set_Velocity : public Fix {
   void setup(int);
   void min_setup(int);
   virtual void initial_integrate(int vflag);
-  void post_force_respa(int, int, int);
   void min_post_force(int);
   double compute_vector(int);
 
@@ -45,12 +44,11 @@ class FixCAC_Set_Velocity : public Fix {
   char *xstr,*ystr,*zstr;
   char *idregion;
   int xvar,yvar,zvar,xstyle,ystyle,zstyle;
-  double foriginal[3],foriginal_all[3];
+  double voriginal[3],voriginal_all[3];
   int force_flag;
-  int nlevels_respa,ilevel_respa;
 
   int maxatom;
-  double **sforce;
+  double **svelocity;
 };
 
 }
