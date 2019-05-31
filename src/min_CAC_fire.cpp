@@ -55,8 +55,8 @@ void CACMinFire::init()
 void CACMinFire::setup_style()
 {
   double **v = atom->nodal_velocities[0][0];
-  int nlocal = atom->maxpoly*atom->nodes_per_element * atom->nlocal;
-
+  //int nlocal = atom->maxpoly*atom->nodes_per_element * atom->nlocal;
+  int nlocal = atom->nlocal
   for (int i = 0; i < nlocal; i++)
     v[i][0] = v[i][1] = v[i][2] = 0.0;
 }
@@ -70,7 +70,8 @@ void CACMinFire::reset_vectors()
 {
   // atomic dof
 
-  nvec = 3*atom->maxpoly*atom->nodes_per_element * atom->nlocal;
+  //nvec = 3*atom->maxpoly*atom->nodes_per_element * atom->nlocal;
+  nvec = 3*atom->nlocal
   if (nvec) xvec = atom->nodal_positions[0][0][0];
   if (nvec) fvec = atom->nodal_forces[0][0][0];
 }
@@ -89,9 +90,13 @@ int CACMinFire::iterate(int maxiter)
   int *poly_count = atom->poly_count;
   int *nodes_count_list = atom->nodes_per_element_list;
   int nodes_per_element;
+  int **node_types = atom->node_types;
   double ****nodal_positions=atom->nodal_positions;
   double ****nodal_velocities=atom->nodal_velocities;
+  double ****nodal_forces = atom->nodal_forces;
 
+  double **x = atom->x;
+  double **v = atom->v;
 
   alpha_final = 0.0;
 
@@ -105,13 +110,23 @@ int CACMinFire::iterate(int maxiter)
 
     // vdotfall = v dot f
 
-    double **v = atom->nodal_velocities[0][0];
-    double **f = atom->nodal_forces[0][0];
-    int nlocal = atom->maxpoly*atom->nodes_per_element * atom->nlocal;
+    // int nlocal = atom->maxpoly*atom->nodes_per_element * atom->nlocal;
+    int nlocal = atom->nlocal;
 
+    double *fn;
+    double *vn;
     vdotf = 0.0;
-    for (int i = 0; i < nlocal; i++)
-      vdotf += v[i][0]*f[i][0] + v[i][1]*f[i][1] + v[i][2]*f[i][2];
+    for (int i = 0; i < nlocal; i++) {
+      nodes_per_element = nodes_count_list[element_type[i]];
+      for(int k=0; k<nodes_per_element; k++){
+        for (int poly_counter = 0; poly_counter < poly_count[i];poly_counter++) {
+          vn = nodal_velocities[i][k][poly_counter];
+          fn = nodal_forces[i][k][poly_counter];
+          vdotf += vn[0]*fn[0] + vn[1]*fn[1] + vn[2]*fn[2];
+        }
+      }
+    }
+      
     MPI_Allreduce(&vdotf,&vdotfall,1,MPI_DOUBLE,MPI_SUM,world);
 
     // sum vdotf over replicas, if necessary
@@ -130,8 +145,15 @@ int CACMinFire::iterate(int maxiter)
 
     if (vdotfall > 0.0) {
       vdotv = 0.0;
-      for (int i = 0; i < nlocal; i++)
-        vdotv += v[i][0]*v[i][0] + v[i][1]*v[i][1] + v[i][2]*v[i][2];
+      for (int i = 0; i < nlocal; i++) {
+      nodes_per_element = nodes_count_list[element_type[i]];
+        for(int k=0; k<nodes_per_element; k++){
+          for (int poly_counter = 0; poly_counter < poly_count[i];poly_counter++) {
+            double *vn = nodal_velocities[i][k][poly_counter];
+            vdotv += vn[0]*vn[0] + vn[1]*vn[1] + vn[2]*vn[2];
+          }
+        }
+      }
       MPI_Allreduce(&vdotv,&vdotvall,1,MPI_DOUBLE,MPI_SUM,world);
 
       // sum vdotv over replicas, if necessary
@@ -143,8 +165,16 @@ int CACMinFire::iterate(int maxiter)
       }
 
       fdotf = 0.0;
-      for (int i = 0; i < nlocal; i++)
-        fdotf += f[i][0]*f[i][0] + f[i][1]*f[i][1] + f[i][2]*f[i][2];
+      for (int i = 0; i < nlocal; i++) {
+        nodes_per_element = nodes_count_list[element_type[i]];
+        for(int k=0; k<nodes_per_element; k++){
+          for (int poly_counter = 0; poly_counter < poly_count[i];poly_counter++) {
+            double *fn = nodal_forces[i][k][poly_counter];
+            fdotf += fn[0]*fn[0] + fn[1]*fn[1] + fn[2]*fn[2];
+          }
+        }
+      }
+
       MPI_Allreduce(&fdotf,&fdotfall,1,MPI_DOUBLE,MPI_SUM,world);
 
       // sum fdotf over replicas, if necessary
@@ -159,9 +189,16 @@ int CACMinFire::iterate(int maxiter)
       if (fdotfall == 0.0) scale2 = 0.0;
       else scale2 = alpha * sqrt(vdotvall/fdotfall);
       for (int i = 0; i < nlocal; i++) {
-        v[i][0] = scale1*v[i][0] + scale2*f[i][0];
-        v[i][1] = scale1*v[i][1] + scale2*f[i][1];
-        v[i][2] = scale1*v[i][2] + scale2*f[i][2];
+        nodes_per_element = nodes_count_list[element_type[i]];
+        for(int k=0; k<nodes_per_element; k++){
+          for (int poly_counter = 0; poly_counter < poly_count[i];poly_counter++) {
+            double *fn = nodal_forces[i][k][poly_counter];
+            double *vn = nodal_velocities[i][k][poly_counter];
+            nodal_velocities[i][k][poly_counter][0] = scale1*vn[0] + scale2*fn[0];
+            nodal_velocities[i][k][poly_counter][1] = scale1*vn[1] + scale2*fn[1];
+            nodal_velocities[i][k][poly_counter][2] = scale1*vn[2] + scale2*fn[2];          
+          }
+        }
       }
 
       if (ntimestep - last_negative > DELAYSTEP) {
@@ -176,9 +213,19 @@ int CACMinFire::iterate(int maxiter)
       last_negative = ntimestep;
       dt *= DT_SHRINK;
       alpha = ALPHA0;
-      for (int i = 0; i < nlocal; i++)
+      for (int i = 0; i < nlocal; i++) {
+        nodes_per_element = nodes_count_list[element_type[i]];
+        for(int k=0; k<nodes_per_element; k++){
+          for (int poly_counter = 0; poly_counter < poly_count[i];poly_counter++) {
+            nodal_velocities[i][k][poly_counter][0] = 0.0;
+            nodal_velocities[i][k][poly_counter][1] = 0.0;
+            nodal_velocities[i][k][poly_counter][2] = 0.0;
+          }
+        }
         v[i][0] = v[i][1] = v[i][2] = 0.0;
+      }
     }
+
 
     // limit timestep so no particle moves further than dmax
 
@@ -207,57 +254,65 @@ int CACMinFire::iterate(int maxiter)
 
     // Euler integration step
 
-    double **xx = atom->x;
-    double **vv = atom->v;
-    double **x = atom->nodal_positions[0][0];
-    
     if (rmass) {
       for (int i = 0; i < nlocal; i++) {
-        dtfm = dtf / rmass[i];
-        x[i][0] += dtv * v[i][0];
-        x[i][1] += dtv * v[i][1];
-        x[i][2] += dtv * v[i][2];
-        v[i][0] += dtfm * f[i][0];
-        v[i][1] += dtfm * f[i][1];
-        v[i][2] += dtfm * f[i][2];
+        nodes_per_element = nodes_count_list[element_type[i]];
+        x[i][0] = x[i][1] = x[i][2] = 0.0;
+        v[i][0] = v[i][1] = v[i][2] = 0.0;
+        for(int k=0; k<nodes_per_element; k++){
+          for (int poly_counter = 0; poly_counter < poly_count[i];poly_counter++) {
+            dtfm = dtf / rmass[i];
+            nodal_positions[i][k][poly_counter][0] += dtv * nodal_velocities[i][k][poly_counter][0];
+            nodal_positions[i][k][poly_counter][1] += dtv * nodal_velocities[i][k][poly_counter][1];
+            nodal_positions[i][k][poly_counter][2] += dtv * nodal_velocities[i][k][poly_counter][2];
+            nodal_velocities[i][k][poly_counter][0] += dtfm * nodal_forces[i][k][poly_counter][0];
+            nodal_velocities[i][k][poly_counter][1] += dtfm * nodal_forces[i][k][poly_counter][1];
+            nodal_velocities[i][k][poly_counter][2] += dtfm * nodal_forces[i][k][poly_counter][2];
+
+            x[i][0] += nodal_positions[i][k][poly_counter][0];
+            x[i][1] += nodal_positions[i][k][poly_counter][1];
+            x[i][2] += nodal_positions[i][k][poly_counter][2];
+            v[i][0] += nodal_velocities[i][k][poly_counter][0];
+            v[i][1] += nodal_velocities[i][k][poly_counter][1];
+            v[i][2] += nodal_velocities[i][k][poly_counter][2];
+          }
+        }
       }
     } else {
       for (int i = 0; i < nlocal; i++) {
-        dtfm = dtf / mass[type[i]];
-        x[i][0] += dtv * v[i][0];
-        x[i][1] += dtv * v[i][1];
-        x[i][2] += dtv * v[i][2];
-        v[i][0] += dtfm * f[i][0];
-        v[i][1] += dtfm * f[i][1];
-        v[i][2] += dtfm * f[i][2];
+        nodes_per_element = nodes_count_list[element_type[i]];
+        x[i][0] = x[i][1] = x[i][2] = 0.0;
+        v[i][0] = v[i][1] = v[i][2] = 0.0;
+        for(int k=0; k<nodes_per_element; k++){
+          for (int poly_counter = 0; poly_counter < poly_count[i];poly_counter++) {
+            dtfm = dtf / mass[node_types[i][poly_counter]];
+            nodal_positions[i][k][poly_counter][0] += dtv * nodal_velocities[i][k][poly_counter][0];
+            nodal_positions[i][k][poly_counter][1] += dtv * nodal_velocities[i][k][poly_counter][1];
+            nodal_positions[i][k][poly_counter][2] += dtv * nodal_velocities[i][k][poly_counter][2];
+            nodal_velocities[i][k][poly_counter][0] += dtfm * nodal_forces[i][k][poly_counter][0];
+            nodal_velocities[i][k][poly_counter][1] += dtfm * nodal_forces[i][k][poly_counter][1];
+            nodal_velocities[i][k][poly_counter][2] += dtfm * nodal_forces[i][k][poly_counter][2];
+
+            x[i][0] += nodal_positions[i][k][poly_counter][0];
+            x[i][1] += nodal_positions[i][k][poly_counter][1];
+            x[i][2] += nodal_positions[i][k][poly_counter][2];
+            v[i][0] += nodal_velocities[i][k][poly_counter][0];
+            v[i][1] += nodal_velocities[i][k][poly_counter][1];
+            v[i][2] += nodal_velocities[i][k][poly_counter][2];
+          }
+        }
       }
     }
     // update x,v for elements and atoms using nodal variables
-    for (int i = 0; i < atom->nlocal; i++){
-      //determine element type
-      nodes_per_element = nodes_count_list[element_type[i]];    
-      xx[i][0] = xx[i][1] = xx[i][2] = 0;
-      vv[i][0] = vv[i][1] = vv[i][2] = 0.0;
-
-      for(int k=0; k<nodes_per_element; k++){
-        for (int poly_counter = 0; poly_counter < poly_count[i];poly_counter++) {
-          
-            xx[i][0] += nodal_positions[i][k][poly_counter][0];
-            xx[i][1] += nodal_positions[i][k][poly_counter][1];
-            xx[i][2] += nodal_positions[i][k][poly_counter][2];
-            vv[i][0] += nodal_velocities[i][k][poly_counter][0];
-            vv[i][1] += nodal_velocities[i][k][poly_counter][1];
-            vv[i][2] += nodal_velocities[i][k][poly_counter][2];
-          }
-      }
-
-      xx[i][0] = xx[i][0] / nodes_per_element / poly_count[i];
-      xx[i][1] = xx[i][1] / nodes_per_element / poly_count[i];
-      xx[i][2] = xx[i][2] / nodes_per_element / poly_count[i];
-      vv[i][0] = vv[i][0] / nodes_per_element / poly_count[i];
-      vv[i][1] = vv[i][1] / nodes_per_element / poly_count[i];
-      vv[i][2] = vv[i][2] / nodes_per_element / poly_count[i];
+    for (int i = 0; i < nlocal; i++){
+      x[i][0] = x[i][0] / nodes_per_element / poly_count[i];
+      x[i][1] = x[i][1] / nodes_per_element / poly_count[i];
+      x[i][2] = x[i][2] / nodes_per_element / poly_count[i];
+      v[i][0] = v[i][0] / nodes_per_element / poly_count[i];
+      v[i][1] = v[i][1] / nodes_per_element / poly_count[i];
+      v[i][2] = v[i][2] / nodes_per_element / poly_count[i];
     }
+
     eprevious = ecurrent;
     ecurrent = energy_force(0);
     neval++;

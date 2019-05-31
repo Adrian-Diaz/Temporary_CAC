@@ -13,12 +13,12 @@ atom_style     atomic
 
 region	    box block 0 6 0 6 0 6 units box
 create_box  1 box
+create_atoms 1 box
 
-
- create_atoms 1 single 0.1 0.1 0.1 
- create_atoms 1 single 3.715 0.1 0.1
- create_atoms 1 single 0.1 3.715 0.1
- create_atoms 1 single 0.1 0.1 3.715 
+# create_atoms 1 single 0.1 0.1 0.1 
+# create_atoms 1 single 3.715 0.1 0.1
+# create_atoms 1 single 0.1 3.715 0.1
+# create_atoms 1 single 0.1 0.1 3.715 
 
 thermo_style custom step pe
 thermo 1
@@ -27,7 +27,7 @@ pair_coeff * * Cu_u3.eam
 
 dump 1 all xyz 1 lammps.xyz
 
-min_style CAC_cg
+min_style fire
 minimize 1.0e-4 1.0e-6 100 1000
 
 #fix NVE all nve

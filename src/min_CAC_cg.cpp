@@ -76,6 +76,7 @@ CACMinCG::~CACMinCG()
 
 void CACMinCG::init()
 {
+
   Min::init();
 
   if (linestyle == 0) linemin = &CACMinCG::linemin_backtrack;
@@ -145,10 +146,10 @@ void CACMinCG::reset_vectors()
 	//hence the three dereferences for the 4-D array
 	//nvec will loop over all elements of the array with that size
   if (nvec) xvec = atom->nodal_positions[0][0][0];
-  if (nvec) fvec = atom->nodal_gradients[0][0][0];
+  //if (nvec) fvec = atom->nodal_gradients[0][0][0];
   //if you want to use the computed nodal forces instead of energy gradients comment out gradients
   //and uncomment the forces below
-	//if (nvec) fvec = atom->nodal_forces[0][0][0];
+	if (nvec) fvec = atom->nodal_forces[0][0][0];
   x0 = fix_minimize->request_vector(0);
   g = fix_minimize->request_vector(1);
   h = fix_minimize->request_vector(2);

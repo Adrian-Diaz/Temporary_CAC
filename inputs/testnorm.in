@@ -2,7 +2,7 @@ echo both
 units       metal
 
 dimension    3
-boundary     p p p 
+boundary     p p p
 
 #two CAC element styles currently available
 #one has charge and the other does not
@@ -12,8 +12,8 @@ boundary     p p p
 #degrees of freedom an element can have in the model
 atom_style     atomic
 
-#region	    box block 0 35 0 35 0 35 units box
-region	    box block 0 6 0 6 0 6 units box
+#region	    box block 0 34.3425 0 34.3425 0 34.3452 units box
+region	    box block 0 5 0 5 0 5 units box
 create_box  1 box
 
 #lattice fcc 3.615
@@ -35,5 +35,5 @@ dump 1 all xyz 1 lammps.xyz
 #fix 1 all nve 
 #run 10
 
-min_style cg
+min_style fire
 minimize 1e-14 0.0 1000 10000

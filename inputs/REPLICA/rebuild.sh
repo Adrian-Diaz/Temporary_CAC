@@ -4,8 +4,9 @@ if [ "$1" == "-p" ]; then
   make mpi 
   cp -v lmp_mpi ../inputs/REPLICA
 elif [ "$1" == "-s" ]; then
+  make yes-replica
   make serial
-  cp lmp_serial ../inputs/REPLICA
+  cp -v lmp_serial ../inputs/REPLICA
 else
   echo "-p or -s"
 fi
