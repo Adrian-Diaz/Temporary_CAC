@@ -56,7 +56,7 @@ void CACMinFire::setup_style()
 {
   double **v = atom->nodal_velocities[0][0];
   //int nlocal = atom->maxpoly*atom->nodes_per_element * atom->nlocal;
-  int nlocal = atom->nlocal
+  int nlocal = atom->nlocal;
   for (int i = 0; i < nlocal; i++)
     v[i][0] = v[i][1] = v[i][2] = 0.0;
 }
@@ -71,7 +71,7 @@ void CACMinFire::reset_vectors()
   // atomic dof
 
   //nvec = 3*atom->maxpoly*atom->nodes_per_element * atom->nlocal;
-  nvec = 3*atom->nlocal
+  nvec = 3*atom->nlocal;
   if (nvec) xvec = atom->nodal_positions[0][0][0];
   if (nvec) fvec = atom->nodal_forces[0][0][0];
 }
