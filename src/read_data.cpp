@@ -1735,6 +1735,7 @@ void ReadData::CAC_elements()
 	int chunk = 20;
 	int mapflag = 0;
 	char *CAC_buffer = (char*)memory->smalloc(sizeof(char) *(chunk*MAXLINE*(MAXELEMENT+1)+1), "read_data: CAC_buffer");
+  int *nodes_per_element_list = atom->nodes_per_element_list;
 	//std::ofstream myfile;
 
 	// nmax = max # of bodies to read in this chunk
@@ -1762,15 +1763,18 @@ void ReadData::CAC_elements()
 				m += strlen(&CAC_buffer[m]);
 				element_type = strtok(element_type, " \t\n\r\f");
 				if (strcmp(element_type, "Eight_Node") == 0) {
-					nodecount = 8;
+					nodecount = nodes_per_element_list[1];
+          if(npoly<1)
+          error->one(FLERR, "poly_count less than one in data file");
 				}
 				else if (strcmp(element_type, "Atom") == 0) {
 					nodecount = 1;
 					npoly = 1;
 				}
 				else {
-					error->one(FLERR, "Unexpected element type in data file");
+					error->one(FLERR, "Unexpected element type in data file, may be caused by wrong number of lines after an element header");
 				}
+        
 				// read lines one at a time into buffer and count words
 				// count to ninteger and ndouble until have enough lines
 				//comm->size_forward = 9 * nodecount*npoly + 8 + npoly;
