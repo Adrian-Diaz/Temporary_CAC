@@ -92,6 +92,9 @@ void AtomVecCAC_Charge::process_args(int narg, char **arg)
 		atom->nodes_per_element_list[1] = 8;
 	}	
 
+  //create array that tests in data_atom for odd node to iDod counts
+	memory->create(node_count_per_poly, maxpoly, "AtomVecCAC: node_count_per_poly");
+
    //minimization algorithm parameters
   //asacg_parm scgParm;
   //asa_parm sasaParm;
@@ -1526,6 +1529,7 @@ void AtomVecCAC_Charge::data_atom(double *coord, imageint imagetmp, char **value
 	for (int polycount = 0; polycount < npoly; polycount++) {
 		node_types[nlocal][polycount] = 0; //initialize
 		node_charges[nlocal][polycount] = 0; //initialize
+		node_count_per_poly[polycount]=0;
 	}
 
 
@@ -1537,19 +1541,19 @@ void AtomVecCAC_Charge::data_atom(double *coord, imageint imagetmp, char **value
 
 
 		node_index = atoi(values[m++]);
-		if (node_index <= 0 ||node_index > nodetotal)
+		if (node_index < 1 ||node_index > nodetotal)
 			error->one(FLERR, "Invalid node index in CAC_Elements section of data file");
 		poly_index = atoi(values[m++]);
-		if (poly_index <= 0 || poly_index > npoly)
+		if (poly_index < 1 || poly_index > npoly)
 			error->one(FLERR, "Invalid poly index in CAC_Elements section of data file");
 		node_index = node_index - 1;
 		poly_index = poly_index - 1;
 		node_type = atoi(values[m++]);
 		node_charge = atof(values[m++]);
+		node_count_per_poly[poly_index]++;
 		if (node_type <= 0 || node_type > atom->ntypes)
 			error->one(FLERR, "Invalid atom type in CAC_Elements section of data file");
 		 
-
 		if (node_types[nlocal][poly_index] == 0 || node_types[nlocal][poly_index] == node_type) {
 			node_types[nlocal][poly_index] = node_type;
 			node_charges[nlocal][poly_index] = node_charge;
@@ -1557,10 +1561,9 @@ void AtomVecCAC_Charge::data_atom(double *coord, imageint imagetmp, char **value
 		else {
 			error->one(FLERR, "more than one type assigned to the same poly index in an element");
 		}
-
-
-
-		
+    
+    if(node_count_per_poly[poly_index]>nodetotal)
+		error->one(FLERR, "there are more nodes for one internal DOF than the element type admits");
 
 		nodal_positions[nlocal][node_index][poly_index][0] = atof(values[m++]);
 		nodal_positions[nlocal][node_index][poly_index][1] = atof(values[m++]);
@@ -1601,6 +1604,7 @@ void AtomVecCAC_Charge::data_atom(double *coord, imageint imagetmp, char **value
 
 void AtomVecCAC_Charge::pack_data(double **buf)
 {
+	error->all(FLERR,"CAC atom style does not yet support writing data files");
   int nlocal = atom->nlocal;
 	int *nodes_count_list = atom->nodes_per_element_list;
   for (int i = 0; i < nlocal; i++) {
@@ -1650,7 +1654,8 @@ void AtomVecCAC_Charge::pack_data(double **buf)
 ------------------------------------------------------------------------- */
 
 void AtomVecCAC_Charge::write_data(FILE *fp, int n, double **buf)
-{
+{ 
+	error->all(FLERR,"CAC atom style does not yet support writing data files");
   for (int i = 0; i < n; i++)
     fprintf(fp,TAGINT_FORMAT " %d %-1.16e %-1.16e %-1.16e %d %d %d\n",
             (tagint) ubuf(buf[i][0]).i,(int) ubuf(buf[i][1]).i,

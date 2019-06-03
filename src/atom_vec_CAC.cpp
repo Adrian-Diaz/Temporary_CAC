@@ -104,6 +104,9 @@ void AtomVecCAC::process_args(int narg, char **arg)
 		atom->nodes_per_element_list[0] = 1;
 		atom->nodes_per_element_list[1] = 8;
 	}	
+  
+	//create array that tests in data_atom for odd node to iDod counts
+	memory->create(node_count_per_poly, maxpoly, "AtomVecCAC: node_count_per_poly");
 
 	  //minimization algorithm parameters
   //asacg_parm scgParm;
@@ -473,7 +476,7 @@ int AtomVecCAC::pack_comm_vel(int n, int *list, double *buf,
 		  buf[m++] = element_scale[j][1];
 		  buf[m++] = element_scale[j][2];
 		  buf[m++] = poly_count[j];
-		  for (int type_map = 0; type_map < maxpoly; type_map++) {
+		  for (int type_map = 0; type_map < poly_count[j]; type_map++) {
 			  buf[m++] = node_types[j][type_map];
 		  }
 
@@ -775,7 +778,7 @@ int AtomVecCAC::pack_border_vel(int n, int *list, double *buf,
 	  buf[m++] = element_scale[j][1];
 	  buf[m++] = element_scale[j][2];
 	  buf[m++] = poly_count[j];
-	  for (int type_map = 0; type_map < maxpoly; type_map++) {
+	  for (int type_map = 0; type_map < poly_count[j]; type_map++) {
 		  buf[m++] = node_types[j][type_map];
 	  }
 
@@ -1502,6 +1505,7 @@ void AtomVecCAC::data_atom(double *coord, imageint imagetmp, char **values)
 		error->one(FLERR, "element type requires a greater number of nodes than the specified maximum nodes per element passed to atom style CAC");
 	for (int polycount = 0; polycount < npoly; polycount++) {
 		node_types[nlocal][polycount] = 0; //initialize
+		node_count_per_poly[polycount]=0;
 	}
 
 
@@ -1513,14 +1517,15 @@ void AtomVecCAC::data_atom(double *coord, imageint imagetmp, char **values)
 
 
 		node_index = atoi(values[m++]);
-		if (node_index <= 0 ||node_index > nodetotal)
+		if (node_index < 1 ||node_index > nodetotal)
 			error->one(FLERR, "Invalid node index in CAC_Elements section of data file");
 		poly_index = atoi(values[m++]);
-		if (poly_index <= 0 || poly_index > npoly)
+		if (poly_index < 1 || poly_index > npoly)
 			error->one(FLERR, "Invalid poly index in CAC_Elements section of data file");
 		node_index = node_index - 1;
 		poly_index = poly_index - 1;
 		node_type = atoi(values[m++]);
+		node_count_per_poly[poly_index]++;
 		if (node_type <= 0 || node_type > atom->ntypes)
 			error->one(FLERR, "Invalid atom type in CAC_Elements section of data file");
 		 
@@ -1532,37 +1537,8 @@ void AtomVecCAC::data_atom(double *coord, imageint imagetmp, char **values)
 			error->one(FLERR, "more than one type assigned to the same poly index in an element");
 		}
 
-
-		
-/*
-		//search encountered types for current elements and add new type if not found
-		for (int scan_sort = 0; scan_sort < types_filled; scan_sort++) {
-			
-			if (node_type == type_map[scan_sort]) {
-				type_index = scan_sort;
-				
-				break;
-			}
-			if(scan_sort==types_filled-1) {
-				types_filled += 1;
-				if (types_filled > ntypes) {
-					error->one(FLERR, "number of element types exceeds specified number of types");
-				}
-
-				type_map[types_filled - 1] = node_type;
-				type_index = types_filled - 1;
-			}
-
-
-		}
-		
-		//add first type 
-		if (types_filled == 0) {
-			type_map[0] = node_type;
-			types_filled = 1;
-		}
-		*/
-		
+    if(node_count_per_poly[poly_index]>nodetotal)
+		error->one(FLERR, "there are more nodes for one internal DOF than the element type admits");
 
 		nodal_positions[nlocal][node_index][poly_index][0] = atof(values[m++]);
 		nodal_positions[nlocal][node_index][poly_index][1] = atof(values[m++]);
@@ -1601,6 +1577,7 @@ void AtomVecCAC::data_atom(double *coord, imageint imagetmp, char **values)
 
 void AtomVecCAC::pack_data(double **buf)
 {
+	error->all(FLERR,"CAC atom style does not yet support writing data files");
   int nlocal = atom->nlocal;
 	int *nodes_count_list = atom->nodes_per_element_list;
   for (int i = 0; i < nlocal; i++) {
@@ -1648,6 +1625,7 @@ void AtomVecCAC::pack_data(double **buf)
 
 void AtomVecCAC::write_data(FILE *fp, int n, double **buf)
 {
+	error->all(FLERR,"CAC atom style does not yet support writing data files");
   for (int i = 0; i < n; i++)
     fprintf(fp,TAGINT_FORMAT " %d %-1.16e %-1.16e %-1.16e %d %d %d\n",
             (tagint) ubuf(buf[i][0]).i,(int) ubuf(buf[i][1]).i,

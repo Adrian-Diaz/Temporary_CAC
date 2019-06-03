@@ -1474,8 +1474,11 @@ void Atom::data_CAC(int n, char *buf, tagint id_offset, int type_offset,
 	imageint imagedata;
 	double xdata[3], lamda[3];
 	double *coord;
-	char *next;
 	char *read_element_type;
+  int *nodes_per_element_list = atom->nodes_per_element_list;
+  char *next, *node_next;
+  int nwords;
+  int decline_size;
 
 	int decline = 6;
 	iptr = NULL;
@@ -1563,6 +1566,26 @@ void Atom::data_CAC(int n, char *buf, tagint id_offset, int type_offset,
 	for (int i = 0; i < n; i++) {
 		//next = strchr(buf, '\n');
 		//fix so that it can be repeated for next element
+    //count number of tokens in the element header of the first
+    //element to probe for error; expensive to do for all
+    if(i==0){
+    next = strchr(buf,'\n');
+    *next = '\0';
+    nwords = count_words(buf);
+    *next = '\n';
+    if(nwords!=6)
+    error->one(FLERR, "Incorrect element header line format in data file");
+    //count tokens in first node of first element to probe for error
+    
+    node_next = strchr(next+1,'\n');
+    *node_next = '\0';
+    nwords = count_words(next+1);
+    *node_next = '\n';
+    if(nwords!=words_per_node)
+    error->one(FLERR, "Incorrect node line format for this CAC atom style");
+    }
+   
+    
 		if (i == 0) {
 			values[0] = strtok(buf, " \t\n\r\f");
 		}
@@ -1582,18 +1605,31 @@ void Atom::data_CAC(int n, char *buf, tagint id_offset, int type_offset,
 		if (values[2] == NULL)
 			error->one(FLERR, "Incorrect atom format in data file");
 		npoly = atoi(values[2]);
+    if(npoly<1)
+      error->one(FLERR, "poly_count less than one in data file");
 		if (strcmp(read_element_type, "Eight_Node") == 0) {
-			nodecount = 8;
+			nodecount = nodes_per_element_list[1];
 		}
 		else if (strcmp(read_element_type, "Atom") == 0) {
 			nodecount = 1;
 			npoly = 1;
 		}
-
-
-
-
-		for (m = decline - 3; m < nodecount*npoly*words_per_node + decline; m++) {
+    else{
+      error->one(FLERR, "undefined element type in the data file");
+    }
+    
+    //check element scales
+    int escale;
+    for(int dimcheck=0; dimcheck<3; dimcheck++){
+    values[3+dimcheck] = strtok(NULL, " \t\n\r\f");
+			if (values[3+dimcheck] == NULL)
+				error->one(FLERR, "Incorrect atom format in data file"); 
+    escale=atoi(values[3+dimcheck]);
+    if(escale<1)
+    error->one(FLERR, "negative element scale in data file"); 
+    }
+    //count the number of tokens in each nodel line for error check
+		for (m = decline; m < nodecount*npoly*words_per_node + decline; m++) {
 			values[m] = strtok(NULL, " \t\n\r\f");
 			if (values[m] == NULL)
 				error->one(FLERR, "Incorrect atom format in data file");
