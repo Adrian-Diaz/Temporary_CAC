@@ -56,6 +56,9 @@ variables but can also include per-atom values, such as atom
 coordinates.  Thus it is easy to specify a spatially-dependent velocity
 field with optional time-dependence as well.
 
+NOTE: For finite elements an atom style variable that is a function of position
+will be evaluated by the position of the element's centroid.
+
 If the {region} keyword is used, the atom or element centroid must also 
 be in the specified geometric "region"_region.html in order to have its
 velocity altered.

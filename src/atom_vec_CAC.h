@@ -92,6 +92,7 @@ class AtomVecCAC : public AtomVec {
   double ****hold_nodal_positions;
   int max_old;
   int *node_count_per_poly;
+  char **element_names;
 };
 
 }

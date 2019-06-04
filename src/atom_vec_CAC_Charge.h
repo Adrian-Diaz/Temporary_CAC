@@ -67,6 +67,7 @@ class AtomVecCAC_Charge : public AtomVecCAC {
   int element_type_count;
   int search_range_max;
   int initial_size;
+  char **element_names;
 };
 
 }
