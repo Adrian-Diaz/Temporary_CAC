@@ -25,6 +25,8 @@
 #include <string.h>
 #include "asa_user.h"
 
+#define MAX_ELEMENT_NAME 256
+
 using namespace LAMMPS_NS;
 
 /* ---------------------------------------------------------------------- */
@@ -78,7 +80,8 @@ void AtomVecCAC::process_args(int narg, char **arg)
 {
   if (narg < 1) error->all(FLERR,"Invalid atom_style CAC command");
   if (narg > 3) error->all(FLERR,"Invalid atom_style CAC command");
-
+ 
+ 
  nodes_per_element=force->numeric(FLERR,arg[0]);
  maxpoly = force->numeric(FLERR, arg[1]);
  atom->nodes_per_element=nodes_per_element;
@@ -97,13 +100,26 @@ void AtomVecCAC::process_args(int narg, char **arg)
 
   comm->maxexchange_atom=size_border;
   
+  
+  //define element node counts and names
   if(element_type_count==0){
-		element_type_count = 2; //increase if new types added
+		atom->element_type_count=element_type_count = 3; //increase if new types added
 		 memory->grow(atom->nodes_per_element_list, element_type_count, "atom:nodes_per_element_list");
 		//define number of nodes for existing element types
 		atom->nodes_per_element_list[0] = 1;
 		atom->nodes_per_element_list[1] = 8;
+		atom->nodes_per_element_list[2] = 4;
+		//define element type names, must be less than 256 characters in length
+	  element_names=memory->grow(atom->element_names, element_type_count, MAX_ELEMENT_NAME, "atom:nodes_per_element_list");
+		strcpy(element_names[0],"Atom");
+		strcpy(element_names[1],"Eight_Node");
+		strcpy(element_names[2],"Tetrahedral");
+		//define set of element names
 	}	
+
+	
+
+
   
 	//create array that tests in data_atom for odd node to iDod counts
 	memory->create(node_count_per_poly, maxpoly, "AtomVecCAC: node_count_per_poly");
@@ -1476,19 +1492,26 @@ void AtomVecCAC::data_atom(double *coord, imageint imagetmp, char **values)
 	npoly = atoi(values[2]);
 	if (npoly > maxpoly)
 		error->one(FLERR, "poly count declared in data file was greater than maxpoly in input file");
-		//add a block for new element types; this does not have to be done in unpack restart
-		//by convention atoms are element type 0; this has nothing to do with the mass type.
-		// you should only be setting the name of your element in the read comparison check
-		// and the corresponding numerical id for this type
-	if (strcmp(element_type_read, "Eight_Node") == 0) {//add a control block for new types of elements
-		element_type[nlocal] = 1;
-		nodetotal = nodes_count_list[element_type[nlocal]];
+		
+	//loop through defined element types
+	int type_found=0;
+	for(int string_check=1; string_check < element_type_count; string_check++){
+		if (strcmp(element_type_read, element_names[string_check]) == 0){
+		type_found=1;	
+		element_type[nlocal] = string_check;
+		nodetotal = nodes_count_list[string_check];
 		poly_count[nlocal] = npoly;
 		element_scale[nlocal][0] = atoi(values[3]);
 		element_scale[nlocal][1] = atoi(values[4]);
 		element_scale[nlocal][2] = atoi(values[5]);
+		}
 	}
-	else if (strcmp(element_type_read, "Atom") == 0) {
+	//if (strcmp(element_type_read, "Eight_Node") == 0) {//add a control block for new types of elements
+		
+	//}
+	//set atom type explicitly in case default values werent set to convention
+	if (strcmp(element_type_read, "Atom") == 0) {
+		type_found=1;
 		element_type[nlocal] = 0;
 		nodetotal = nodes_count_list[element_type[nlocal]];
 		npoly = 1;
@@ -1498,8 +1521,9 @@ void AtomVecCAC::data_atom(double *coord, imageint imagetmp, char **values)
 		element_scale[nlocal][2] = 1;
 		
 	}
-	else {
-		error->one(FLERR, "element type not yet defined, add definition in atom_vec_CAC.cpp style");
+	
+	if(!type_found) {
+		error->one(FLERR, "element type not yet defined, add definition in process_args function of atom_vec_CAC.cpp style");
 	}
 	if (nodetotal > nodes_per_element)
 		error->one(FLERR, "element type requires a greater number of nodes than the specified maximum nodes per element passed to atom style CAC");

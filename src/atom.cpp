@@ -106,7 +106,7 @@ Atom::Atom(LAMMPS *lmp) : Pointers(lmp)
   dpdTheta = NULL;
 
 
-  //CAC
+  //USER-CAC
   
   nodal_positions = NULL;
   initial_nodal_positions = NULL;
@@ -136,6 +136,8 @@ Atom::Atom(LAMMPS *lmp) : Pointers(lmp)
   neighbor_weights=NULL;
   weight_count=0;
   CAC_pair_flag=0;
+  element_names=NULL;
+  element_type_count=0;
   
   // USER-MESO
 
@@ -208,7 +210,7 @@ Atom::Atom(LAMMPS *lmp) : Pointers(lmp)
   rho_flag = e_flag = cv_flag = vest_flag = 0;
   dpd_flag = edpd_flag = tdpd_flag = 0;
 
-  // CAC
+  // USER-CAC
   CAC_flag = 0;
 
   // USER-SMD
@@ -1475,7 +1477,6 @@ void Atom::data_CAC(int n, char *buf, tagint id_offset, int type_offset,
 	double xdata[3], lamda[3];
 	double *coord;
 	char *read_element_type;
-  int *nodes_per_element_list = atom->nodes_per_element_list;
   char *next, *node_next;
   int nwords;
   int decline_size;
@@ -1607,6 +1608,7 @@ void Atom::data_CAC(int n, char *buf, tagint id_offset, int type_offset,
 		npoly = atoi(values[2]);
     if(npoly<1)
       error->one(FLERR, "poly_count less than one in data file");
+      /*
 		if (strcmp(read_element_type, "Eight_Node") == 0) {
 			nodecount = nodes_per_element_list[1];
 		}
@@ -1617,7 +1619,22 @@ void Atom::data_CAC(int n, char *buf, tagint id_offset, int type_offset,
     else{
       error->one(FLERR, "undefined element type in the data file");
     }
-    
+    */
+   int type_found=0;
+	for(int string_check=1; string_check < element_type_count; string_check++){
+		if (strcmp(read_element_type, element_names[string_check]) == 0){
+		type_found=1;	
+		nodecount = nodes_per_element_list[string_check];
+		}
+	}
+  if (strcmp(read_element_type, "Atom") == 0) {
+    type_found=1;
+			nodecount = 1;
+			npoly = 1;
+	}
+  if(!type_found) {
+		error->one(FLERR, "element type not yet defined, add definition in process_args function of atom_vec_CAC.cpp style");
+	}
     //check element scales
     int escale;
     for(int dimcheck=0; dimcheck<3; dimcheck++){

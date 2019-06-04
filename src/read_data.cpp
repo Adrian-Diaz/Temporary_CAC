@@ -1736,6 +1736,8 @@ void ReadData::CAC_elements()
 	int mapflag = 0;
 	char *CAC_buffer = (char*)memory->smalloc(sizeof(char) *(chunk*MAXLINE*(MAXELEMENT+1)+1), "read_data: CAC_buffer");
   int *nodes_per_element_list = atom->nodes_per_element_list;
+  char **element_names = atom->element_names;
+  int element_type_count = atom->element_type_count;
 	//std::ofstream myfile;
 
 	// nmax = max # of bodies to read in this chunk
@@ -1762,6 +1764,7 @@ void ReadData::CAC_elements()
 				sscanf(&CAC_buffer[m], "%d %s %d", &tmp, element_type, &npoly);
 				m += strlen(&CAC_buffer[m]);
 				element_type = strtok(element_type, " \t\n\r\f");
+        /*
 				if (strcmp(element_type, "Eight_Node") == 0) {
 					nodecount = nodes_per_element_list[1];
           if(npoly<1)
@@ -1774,6 +1777,24 @@ void ReadData::CAC_elements()
 				else {
 					error->one(FLERR, "Unexpected element type in data file, may be caused by wrong number of lines after an element header");
 				}
+        */
+        int type_found=0;
+	      for(int string_check=1; string_check < element_type_count; string_check++){
+	    	if (strcmp(element_type, element_names[string_check]) == 0){
+		    type_found=1;	
+	     	nodecount = nodes_per_element_list[string_check];
+		    }
+	      }
+        if (strcmp(element_type, "Atom") == 0) {
+        type_found=1;
+		   	nodecount = 1;
+		  	npoly = 1;
+	      }
+        if(!type_found) {
+		    error->one(FLERR, "element type not yet defined, add definition in process_args function of atom_vec_CAC.cpp style");
+	      }
+        if(npoly<1)
+        error->one(FLERR, "poly_count less than one in data file");
         
 				// read lines one at a time into buffer and count words
 				// count to ninteger and ndouble until have enough lines
@@ -1853,10 +1874,8 @@ void ReadData::CAC_elements()
 		if (logfile) fprintf(logfile, "  " BIGINT_FORMAT " CAC_Elements\n", nCAC_elements);
 	}
 	*/
-
 	free (element_type);
 	free (CAC_buffer);
-
 }
 
 //----------------------------------------------------

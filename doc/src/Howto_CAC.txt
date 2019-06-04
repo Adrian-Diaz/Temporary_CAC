@@ -132,6 +132,15 @@ to explain about how to create CAC model geometries that work as intended.
 
 :line
 
+[CAC atom styles list:]
+
+currently all CAC atom styles have the same input arguments as show in the CAC 
+atom style documented in "atom style"_atom_style.html. The current list of CAC atom
+styles is:
+
+{CAC}
+{CAC/charge} :pre
+
 [The CAC input geometry:]
 
 A CAC model can involve a collection of atoms and finite elements in a discontinuous
