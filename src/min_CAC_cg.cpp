@@ -35,6 +35,8 @@
 #include "timer.h"
 #include "error.h"
 #include <string.h>
+#include "memory.h"
+
 using namespace LAMMPS_NS;
 
 // ALPHA_MAX = max alpha allowed to avoid long backtracks
@@ -59,6 +61,7 @@ CACMinCG::CACMinCG(LAMMPS *lmp) : Min(lmp)
   searchflag = 1;
   gextra = hextra = NULL;
   x0extra_atom = gextra_atom = hextra_atom = NULL;
+  copy_flag=1;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -137,15 +140,25 @@ void CACMinCG::reset_vectors()
   //original nvec count
   //nvec = 3 * atom->nlocal;
   //CAC nvec count
-	nvec = 3*atom->maxpoly*atom->nodes_per_element * atom->nlocal;
-  //if (nvec) xvec = atom->x[0];
-  //if (nvec) fvec = atom->f[0];
+  //construct a denser aligned version of nodal_positions and nodal_forces
+  //count the size of this vector
+
+  int *npoly = atom->poly_count;
+  int *nodes_per_element_list = atom->nodes_per_element_list;
+  int *element_type = atom->element_type;
+  double ****nodal_positions = atom->nodal_positions;
+  double ****nodal_forces = atom->nodal_forces;
+  double *min_x = atom->min_x;
+  double *min_f = atom->min_f;
+  nvec=atom->dense_count;
+
+
 	//lammps uses a 1D representation of N-D arrays constructed with memory->grow and memory->create
 	//as a result the algorithm here seems to just dereference up to the rank one pointer status
 	//hence the three dereferences for the 4-D array
 	//nvec will loop over all elements of the array with that size
-  if (nvec) xvec = atom->nodal_positions[0][0][0];
-  if (nvec) fvec = atom->nodal_gradients[0][0][0];
+  if (nvec) xvec = min_x;
+  if (nvec) fvec = min_f;
   //if you want to use the computed nodal forces instead of energy gradients comment out gradients
   //and uncomment the forces below
 	//if (nvec) fvec = atom->nodal_forces[0][0][0];
@@ -168,6 +181,63 @@ void CACMinCG::reset_vectors()
 }
 
 /* ----------------------------------------------------------------------
+   copy dense arrays to atomvec arrays for energy_force evaluation
+------------------------------------------------------------------------- */
+
+void CACMinCG::copy_vectors(){
+int *npoly = atom->poly_count;
+  int *nodes_per_element_list = atom->nodes_per_element_list;
+  int *element_type = atom->element_type;
+  double ****nodal_positions = atom->nodal_positions;
+  double ****nodal_forces = atom->nodal_forces;
+  double *min_x = atom->min_x;
+  double *min_f = atom->min_f;
+  double **x = atom->x;
+  int nodes_per_element;
+
+
+
+  //copy contents to these vectors
+  int dense_count_x=0;
+  int dense_count_f=0;
+  for(int element_counter=0; element_counter < atom->nlocal; element_counter++){
+     for(int node_counter=0; node_counter < nodes_per_element_list[element_type[element_counter]]; node_counter++){
+       for(int poly_counter=0; poly_counter < npoly[element_counter]; poly_counter++){
+         nodal_positions[element_counter][node_counter][poly_counter][0] = min_x[dense_count_x++];
+         nodal_positions[element_counter][node_counter][poly_counter][1] = min_x[dense_count_x++];
+         nodal_positions[element_counter][node_counter][poly_counter][2] = min_x[dense_count_x++];
+         nodal_forces[element_counter][node_counter][poly_counter][0] = min_f[dense_count_f++];
+         nodal_forces[element_counter][node_counter][poly_counter][1] = min_f[dense_count_f++];
+         nodal_forces[element_counter][node_counter][poly_counter][2] = min_f[dense_count_f++];
+       }
+     }
+  }
+
+    // update x for elements and atoms using nodal variables
+  for (int i = 0; i < atom->nlocal; i++){
+		//determine element type
+
+	  nodes_per_element=nodes_per_element_list[element_type[i]];
+		x[i][0] = 0;
+		x[i][1] = 0;
+		x[i][2] = 0;
+
+    for(int k=0; k<nodes_per_element; k++){
+		for (int poly_counter = 0; poly_counter < npoly[i];poly_counter++) {
+			
+				x[i][0] += nodal_positions[i][k][poly_counter][0];
+				x[i][1] += nodal_positions[i][k][poly_counter][1];
+				x[i][2] += nodal_positions[i][k][poly_counter][2];
+			}
+		}
+	x[i][0] = x[i][0] / nodes_per_element / npoly[i];
+	x[i][1] = x[i][1] / nodes_per_element / npoly[i];
+	x[i][2] = x[i][2] / nodes_per_element / npoly[i];
+  }
+
+}
+
+/* ----------------------------------------------------------------------
 minimization via conjugate gradient iterations
 ------------------------------------------------------------------------- */
 
@@ -176,7 +246,9 @@ int CACMinCG::iterate(int maxiter)
 	int i, m, n, fail, ntimestep;
 	double beta, gg, dot[2], dotall[2];
 	double *fatom, *gatom, *hatom;
-
+  nvec=atom->dense_count; //needed for setup step so nvec isn't zero
+  if (nvec) xvec = atom->min_x;
+  if (nvec) fvec = atom->min_f;
 	// nlimit = max # of CG iterations before restarting
 	// set to ndoftotal unless too big
 
@@ -430,6 +502,7 @@ int CACMinCG::linemin_backtrack(double eoriginal, double &alpha)
     if (de <= de_ideal) {
       if (nextra_global) {
         int itmp = modify->min_reset_ref();
+        //if (itmp) copy_vectors();
         if (itmp) ecurrent = energy_force(1);
       }
       return 0;
@@ -633,6 +706,7 @@ int CACMinCG::linemin_quadratic(double eoriginal, double &alpha)
       if (ecurrent - eoriginal < EMACH) {
         if (nextra_global) {
           int itmp = modify->min_reset_ref();
+          //if (itmp) copy_vectors();
           if (itmp) ecurrent = energy_force(1);
         }
         return 0;
@@ -647,6 +721,7 @@ int CACMinCG::linemin_quadratic(double eoriginal, double &alpha)
     if (de <= de_ideal) {
       if (nextra_global) {
         int itmp = modify->min_reset_ref();
+        //if (itmp) copy_vectors();
         if (itmp) ecurrent = energy_force(1);
       }
       return 0;
@@ -891,6 +966,7 @@ int CACMinCG::linemin_forcezero(double eoriginal, double &alpha)
       alpha -= alpha_del;
       if (nextra_global) {
         int itmp = modify->min_reset_ref();
+        //if (itmp) copy_vectors();
         if (itmp) ecurrent = energy_force(1);
       }
 
@@ -927,6 +1003,7 @@ int CACMinCG::linemin_forcezero(double eoriginal, double &alpha)
     if ((!backtrack) && (fabs(fhCurr/fhoriginal) <= GRAD_TOL)) {
       if (nextra_global) {
         int itmp = modify->min_reset_ref();
+        //if (itmp) copy_vectors();
         if (itmp) ecurrent = energy_force(1);
       }
 
@@ -1007,12 +1084,7 @@ double CACMinCG::alpha_step(double alpha, int resetflag)
 {
   int i,n,m;
   double *xatom,*x0atom,*hatom;
-double ****nodal_positions=atom->nodal_positions;
- double **x = atom->x;
- int *element_type = atom->element_type;
-  int *poly_count = atom->poly_count;
-  int *nodes_count_list = atom->nodes_per_element_list;
-  int nodes_per_element;
+
   // reset to starting point
 
   if (nextra_global) modify->min_step(0.0,hextra);
@@ -1042,39 +1114,11 @@ double ****nodal_positions=atom->nodal_positions;
   }
 
  
-  // update x for elements and atoms using nodal variables
-  for (int i = 0; i < atom->nlocal; i++){
-		//determine element type
-
-    nodes_per_element = nodes_count_list[element_type[i]];
-	
-		x[i][0] = 0;
-		x[i][1] = 0;
-		x[i][2] = 0;
-
-    for(int k=0; k<nodes_per_element; k++){
-		for (int poly_counter = 0; poly_counter < poly_count[i];poly_counter++) {
-			
-				x[i][0] += nodal_positions[i][k][poly_counter][0];
-				x[i][1] += nodal_positions[i][k][poly_counter][1];
-				x[i][2] += nodal_positions[i][k][poly_counter][2];
-			}
-		}
-	x[i][0] = x[i][0] / nodes_per_element / poly_count[i];
-	x[i][1] = x[i][1] / nodes_per_element / poly_count[i];
-	x[i][2] = x[i][2] / nodes_per_element / poly_count[i];
-
-    
-
-
-
-      }
-
-
 
   //
   // compute and return new energy
   neval++;
+  //copy_vectors();
   return energy_force(resetflag);
 }
 

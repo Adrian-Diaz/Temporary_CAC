@@ -123,6 +123,7 @@ Atom::Atom(LAMMPS *lmp) : Pointers(lmp)
   scale_list = NULL;
   eboxes = NULL;
   ebox_ref = NULL;
+  min_x = min_f = min_v = NULL;
   scale_count=0;
   CAC_cut=0;
   max_search_range=0;
@@ -138,6 +139,8 @@ Atom::Atom(LAMMPS *lmp) : Pointers(lmp)
   CAC_pair_flag=0;
   element_names=NULL;
   element_type_count=0;
+  dense_count=0;
+  outer_neigh_flag=0;
   
   // USER-MESO
 
@@ -317,6 +320,9 @@ Atom::~Atom()
   memory->destroy(element_scale);
   memory->destroy(element_type);
   memory->destroy(nodes_per_element_list);
+  memory->destroy(min_x);
+  memory->destroy(min_v);
+  memory->destroy(min_f);
 
   memory->destroy(vfrac);
   memory->destroy(s0);
