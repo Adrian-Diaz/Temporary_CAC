@@ -322,7 +322,7 @@ void PairCACEAM::init_style()
 	maxneigh_quad_outer = MAXNEIGH1;
 	file2array();
 	array2spline();
-	
+
   atom->outer_neigh_flag=1;
 	int irequest = neighbor->request(this, instance_me);
   neighbor->requests[irequest]->half = 0;
@@ -1100,12 +1100,7 @@ int distanceflag=0;
 		p = MIN(p, 1.0);
 		coeff = frho_spline[type2frho[scan_type]][m];
 		fp[l+1] = (coeff[0] * p + coeff[1])*p + coeff[2];
-    if (quad_eflag){
-		phi = ((coeff[3]*p + coeff[4])*p + coeff[5])*p + coeff[6];
-		if (rho[0] > rhomax) phi += fp[0] * (rho[0]-rhomax);
- 		phi *= scale[origin_type][scan_type];
-  		quadrature_energy += phi;
-	 }
+
 	}
 	//compute force contribution
 	for (int l = 0; l < neigh_max_inner; l++) {
