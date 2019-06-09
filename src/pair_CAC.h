@@ -159,12 +159,13 @@ class PairCAC : public Pair {
   int quad_list_counter;
   int local_inner_max;
 	int local_outer_max;
+  int densemax;
+
 	virtual void allocate();
 	virtual void read_file(char *) {}
   virtual void array2spline(){}
   virtual void file2array(){}
-
-
+  void copy_vectors(int copymode);
 
   //further CAC functions 
   //double density_map(double);

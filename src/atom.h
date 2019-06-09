@@ -98,8 +98,10 @@ class Atom : protected Pointers {
     , initial_size, neboxes, local_neboxes, nforeign_eboxes, *ebox_ref;
   int neigh_weight_flag, **neighbor_weights, quadrature_node_count;
   double CAC_cut, CAC_skin, max_search_range;				//used by npair_CAC styles
-  int one_layer_flag, weight_count,CAC_pair_flag, element_type_count;
+  int one_layer_flag, weight_count,CAC_pair_flag, element_type_count, outer_neigh_flag;
   char **element_names;
+  double *min_x, *min_v, *min_f; //used by CAC min styles
+  int dense_count; //used when minimizing with CAC styles
 
   // USER-DPD package
 

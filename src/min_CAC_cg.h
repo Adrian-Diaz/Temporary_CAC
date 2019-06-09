@@ -31,7 +31,7 @@ class CACMinCG : public Min {
   void init();
   void setup_style();
   void reset_vectors();
-  int iterate(int);
+  virtual int iterate(int);
  protected:
   // vectors needed by linesearch minimizers
   // allocated and stored by fix_minimize
@@ -48,6 +48,7 @@ class CACMinCG : public Min {
   double **gextra_atom;
   double **hextra_atom;
 
+
   typedef int (CACMinCG::*FnPtr)(double, double &);
   FnPtr linemin;
   int linemin_backtrack(double, double &);
@@ -56,6 +57,7 @@ class CACMinCG : public Min {
 
   double alpha_step(double, int);
   double compute_dir_deriv(double &);
+  virtual void copy_vectors();
 };
 
 }

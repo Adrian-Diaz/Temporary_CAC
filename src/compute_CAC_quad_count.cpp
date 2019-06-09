@@ -24,7 +24,7 @@
 #include "error.h"
 #include <math.h>
 
-#define QUADSCALE  1.0 //adhoc scaling used to offset the fact that quadrature points
+#define QUADSCALE  1.5 //adhoc scaling used to offset the fact that quadrature points
 #define QUADSCALE2  0 //adhoc scaling used to offset the fact that quadrature points
 #define MAXNEIGH   1000 //used to divide weights so they aren't such large numbers
 //for elements are more expensive due to the tendency to have more nodal interpolation
@@ -126,7 +126,11 @@ void ComputeCACQuadCount::compute_peratom()
 	  }
 	}
 	else{
-    quad_count[i]=neighbor_weights[i][0]+QUADSCALE*neighbor_weights[i][1]+QUADSCALE2*neighbor_weights[i][2];
+    //quad_count[i]=neighbor_weights[i][0]+QUADSCALE*neighbor_weights[i][1]+QUADSCALE2*neighbor_weights[i][2];
+		if(atom->outer_neigh_flag)
+		quad_count[i]=neighbor_weights[i][0]+neighbor_weights[i][1];
+		else
+		quad_count[i]=neighbor_weights[i][0]+neighbor_weights[i][1]+QUADSCALE*neighbor_weights[i][1]+QUADSCALE2*neighbor_weights[i][2];
 	}
   }
 	atom->neigh_weight_flag=0;

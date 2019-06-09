@@ -234,7 +234,7 @@ void PairCACSW::init_style()
   if (atom->tag_enable == 0)
     error->all(FLERR,"Pair style CAC_LJ requires atom IDs");
 
-
+  atom->outer_neigh_flag=1;
   // need a full neighbor list
 
   int irequest = neighbor->request(this,instance_me);

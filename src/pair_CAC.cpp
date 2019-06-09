@@ -83,6 +83,7 @@ PairCAC::PairCAC(LAMMPS *lmp) : Pair(lmp)
 	cgParm=NULL;
   asaParm=NULL;
   Objective=NULL;
+  densemax=0;
 	neighbor->pgsize=10;
 	neighbor->oneatom=1;
 	old_atom_count=0;
@@ -226,9 +227,6 @@ void PairCAC::compute(int eflag, int vflag) {
 	int *nodes_count_list = atom->nodes_per_element_list;	
   quad_eflag = eflag;
   cutoff_skin = neighbor->skin;
-  
-  
-
   
   reneighbor_time = neighbor->lastcall;
 	if (update->ntimestep == reneighbor_time||update->whichflag==2){
@@ -408,6 +406,8 @@ void PairCAC::compute(int eflag, int vflag) {
 		}
 
   if (vflag_fdotr) virial_fdotr_compute();
+  if(update->whichflag==2)
+  copy_vectors(1);
 }
 
 /* ----------------------------------------------------------------------
@@ -693,6 +693,7 @@ void PairCAC::compute_forcev(int iii){
 	unit_cell_mapped[0] = 2 / double(current_element_scale[0]);
 	unit_cell_mapped[1] = 2 / double(current_element_scale[1]);
 	unit_cell_mapped[2] = 2 / double(current_element_scale[2]);
+	double iso_volume=unit_cell_mapped[0]*unit_cell_mapped[1]*unit_cell_mapped[2];
 
 	nodes_per_element = nodes_count_list[current_element_type];
 	for (int js = 0; js<nodes_per_element; js++) {
@@ -778,7 +779,7 @@ void PairCAC::compute_forcev(int iii){
 						}
 					}
 					if (quad_eflag) {
-						element_energy += coefficients*quadrature_energy;
+						element_energy += coefficients*quadrature_energy/iso_volume;
 					}
 
 
@@ -842,7 +843,7 @@ void PairCAC::compute_forcev(int iii){
 						}
 
 						if (quad_eflag) {
-							element_energy += coefficients*quadrature_energy;
+							element_energy += coefficients*quadrature_energy/iso_volume;
 						}
 
 					}
@@ -899,7 +900,7 @@ void PairCAC::compute_forcev(int iii){
 						}
 
 						if (quad_eflag) {
-							element_energy += coefficients*quadrature_energy;
+							element_energy += coefficients*quadrature_energy/iso_volume;
 						}
 
 					}
@@ -953,7 +954,7 @@ void PairCAC::compute_forcev(int iii){
 						}
 
 						if (quad_eflag) {
-							element_energy += coefficients*quadrature_energy;
+							element_energy += coefficients*quadrature_energy/iso_volume;
 						}
 
 					}
@@ -1138,7 +1139,7 @@ void PairCAC::compute_forcev(int iii){
 						}
 
 						if (quad_eflag) {
-							element_energy += coefficients*quadrature_energy;
+							element_energy += coefficients*quadrature_energy/iso_volume;
 						}
 
 					}
@@ -1223,7 +1224,7 @@ void PairCAC::compute_forcev(int iii){
 						}
 
 						if (quad_eflag) {
-							element_energy += coefficients*quadrature_energy;
+							element_energy += coefficients*quadrature_energy/iso_volume;
 						}
 
 					}
@@ -3374,68 +3375,69 @@ void PairCAC::allocate_surface_counts() {
 	nmax = atom->nlocal;
 }
 
-/*double PairSPHLJ::LJEOS2(double rho, double e, double cv) {
+/* ----------------------------------------------------------------------
+   copy dense arrays to atomvec arrays for energy_force evaluation
+------------------------------------------------------------------------- */
 
+void PairCAC::copy_vectors(int copymode){
+int *npoly = atom->poly_count;
+  int *nodes_per_element_list = atom->nodes_per_element_list;
+  int *element_type = atom->element_type;
+  double ****nodal_positions = atom->nodal_positions;
+  double ****nodal_velocities = atom->nodal_velocities;
+  double ****nodal_forces = atom->nodal_forces;
+  double *min_x = atom->min_x;
+  double *min_v = atom->min_x;
+  double *min_f = atom->min_f;
+  atom->dense_count=0;
 
-  double T = e / cv;
-  if (T < 1.e-2) T = 1.e-2;
-  //printf("%f %f\n", T, rho);
-  double iT = 0.1e1 / T;
-  //double itpow1_4 = exp(0.25 * log(iT)); //pow(iT, 0.1e1 / 0.4e1);
-  double itpow1_4 = pow(iT, 0.1e1 / 0.4e1);
-  double x = rho * itpow1_4;
-  double xsq = x * x;
-  double xpow3 = xsq * x;
-  double xpow4 = xsq * xsq;
-  double xpow9 = xpow3 * xpow3 * xpow3;
+  
+  //copy contents of min vectors to the avec arrays and vice versa
+  int dense_count_x=0;
+  int dense_count_v=0;
+  int dense_count_f=0;
+  if(copymode==0){
+  for(int element_counter=0; element_counter < atom->nlocal; element_counter++){
+     for(int node_counter=0; node_counter < nodes_per_element_list[element_type[element_counter]]; node_counter++){
+       for(int poly_counter=0; poly_counter < npoly[element_counter]; poly_counter++){
+         nodal_positions[element_counter][node_counter][poly_counter][0] = min_x[dense_count_x++];
+         nodal_positions[element_counter][node_counter][poly_counter][1] = min_x[dense_count_x++];
+         nodal_positions[element_counter][node_counter][poly_counter][2] = min_x[dense_count_x++];
+         nodal_forces[element_counter][node_counter][poly_counter][0] = min_f[dense_count_f++];
+         nodal_forces[element_counter][node_counter][poly_counter][1] = min_f[dense_count_f++];
+         nodal_forces[element_counter][node_counter][poly_counter][2] = min_f[dense_count_f++];
+       }
+     }
+  }
+  }
+  if(copymode==1){
+   for(int element_counter=0; element_counter < atom->nlocal; element_counter++){
+     atom->dense_count+=3*npoly[element_counter]*nodes_per_element_list[element_type[element_counter]];
+  }
+  
+  //grow the dense aligned vectors
+  if(atom->dense_count>densemax){
+  min_x = memory->grow(atom->min_x,atom->dense_count,"min_CAC_cg:min_x");
+  min_v = memory->grow(atom->min_v,atom->dense_count,"min_CAC_cg:min_x");
+  min_f = memory->grow(atom->min_f,atom->dense_count,"min_CAC_cg:min_f");
+  densemax=atom->dense_count;
+  }
 
+  for(int element_counter=0; element_counter < atom->nlocal; element_counter++){
+     for(int node_counter=0; node_counter < nodes_per_element_list[element_type[element_counter]]; node_counter++){
+       for(int poly_counter=0; poly_counter < npoly[element_counter]; poly_counter++){
+         min_x[dense_count_x++] = nodal_positions[element_counter][node_counter][poly_counter][0];
+         min_x[dense_count_x++] = nodal_positions[element_counter][node_counter][poly_counter][1];
+         min_x[dense_count_x++] = nodal_positions[element_counter][node_counter][poly_counter][2];
+		 min_v[dense_count_v++] = nodal_velocities[element_counter][node_counter][poly_counter][0];
+         min_v[dense_count_v++] = nodal_velocities[element_counter][node_counter][poly_counter][1];
+         min_v[dense_count_v++] = nodal_velocities[element_counter][node_counter][poly_counter][2];
+         min_f[dense_count_f++] = nodal_forces[element_counter][node_counter][poly_counter][0];
+         min_f[dense_count_f++] = nodal_forces[element_counter][node_counter][poly_counter][1];
+         min_f[dense_count_f++] = nodal_forces[element_counter][node_counter][poly_counter][2];
+       }
+     }
+  }
+  }
 
-  return (0.1e1 + rho * (0.3629e1 + 0.7264e1 * x + 0.104925e2 * xsq + 0.11460e2
-      * xpow3 + 0.21760e1 * xpow9 - itpow1_4 * itpow1_4 * (0.5369e1 + 0.13160e2
-      * x + 0.18525e2 * xsq - 0.17076e2 * xpow3 + 0.9320e1 * xpow4) + iT
-      * (-0.3492e1 + 0.18698e2 * x - 0.35505e2 * xsq + 0.31816e2 * xpow3
-          - 0.11195e2 * xpow4)) * itpow1_4) * rho * T;
-}*/
-
-
-/* --------------------------------------------------------------------------------------------- */
-/* Lennard-Jones EOS,
-   Francis H. Ree
-   "Analytic representation of thermodynamic data for the Lennard‐Jones fluid",
-   Journal of Chemical Physics 73 pp. 5401-5403 (1980)
-*/
-
-
-
-/* ------------------------------------------------------------------------------ */
-
-/* Jirí Kolafa, Ivo Nezbeda
- * "The Lennard-Jones fluid: an accurate analytic and theoretically-based equation of state",
- *  Fluid Phase Equilibria 100 pp. 1-34 (1994) */
-/*double PairSPHLJ::LJEOS2(double rho, double e, double cv) {
- double T = e / cv;
-
- double sT = sqrt(T);
- double isT = 1.0 / sT;
- double dC = -0.063920968 * log(T) + 0.011117524 / T - 0.076383859 / sT
- + 1.080142248 + 0.000693129 * sT;
- double eta = 3.141592654 / 6. * rho * (dC * dC * dC);
- double zHS = (1 + eta * (1 + eta * (1 - eta / 1.5 * (1 + eta))))
- / ((1. - eta) * (1. - eta) * (1. - eta));
- double BC = (((((-0.58544978 * isT + 0.43102052) * isT + .87361369) * isT
- - 4.13749995) * isT + 2.90616279) * isT - 7.02181962) / T + 0.02459877;
- double gammaBH = 1.92907278;
-
- double sum = ((2.01546797 * 2 + rho * ((-28.17881636) * 3 + rho
- * (28.28313847 * 4 + rho * (-10.42402873) * 5))) + (-19.58371655 * 2
- + rho * (+75.62340289 * 3 + rho * ((-120.70586598) * 4 + rho
- * (+93.92740328 * 5 + rho * (-27.37737354) * 6)))) / sqrt(T)
- + ((29.34470520 * 2 + rho * ((-112.35356937) * 3 + rho * (+170.64908980
- * 4 + rho * ((-123.06669187) * 5 + rho * 34.42288969 * 6))))
- + ((-13.37031968) * 2 + rho * (65.38059570 * 3 + rho
- * ((-115.09233113) * 4 + rho * (88.91973082 * 5 + rho
- * (-25.62099890) * 6)))) / T) / T) * rho * rho;
- return ((zHS + BC / exp(gammaBH * rho * rho) * rho * (1 - 2 * gammaBH * rho
- * rho)) * T + sum) * rho;
- }
-*/
+}
