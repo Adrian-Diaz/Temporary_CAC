@@ -28,5 +28,5 @@ pair_style CAC/eam
 pair_coeff * * Cu_u3.eam
 dump          2 all CAC/xyz 50 cac.xyz
 
-min_style	CAC_fire
+min_style	CAC_cg
 minimize	1e-14 0.0 1000 10000

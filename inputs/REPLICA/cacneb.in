@@ -2,12 +2,12 @@ echo 			both
 units			metal
 dimension		3
 boundary		p p p
-atom_style     	CAC 1 1
+atom_style     	CAC 8 4
 comm_style	CAC
 atom_modify		map array sort 0 0
 
 newton			off
-read_data		cacinit.dat
+read_data		Cu_mixed.cac
 
 
 variable		u uloop 31 # for NEB per-replica output
@@ -18,10 +18,10 @@ pair_coeff 		* * Cu_u3.eam
 group			vac id 252 
 delete_atoms		group vac
 
-fix				1 all neb_CAC 1.0 perp 1.0 end last 1.0
+fix				1 all CAC/neb 1.0 perp 1.0 end last 1.0
 variable		this_u equal $u-1
 dump 			1 all cfg 10000 *_${this_u}.cfg mass type xs ys zs
 dump_modify		1 element Cu
-
-min_style 			CAC_quickmin
-neb_CAC 			1e-16 0.0 10000 10000 500 final cac.last
+dump			2 all CAC/xyz 100 cac*_${this_u}.xyz
+min_style 			CAC/fire
+CAC/neb 			1e-16 0.0 10000 10000 500 final cac.last
