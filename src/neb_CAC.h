@@ -13,7 +13,7 @@
 
 #ifdef COMMAND_CLASS
 
-CommandStyle(neb_CAC,NEBCAC)
+CommandStyle(CAC/neb,NEBCAC)
 
 #else
 

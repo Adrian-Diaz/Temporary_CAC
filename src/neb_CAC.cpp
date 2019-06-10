@@ -184,8 +184,8 @@ void NEBCAC::run()
 
   int ineb;
   for (ineb = 0; ineb < modify->nfix; ineb++)
-    if (strcmp(modify->fix[ineb]->style,"neb_CAC") == 0) break;
-  if (ineb == modify->nfix) error->all(FLERR,"CAC-NEB requires use of fix neb_CAC");
+    if (strcmp(modify->fix[ineb]->style,"CAC/neb") == 0) break;
+  if (ineb == modify->nfix) error->all(FLERR,"CAC-NEB requires use of fix CAC/neb");
 
   fneb = (FixNEBCAC *) modify->fix[ineb];
   if (verbose) numall =7;
@@ -266,10 +266,7 @@ void NEBCAC::run()
     if (update->minimize->stop_condition) break;
   }
   // printf("Energy (%i): %f", me_universe, update->minimize->einitial);
-  //   //   Debug block
-  //   volatile int qq = 0;
-  //   printf("set var qq = 1");
-  //   while (qq == 0){}
+
   timer->barrier_stop();
 
   // update->minimize->cleanup();
@@ -399,7 +396,7 @@ void NEBCAC::readfile(char *file, int flag)
   // flag = 0, universe root reads header of file, bcast to universe
   // flag = 1, each replica's root reads header of file, bcast to world
   //   but explicitly skip first replica
-
+  // nlines in the CAC case is the number of full CAC elements to read
   if (flag == 0) {
     if (me_universe == 0) {
       open(file);
@@ -506,20 +503,26 @@ void NEBCAC::readfile(char *file, int flag)
       //     its image flags will then be adjusted
       tag = ATOTAGINT(values[0]);
       m = atom->map(tag);
-      if (m >= 0 && m < nlocal) {
+      if (m >= 0 && m < atom->nlocal) {
+        ncount++;
         x[m][0] = x[m][1] = x[m][2] = 0;
-        for (int p = 0; p < nodecount; p++) {
-          for (int k = 0; k < npoly; k++){
-            ncount++;
-            index = 9 + p*npoly + k*decline;
+        for (int k = 0; k < npoly; k++){  
+          for (int p = 0; p < nodecount; p++) {          
+            index = 9 + k*nodecount*decline + p*decline;
             xx = atof(values[index]);
             yy = atof(values[index+1]);
             zz = atof(values[index+2]);
-            
+
             if (flag == 0) {
               delx = xx - xnodes[m][p][k][0];
               dely = yy - xnodes[m][p][k][1];
               delz = zz - xnodes[m][p][k][2];
+              //if(delx < 0 || dely < 0 || delz < 0){
+                // printf("%f, %f, %f\n", xx, yy, zz);
+                // printf("%f, %f, %f\n", delx, dely, delz);
+                // printf("%f, %f, %f\n", xnodes[m][p][k][0], xnodes[m][p][k][1], xnodes[m][p][k][2]);
+                // printf("m=%d, k=%d, p=%d, index=%d, d=%d\n\n", m, k, p, index,decline);
+              //}
               domain->minimum_image(delx,dely,delz);
               xnodes[m][p][k][0] += fraction*delx;
               xnodes[m][p][k][1] += fraction*dely;
@@ -544,17 +547,20 @@ void NEBCAC::readfile(char *file, int flag)
     nread += nchunk;
   }
 
-
+            //   Debug block
+            // volatile int qq = 0;
+            // printf("set var qq = 1");
+            // while (qq == 0){}
   // check that all IDs in file were found by a proc
 
   if (flag == 0) {
     int ntotal;
-    MPI_Allreduce(&ncount,&ntotal,1,MPI_INT,MPI_SUM,uworld);
+    MPI_Allreduce(&nread,&ntotal,1,MPI_INT,MPI_SUM,uworld);
     if (ntotal != nreplica*nlines)
       error->universe_all(FLERR,"Invalid atom IDs in neb file");
   } else {
     int ntotal;
-    MPI_Allreduce(&ncount,&ntotal,1,MPI_INT,MPI_SUM,world);
+    MPI_Allreduce(&nread,&ntotal,1,MPI_INT,MPI_SUM,world);
     if (ntotal != nlines)
       error->all(FLERR,"Invalid atom IDs in neb file");
   }
