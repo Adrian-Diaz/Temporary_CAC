@@ -109,6 +109,8 @@ Atom::Atom(LAMMPS *lmp) : Pointers(lmp)
   //USER-CAC
   
   nodal_positions = NULL;
+  maxpoly = 0;
+  nodes_per_element = 0;
   initial_nodal_positions = NULL;
   nodal_velocities = NULL;
   nodal_forces = NULL;

@@ -171,7 +171,13 @@ void CommCAC::init_buffers()
 void CommCAC::init()
 {
   Comm::init();
+  
+    // temporary restrictions
 
+  if (triclinic)
+    error->all(FLERR,"Cannot yet use comm_style CAC with triclinic box");
+  if (mode == Comm::MULTI)
+    error->all(FLERR,"Cannot yet use comm_style CAC with multi comm option");
   // memory for multi-style communication
  int maxswap = 26;
   if (mode == Comm::MULTI) {
@@ -182,10 +188,6 @@ void CommCAC::init()
     memory->destroy(cutghostmulti);
   }
 
-  // temporary restrictions
-
-  if (triclinic)
-    error->all(FLERR,"Cannot yet use comm_style CAC with triclinic box");
 
 
 
@@ -1749,6 +1751,12 @@ void CommCAC::borders()
   
         
      }
+  //check if buffer is sized large enough 
+  int bufextra_old = bufextra;
+  maxexchange = maxexchange_atom + maxexchange_fix;
+  bufextra = maxexchange + BUFEXTRA;
+  if (bufextra > bufextra_old)
+   memory->grow(buf_send,maxsend+bufextra,"comm:buf_send");
   
   nforeign_eboxes=0;
   //communicate all overlapping elements in all 6 swaps first to modify all sendboxes as needed

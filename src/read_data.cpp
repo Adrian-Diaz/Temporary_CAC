@@ -53,7 +53,6 @@ using namespace LAMMPS_NS;
 #define CHUNK 1024
 #define DELTA 4            // must be 2 or larger
 #define MAXBODY 32         // max # of lines in one body
-#define MAXELEMENT 100      // max # of lines in one element
 // customize for new sections
                            // customize for new sections
 #define NSECTIONS 26       // change when add to header::section_keywords
@@ -1734,7 +1733,8 @@ void ReadData::CAC_elements()
 	char *element_type = (char*)memory->smalloc(sizeof(char) * 20, "read_data: element type string");
 	int chunk = 20;
 	int mapflag = 0;
-	char *CAC_buffer = (char*)memory->smalloc(sizeof(char) *(chunk*MAXLINE*(MAXELEMENT+1)+1), "read_data: CAC_buffer");
+  int maxelement = 2*(atom->maxpoly*atom->nodes_per_element);
+	char *CAC_buffer = (char*)memory->smalloc(sizeof(char) *(chunk*MAXLINE*(maxelement+1)+1), "read_data: CAC_buffer");
   int *nodes_per_element_list = atom->nodes_per_element_list;
   char **element_names = atom->element_names;
   int element_type_count = atom->element_type_count;
@@ -1808,9 +1808,9 @@ void ReadData::CAC_elements()
 					if (eof == NULL) error->one(FLERR, "Unexpected end of data file");
 
 					m += strlen(&CAC_buffer[m]);
-					if (nlineinner + 1 >= MAXELEMENT)
+					if (nlineinner + 1 >= maxelement)
 						error->one(FLERR,
-							"Too many lines in one element in data file - increase MAXELEMENT in read_data.cpp");
+							"Too many lines in one element in data file - increase maxpoly or max nodes per element for atom style CAC");
 
 
 
