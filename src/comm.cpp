@@ -156,6 +156,9 @@ void Comm::copy_arrays(Comm *oldcomm)
     outfile = new char[n];
     strcpy(outfile,oldcomm->outfile);
   }
+  maxexchange_atom = oldcomm->maxexchange_atom;
+  maxexchange_fix = oldcomm->maxexchange_fix;
+
 }
 
 /* ----------------------------------------------------------------------
