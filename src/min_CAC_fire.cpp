@@ -230,17 +230,21 @@ int CACMinFire::iterate(int maxiter)
     } else {
 
         int dense = 0;
-        // nodal loops required to get mass (?)
+        // nodal loops required to get mass
         for(int element_counter=0; element_counter < atom->nlocal; element_counter++) {
           for(int node_counter=0; node_counter < nodes_per_element_list[element_type[element_counter]]; node_counter++){
             for (int poly_counter = 0; poly_counter < npoly[element_counter]; poly_counter++) {
               dtfm = dtf / mass[node_types[element_counter][poly_counter]];
               dense += element_counter + node_counter + poly_counter; 
-              for (int k = 0; k < 3; k ++){
-                x[dense+k] += dtv * v[dense+k];
-                v[dense+k] += dtfm * f[dense+k];
-                dense++;
-              }
+
+              x[dense+0] += dtv * v[dense+0];
+              x[dense+1] += dtv * v[dense+1];
+              x[dense+2] += dtv * v[dense+2];              
+              v[dense+0] += dtfm * f[dense+0];
+              v[dense+1] += dtfm * f[dense+1];
+              v[dense+2] += dtfm * f[dense+2];
+
+              dense+=2;
             }
           }
         }
