@@ -262,6 +262,7 @@ fix_CAC_nve.html
 fix_CAC_viscous.html
 fix_CAC_setvelocity.html
 fix_CAC_setforce.html
+fix_CAC_addforce.html
 fix_CAC_temp_rescale.html
 fix_client_md.html
 fix_cmap.html

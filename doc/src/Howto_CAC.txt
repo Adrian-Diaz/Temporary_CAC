@@ -12,20 +12,27 @@ CAC method :h3
 [Overview:]
 
 The Concurrent Atomistic Continuum (CAC) method, as implemented in LAMMPS,
-is a Finite Element Method (FEM) that consistently solves systems with 
-both coarse grained regions and atomistic regions. This is done by solving
-a non-local force density at all finite elements, and the typical particle force
-at atoms, using the interatomic potential as in Molecular Dynamics. The theoretical
-framework that makes this possible is the Continuum Balance Law of Momentum; thus with
+is a concurrent multiscale method implemented using the Finite Element 
+Method (FEM) that consistently solves systems with 
+both coarsely-meshed, using finite elements, and atomistic regions. This is achieved by defining
+a non-local force density at all finite elements, as well as the typical particle force
+at atoms, using the interatomic potentials that are ubiquitous in Molecular Dynamics. The theoretical
+framework that makes this possible is an atomistic formulation of the field representation
+of conservation laws; this formulation is constructed around the concepts of discontinuous atomic
+level structures and non-local atomic interaction as presented in "(Chen)"_#USER-CAC-Chen. Thus, with
 no additional treatment other than the coarse graining of matter into finite element
 regions, a fully dynamic and consistent solution is obtained with both coarse-grained
 and atomistic regions.
 
-The primary predictive features of the CAC method for material modeling include long wavelength spectral information
-that includes transverse phonons, the ability to model approximations of mobile defects such as dislocations even in the 
-coarse grained region, and exhibit phonon scattering against defects. These features arise seamlessly once the mesh and 
-interatomic potential are defined to drive the system. The features involving defects do however require the definition
-of a discontinuous mesh; this process will be discussed in detail in later sections of this Howto.
+The primary predictive features of the CAC method for material modeling 
+include long wavelength phonon dynamics and transport
+that includes all phonon branches, the ability to model mobile defects
+ such as dislocations even in the coarse grained region, and exhibit both phonon-phonon 
+scattering and phonon-defect/interface scattering. These 
+features arise seamlessly once the mesh and 
+interatomic potential are defined to drive the system. The features involving 
+defects do however require the definition
+of an unconnected mesh; this process will be discussed in detail in later sections of this Howto.
 
 Once the typical LAMMPS settings such as units, dimenion, and boundary conditions have been specified in your
 input script,the CAC style can first be invoked via the "atom_style CAC"_atom_style.html command; in 
@@ -50,14 +57,16 @@ potentially only require atomistic resolution in very small regions at any given
 due to the more predictably smooth deformation that occurs there. This then allows one to interpolate what would normally be 
 an abundance of atoms exhibiting polynomial order deformation in a region; i.e. one can fit a polynomial to describe how the 
 set of atoms is moving with time using a lagrangian description. In such a scenario the use of the CAC method will remove
-the unnecessary detail while providing a seamless non-local force description for both the coarse-grained and atomistically
-resolved regions. Other exploitations include the ability to simulate simple dislocation glide between finite elements; in this case only
-the stress field of the dislocation core is approximated while the defect can be translated with coarse-grained detail, see (ref).
+the unnecessary detail while providing a seamless non-local force description for both the coarse-grained and the atomically
+resolved regions. Other exploitations include the ability to simulate the nucleation and propagation of dislocations
+and cracks between finite elements; in both cases the stress fields associated with the dislocation core or crack surfaces
+are approximated. Nonetheless, it has been demonstrated that such defects can be nucleated and propagated with
+coarse-grained detail, see "(Xu et al)"_#USER-CAC-Xu-et-al for an example.
 
 The CAC method is fundamentally a coarse graining method. One should be cognizant of the level of 
 detail they desire in their system since coarse graining with CAC removes short wavelength spectral information
 in the coarse grained region, has the potential to pin defects against finite element surfaces if the model is not
-well oriented and detailed, and can affect the conservation of energy for dynamic simulations.
+well oriented and detailed, and can exhibit numerically induced instability on the system energy  for certain dynamic simulations.
 
 :line
 
@@ -168,6 +177,13 @@ with nodes of adjacent finite elements in a mesh representing a crystal, and ato
 spaced apart by a (the unit cell length) with respect to other atoms. Thus, whenever one transitions 
 between resolving a crystal with finite elements and atoms they must leave a space of a/2 
 between the adjacent node and atom. This would then simulate a lattice with a mix of atoms and finite elements.
+In the case of polyatomic unit cells the same logic applies to your unit cell origin in place of the atom;
+one then simply convolves the internal basis around that point. 
+
+NOTE: The CAC algorithm assumes for the sake of symmetry that the unit cell's atom or convolution point is
+at the center of the unit cell volume. Thus if you are accustomed to introducing a basis with an atom
+or convolution point at the corner of the unit cell, this practice will not be consistent with the CAC
+algorithm.
 
 IMPORTANT NOTE: Ensure that your simulation box dimensions include the extent of your finite elements when using
 periodic boundary conditions; Otherwise you will create overlapping material between the model and its images.
@@ -216,6 +232,12 @@ and VTK formats are among these. (might include tecplot or paraview picture of a
 
 :line
 
-:link(body-Chen)
-[(Chen)] Chen, Y. Reformulation of microscopic balance equations for multiscale materials modeling. 
+:link(USER-CAC-Chen)
+[(USER-CAC-Chen)] Chen, Y. Reformulation of microscopic balance equations for multiscale materials modeling. 
 The Journal of Chemical Physics 130, 134706, (2009).
+
+:link(USER-CAC-Xu-et-al)
+[(USER-CAC-Xu-et-al)] Xu, S., Xiong, L., Chen, Y. & McDowell, D. L. Sequential slip transfer of mixed-character dislocations across S3 coherent 
+twin boundary in FCC metals: a concurrent atomistic-continuum study. npj Computational Materials 2, 15016 (2016).
+
+                                                                                             

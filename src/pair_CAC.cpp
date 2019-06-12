@@ -1627,7 +1627,10 @@ void PairCAC::quad_list_build(int iii, double s, double t, double w) {
 		neighbor_accumulate(current_x[0], current_x[1]
 			, current_x[2], iii, inner_neigh_index, outer_neigh_index);
 	}
-
+	//accumulate weights for outer neigh flag cases
+	if(outer_neighflag)
+    neighbor_weights[iii][2]+=(outer_quad_lists_counts[iii][neigh_quad_counter]+inner_quad_lists_counts[iii][neigh_quad_counter])*
+	inner_quad_lists_counts[iii][neigh_quad_counter]+inner_quad_lists_counts[iii][neigh_quad_counter];
 }
 
 
@@ -1730,7 +1733,7 @@ void PairCAC::neighbor_accumulate(double x,double y,double z,int iii,int inner_n
 			unit_cell_mapped[0] = 2 / double(neighbor_element_scale[0]);
 			unit_cell_mapped[1] = 2 / double(neighbor_element_scale[1]);
 			unit_cell_mapped[2] = 2 / double(neighbor_element_scale[2]);
-      neighbor_weights[iii][2]+=neigh_poly_count;
+      //neighbor_weights[iii][2]+=neigh_poly_count;
 			neigh_nodes_per_element=nodes_count_list[neighbor_element_type];
 
 			xm[0] = 0;
