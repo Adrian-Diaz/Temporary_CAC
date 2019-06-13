@@ -201,7 +201,7 @@ int CACMinFire::iterate(int maxiter)
 
     for (int i = 0; i < nvec; i+=3) {
       vmax = MAX(fabs(v[i]),fabs(v[i+1]));
-      vmax = MAX(vmax,fabs(v[i+3]));
+      vmax = MAX(vmax,fabs(v[i+2]));
       if (dtvone*vmax > dmax) dtvone = dmax/vmax;
     }
     MPI_Allreduce(&dtvone,&dtv,1,MPI_DOUBLE,MPI_MIN,world);
@@ -235,7 +235,6 @@ int CACMinFire::iterate(int maxiter)
           for(int node_counter=0; node_counter < nodes_per_element_list[element_type[element_counter]]; node_counter++){
             for (int poly_counter = 0; poly_counter < npoly[element_counter]; poly_counter++) {
               dtfm = dtf / mass[node_types[element_counter][poly_counter]];
-              dense += element_counter + node_counter + poly_counter; 
 
               x[dense+0] += dtv * v[dense+0];
               x[dense+1] += dtv * v[dense+1];
@@ -244,7 +243,7 @@ int CACMinFire::iterate(int maxiter)
               v[dense+1] += dtfm * f[dense+1];
               v[dense+2] += dtfm * f[dense+2];
 
-              dense+=2;
+              dense+=3;
             }
           }
         }
@@ -324,6 +323,7 @@ int *npoly = atom->poly_count;
   //copy contents to these vectors
   int dense_count_x=0;
   int dense_count_f=0;
+  int dense_count_v=0;
   for(int element_counter=0; element_counter < atom->nlocal; element_counter++){
      for(int node_counter=0; node_counter < nodes_per_element_list[element_type[element_counter]]; node_counter++){
        for(int poly_counter=0; poly_counter < npoly[element_counter]; poly_counter++){
@@ -333,9 +333,9 @@ int *npoly = atom->poly_count;
          nodal_forces[element_counter][node_counter][poly_counter][0] = min_f[dense_count_f++];
          nodal_forces[element_counter][node_counter][poly_counter][1] = min_f[dense_count_f++];
          nodal_forces[element_counter][node_counter][poly_counter][2] = min_f[dense_count_f++];         
-         nodal_velocities[element_counter][node_counter][poly_counter][0] = min_v[dense_count_f++];
-         nodal_velocities[element_counter][node_counter][poly_counter][1] = min_v[dense_count_f++];
-         nodal_velocities[element_counter][node_counter][poly_counter][2] = min_v[dense_count_f++];
+         nodal_velocities[element_counter][node_counter][poly_counter][0] = min_v[dense_count_v++];
+         nodal_velocities[element_counter][node_counter][poly_counter][1] = min_v[dense_count_v++];
+         nodal_velocities[element_counter][node_counter][poly_counter][2] = min_v[dense_count_v++];
        }
      }
   }
