@@ -12,7 +12,7 @@
 ------------------------------------------------------------------------- */
 #ifdef MINIMIZE_CLASS
 
-MinimizeStyle(CAC_fire,CACMinFire)
+MinimizeStyle(CAC/fire,CACMinFire)
 
 #else
 
@@ -30,8 +30,9 @@ class CACMinFire : public Min {
   void init();
   void setup_style();
   void reset_vectors();
-  int iterate(int);
-
+  virtual int iterate(int);
+ protected:
+  virtual void copy_vectors();
  private:
   double dt,dtmax;
   double alpha;

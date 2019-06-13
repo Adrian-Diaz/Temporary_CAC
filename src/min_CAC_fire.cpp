@@ -20,6 +20,7 @@
 #include "output.h"
 #include "timer.h"
 #include "error.h"
+#include "memory.h"
 
 using namespace LAMMPS_NS;
 
@@ -36,7 +37,9 @@ using namespace LAMMPS_NS;
 
 /* ---------------------------------------------------------------------- */
 
-CACMinFire::CACMinFire(LAMMPS *lmp) : Min(lmp) {}
+CACMinFire::CACMinFire(LAMMPS *lmp) : Min(lmp) {
+  copy_flag=1;
+}
 
 /* ---------------------------------------------------------------------- */
 
@@ -54,11 +57,16 @@ void CACMinFire::init()
 
 void CACMinFire::setup_style()
 {
-  double **v = atom->nodal_velocities[0][0];
-  int nlocal = atom->maxpoly*atom->nodes_per_element * atom->nlocal;
 
-  for (int i = 0; i < nlocal; i++)
-    v[i][0] = v[i][1] = v[i][2] = 0.0;
+  int *npoly = atom->poly_count;
+  int *nodes_per_element_list = atom->nodes_per_element_list;
+  int *element_type = atom->element_type;
+  int nodes_per_element;
+
+  double *min_v = atom->min_v;
+  nvec=atom->dense_count;
+
+  for (int i=0; i < nvec; i ++) min_v[i] = 0.0;
 }
 
 /* ----------------------------------------------------------------------
@@ -68,11 +76,13 @@ void CACMinFire::setup_style()
 
 void CACMinFire::reset_vectors()
 {
-  // atomic dof
+  double *min_x = atom->min_x;
+  double *min_f = atom->min_f;
+  nvec=atom->dense_count;
 
-  nvec = 3*atom->maxpoly*atom->nodes_per_element * atom->nlocal;
-  if (nvec) xvec = atom->nodal_positions[0][0][0];
-  if (nvec) fvec = atom->nodal_forces[0][0][0];
+  if (nvec) xvec = min_x;
+  if (nvec) fvec = min_f;
+
 }
 
 /* ---------------------------------------------------------------------- */
@@ -83,14 +93,12 @@ int CACMinFire::iterate(int maxiter)
   double vmax,vdotf,vdotfall,vdotv,vdotvall,fdotf,fdotfall;
   double scale1,scale2;
   double dtvone,dtv,dtf,dtfm;
-  int flag,flagall;
+  int i, flag,flagall;
 
   int *element_type = atom->element_type;
-  int *poly_count = atom->poly_count;
-  int *nodes_count_list = atom->nodes_per_element_list;
-  int nodes_per_element;
-  double ****nodal_positions=atom->nodal_positions;
-
+  int **node_types = atom->node_types;
+  int *npoly = atom->poly_count;
+  int *nodes_per_element_list = atom->nodes_per_element_list;
 
   alpha_final = 0.0;
 
@@ -104,13 +112,14 @@ int CACMinFire::iterate(int maxiter)
 
     // vdotfall = v dot f
 
-    double **v = atom->nodal_velocities[0][0];
-    double **f = atom->nodal_forces[0][0];
-    int nlocal = atom->maxpoly*atom->nodes_per_element * atom->nlocal;
+    double *f = atom->min_f;
+    double *v = atom->min_v;
+    nvec=atom->dense_count;
 
     vdotf = 0.0;
-    for (int i = 0; i < nlocal; i++)
-      vdotf += v[i][0]*f[i][0] + v[i][1]*f[i][1] + v[i][2]*f[i][2];
+    for (i = 0; i < nvec; i+=3) {
+      vdotf += v[i]*f[i] + v[i+1]*f[i+1] + v[i+2]*f[i+2];
+    }
     MPI_Allreduce(&vdotf,&vdotfall,1,MPI_DOUBLE,MPI_SUM,world);
 
     // sum vdotf over replicas, if necessary
@@ -129,8 +138,9 @@ int CACMinFire::iterate(int maxiter)
 
     if (vdotfall > 0.0) {
       vdotv = 0.0;
-      for (int i = 0; i < nlocal; i++)
-        vdotv += v[i][0]*v[i][0] + v[i][1]*v[i][1] + v[i][2]*v[i][2];
+      for (i = 0; i < nvec; i+=3) {
+        vdotv += v[i]*v[i] + v[i+1]*v[i+1] + v[i+2]*v[i+2];
+      }
       MPI_Allreduce(&vdotv,&vdotvall,1,MPI_DOUBLE,MPI_SUM,world);
 
       // sum vdotv over replicas, if necessary
@@ -142,8 +152,9 @@ int CACMinFire::iterate(int maxiter)
       }
 
       fdotf = 0.0;
-      for (int i = 0; i < nlocal; i++)
-        fdotf += f[i][0]*f[i][0] + f[i][1]*f[i][1] + f[i][2]*f[i][2];
+      for (i = 0; i < nvec; i+=3) {
+        fdotf += f[i]*f[i] + f[i+1]*f[i+1] + f[i+2]*f[i+2];
+      }
       MPI_Allreduce(&fdotf,&fdotfall,1,MPI_DOUBLE,MPI_SUM,world);
 
       // sum fdotf over replicas, if necessary
@@ -157,10 +168,10 @@ int CACMinFire::iterate(int maxiter)
       scale1 = 1.0 - alpha;
       if (fdotfall == 0.0) scale2 = 0.0;
       else scale2 = alpha * sqrt(vdotvall/fdotfall);
-      for (int i = 0; i < nlocal; i++) {
-        v[i][0] = scale1*v[i][0] + scale2*f[i][0];
-        v[i][1] = scale1*v[i][1] + scale2*f[i][1];
-        v[i][2] = scale1*v[i][2] + scale2*f[i][2];
+      for (i = 0; i < nvec; i+=3) {
+        v[i] =  scale1*v[i] + scale2*f[i];
+        v[i+1] =  scale1*v[i+1] + scale2*f[i+1];
+        v[i+2] =  scale1*v[i+2] + scale2*f[i+2];
       }
 
       if (ntimestep - last_negative > DELAYSTEP) {
@@ -175,8 +186,9 @@ int CACMinFire::iterate(int maxiter)
       last_negative = ntimestep;
       dt *= DT_SHRINK;
       alpha = ALPHA0;
-      for (int i = 0; i < nlocal; i++)
-        v[i][0] = v[i][1] = v[i][2] = 0.0;
+      for (i = 0; i < nvec; i+=3) {
+        v[i] =  v[i+1] = v[i+2] = 0.0;
+      }
     }
 
     // limit timestep so no particle moves further than dmax
@@ -187,9 +199,9 @@ int CACMinFire::iterate(int maxiter)
 
     dtvone = dt;
 
-    for (int i = 0; i < nlocal; i++) {
-      vmax = MAX(fabs(v[i][0]),fabs(v[i][1]));
-      vmax = MAX(vmax,fabs(v[i][2]));
+    for (int i = 0; i < nvec; i+=3) {
+      vmax = MAX(fabs(v[i]),fabs(v[i+1]));
+      vmax = MAX(vmax,fabs(v[i+2]));
       if (dtvone*vmax > dmax) dtvone = dmax/vmax;
     }
     MPI_Allreduce(&dtvone,&dtv,1,MPI_DOUBLE,MPI_MIN,world);
@@ -206,51 +218,38 @@ int CACMinFire::iterate(int maxiter)
 
     // Euler integration step
 
-    double **xx = atom->x;
-    double **x = atom->nodal_positions[0][0];
+    double *x = atom->min_x;
     
     if (rmass) {
-      for (int i = 0; i < nlocal; i++) {
+      for (int i = 0; i < nvec; i++) {
         dtfm = dtf / rmass[i];
-        x[i][0] += dtv * v[i][0];
-        x[i][1] += dtv * v[i][1];
-        x[i][2] += dtv * v[i][2];
-        v[i][0] += dtfm * f[i][0];
-        v[i][1] += dtfm * f[i][1];
-        v[i][2] += dtfm * f[i][2];
+        x[i] += dtv * v[i];
+        v[i] += dtfm * f[i];
+
       }
     } else {
-      for (int i = 0; i < nlocal; i++) {
-        dtfm = dtf / mass[type[i]];
-        x[i][0] += dtv * v[i][0];
-        x[i][1] += dtv * v[i][1];
-        x[i][2] += dtv * v[i][2];
-        v[i][0] += dtfm * f[i][0];
-        v[i][1] += dtfm * f[i][1];
-        v[i][2] += dtfm * f[i][2];
-      }
-    }
-    // update x for elements and atoms using nodal variables
-    for (int i = 0; i < atom->nlocal; i++){
-      //determine element type
-      nodes_per_element = nodes_count_list[element_type[i]];    
-      xx[i][0] = 0;
-      xx[i][1] = 0;
-      xx[i][2] = 0;
 
-      for(int k=0; k<nodes_per_element; k++){
-        for (int poly_counter = 0; poly_counter < poly_count[i];poly_counter++) {
-          
-            xx[i][0] += nodal_positions[i][k][poly_counter][0];
-            xx[i][1] += nodal_positions[i][k][poly_counter][1];
-            xx[i][2] += nodal_positions[i][k][poly_counter][2];
+        int dense = 0;
+        // nodal loops required to get mass
+        for(int element_counter=0; element_counter < atom->nlocal; element_counter++) {
+          for(int node_counter=0; node_counter < nodes_per_element_list[element_type[element_counter]]; node_counter++){
+            for (int poly_counter = 0; poly_counter < npoly[element_counter]; poly_counter++) {
+              dtfm = dtf / mass[node_types[element_counter][poly_counter]];
+
+              x[dense+0] += dtv * v[dense+0];
+              x[dense+1] += dtv * v[dense+1];
+              x[dense+2] += dtv * v[dense+2];              
+              v[dense+0] += dtfm * f[dense+0];
+              v[dense+1] += dtfm * f[dense+1];
+              v[dense+2] += dtfm * f[dense+2];
+
+              dense+=3;
+            }
           }
-      }
-
-      xx[i][0] = xx[i][0] / nodes_per_element / poly_count[i];
-      xx[i][1] = xx[i][1] / nodes_per_element / poly_count[i];
-      xx[i][2] = xx[i][2] / nodes_per_element / poly_count[i];
+        }
     }
+
+
     eprevious = ecurrent;
     ecurrent = energy_force(0);
     neval++;
@@ -300,3 +299,68 @@ int CACMinFire::iterate(int maxiter)
 
   return MAXITER;
 }
+
+
+/* ----------------------------------------------------------------------
+   copy dense arrays to atomvec arrays for energy_force evaluation
+------------------------------------------------------------------------- */
+
+void CACMinFire::copy_vectors(){
+int *npoly = atom->poly_count;
+  int *nodes_per_element_list = atom->nodes_per_element_list;
+  int *element_type = atom->element_type;
+  double ****nodal_positions = atom->nodal_positions;
+  double ****nodal_forces = atom->nodal_forces;
+  double ****nodal_velocities = atom->nodal_velocities;
+  double *min_x = atom->min_x;
+  double *min_f = atom->min_f;
+  double *min_v = atom->min_v;
+  double **x = atom->x;
+  int nodes_per_element;
+
+
+
+  //copy contents to these vectors
+  int dense_count_x=0;
+  int dense_count_f=0;
+  int dense_count_v=0;
+  for(int element_counter=0; element_counter < atom->nlocal; element_counter++){
+     for(int node_counter=0; node_counter < nodes_per_element_list[element_type[element_counter]]; node_counter++){
+       for(int poly_counter=0; poly_counter < npoly[element_counter]; poly_counter++){
+         nodal_positions[element_counter][node_counter][poly_counter][0] = min_x[dense_count_x++];
+         nodal_positions[element_counter][node_counter][poly_counter][1] = min_x[dense_count_x++];
+         nodal_positions[element_counter][node_counter][poly_counter][2] = min_x[dense_count_x++];
+         nodal_forces[element_counter][node_counter][poly_counter][0] = min_f[dense_count_f++];
+         nodal_forces[element_counter][node_counter][poly_counter][1] = min_f[dense_count_f++];
+         nodal_forces[element_counter][node_counter][poly_counter][2] = min_f[dense_count_f++];         
+         nodal_velocities[element_counter][node_counter][poly_counter][0] = min_v[dense_count_v++];
+         nodal_velocities[element_counter][node_counter][poly_counter][1] = min_v[dense_count_v++];
+         nodal_velocities[element_counter][node_counter][poly_counter][2] = min_v[dense_count_v++];
+       }
+     }
+  }
+
+    // update x for elements and atoms using nodal variables
+  for (int i = 0; i < atom->nlocal; i++){
+    //determine element type
+
+    nodes_per_element=nodes_per_element_list[element_type[i]];
+    x[i][0] = 0;
+    x[i][1] = 0;
+    x[i][2] = 0;
+
+    for(int k=0; k<nodes_per_element; k++){
+    for (int poly_counter = 0; poly_counter < npoly[i];poly_counter++) {
+      
+        x[i][0] += nodal_positions[i][k][poly_counter][0];
+        x[i][1] += nodal_positions[i][k][poly_counter][1];
+        x[i][2] += nodal_positions[i][k][poly_counter][2];
+      }
+    }
+  x[i][0] = x[i][0] / nodes_per_element / npoly[i];
+  x[i][1] = x[i][1] / nodes_per_element / npoly[i];
+  x[i][2] = x[i][2] / nodes_per_element / npoly[i];
+  }
+
+}
+

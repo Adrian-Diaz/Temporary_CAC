@@ -2,7 +2,7 @@ echo both
 units       metal
 
 dimension    3
-boundary     p p p 
+boundary     s s s
 
 #two CAC element styles currently available
 #one has charge and the other does not
@@ -34,6 +34,6 @@ dump 1 all xyz 1 lammps.xyz
 
 #fix 1 all nve 
 #run 10
-
-min_style cg
+thermo 1
+min_style fire
 minimize 1e-14 0.0 1000 10000
