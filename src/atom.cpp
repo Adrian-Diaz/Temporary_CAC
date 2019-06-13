@@ -50,8 +50,6 @@ using namespace MathConst;
 #define DELTA 1
 #define DELTA_MEMSTR 1024
 #define EPSILON 1.0e-6
-#define MAXWORD 300
-#define MAXELEMENT 100
 enum{LAYOUT_UNIFORM,LAYOUT_NONUNIFORM,LAYOUT_TILED};    // several files
 
 /* ---------------------------------------------------------------------- */
@@ -105,7 +103,6 @@ Atom::Atom(LAMMPS *lmp) : Pointers(lmp)
   duChem = NULL;
   dpdTheta = NULL;
 
-
   //USER-CAC
   
   nodal_positions = NULL;
@@ -121,12 +118,9 @@ Atom::Atom(LAMMPS *lmp) : Pointers(lmp)
   element_type = NULL;
   nodal_gradients = NULL;
   nodes_per_element_list = NULL;
-  scale_search_range = NULL;
-  scale_list = NULL;
   eboxes = NULL;
   ebox_ref = NULL;
   min_x = min_f = min_v = NULL;
-  scale_count=0;
   CAC_cut=0;
   max_search_range=0;
   initial_size=0;
@@ -322,9 +316,14 @@ Atom::~Atom()
   memory->destroy(element_scale);
   memory->destroy(element_type);
   memory->destroy(nodes_per_element_list);
+  memory->destroy(eboxes);
+  memory->destroy(ebox_ref);
+  memory->destroy(neighbor_weights);
+  memory->destroy(element_names);
   memory->destroy(min_x);
   memory->destroy(min_v);
   memory->destroy(min_f);
+ 
 
   memory->destroy(vfrac);
   memory->destroy(s0);
@@ -1492,8 +1491,8 @@ void Atom::data_CAC(int n, char *buf, tagint id_offset, int type_offset,
 	int decline = 6;
 	iptr = NULL;
 
-
-	char **values = new char*[2 * MAXELEMENT*words_per_node];
+  int maxelement = 2*(maxpoly*nodes_per_element);
+	char **values = new char*[2 * maxelement*words_per_node];
 
 	//std::string sbuf(buf);
 

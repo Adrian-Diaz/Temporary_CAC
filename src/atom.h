@@ -34,7 +34,7 @@ class Atom : protected Pointers {
   int tag_enable;               // 0/1 if atom ID tags are defined
   int molecular;                // 0 = atomic, 1 = standard molecular system,
                                 // 2 = molecule template system
-
+ 
   bigint nbonds,nangles,ndihedrals,nimpropers;
   int ntypes,nbondtypes,nangletypes,ndihedraltypes,nimpropertypes;
   int bond_per_atom,angle_per_atom,dihedral_per_atom,improper_per_atom;
@@ -92,10 +92,10 @@ class Atom : protected Pointers {
    int nodes_per_element, maxpoly, words_per_node; //maximum number of nodes and atoms per unit cell per element in model
 	// followed by number of words per node in a data file and the number of pure atoms in the CAC model
   double **node_charges, ****nodal_positions, ****nodal_velocities, ****nodal_forces,
-	  ****nodal_gradients, ****initial_nodal_positions, *scale_search_range, **eboxes, **foreign_eboxes;
+	  ****nodal_gradients, ****initial_nodal_positions, **eboxes, **foreign_eboxes;
   int *poly_count, **node_types,  *element_type,
-	  **element_scale, *nodes_per_element_list, scale_count, bin_foreign, CAC_comm_flag, *scale_list
-    , initial_size, neboxes, local_neboxes, nforeign_eboxes, *ebox_ref;
+	  **element_scale, *nodes_per_element_list, bin_foreign, CAC_comm_flag, 
+     initial_size, neboxes, local_neboxes, nforeign_eboxes, *ebox_ref;
   int neigh_weight_flag, **neighbor_weights, quadrature_node_count;
   double CAC_cut, CAC_skin, max_search_range;				//used by npair_CAC styles
   int one_layer_flag, weight_count,CAC_pair_flag, element_type_count, outer_neigh_flag;
