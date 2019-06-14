@@ -1487,10 +1487,10 @@ void Input::comm_style()
     delete oldcomm;
   }
   else if (strcmp(arg[0],"CAC") == 0) {
-    if (comm->style == 2) return;
+    if (comm->style == 1&&(strcmp(comm->comm_style, "CAC") == 0)) return;
     Comm *oldcomm = comm;
 
-    if (lmp->kokkos) error->all(FLERR,"CAC comm style not yet Kokkos compatible");
+    if (lmp->kokkos) error->all(FLERR,"CAC comm style is not yet Kokkos compatible");
     else comm = new CommCAC(lmp,oldcomm);
 
     delete oldcomm;

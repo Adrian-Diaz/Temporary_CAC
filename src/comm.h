@@ -27,6 +27,7 @@ class Comm : protected Pointers {
   enum{LAYOUT_UNIFORM,LAYOUT_NONUNIFORM,LAYOUT_TILED};
   int mode;      // 0 = single cutoff, 1 = multi-type cutoff
   enum{SINGLE,MULTI};
+  char *comm_style; //name of the comm style
 
   int me,nprocs;                    // proc info
   int ghost_velocity;               // 1 if ghost atoms have velocity, 0 if not

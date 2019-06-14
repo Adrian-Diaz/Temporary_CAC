@@ -55,6 +55,7 @@ Comm::Comm(LAMMPS *lmp) : Pointers(lmp)
   cutghostuser = 0.0;
   cutusermulti = NULL;
   ghost_velocity = 0;
+  comm_style = NULL;
 
   user_procgrid[0] = user_procgrid[1] = user_procgrid[2] = 0;
   coregrid[0] = coregrid[1] = coregrid[2] = 1;
@@ -114,6 +115,7 @@ Comm::~Comm()
   memory->destroy(ysplit);
   memory->destroy(zsplit);
   memory->destroy(cutusermulti);
+  memory->destroy(comm_style);
   delete [] customfile;
   delete [] outfile;
 }
