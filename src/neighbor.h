@@ -241,7 +241,7 @@ namespace NeighConst {
   static const int NB_KOKKOS_DEVICE = 1<<1;
   static const int NB_KOKKOS_HOST   = 1<<2;
   static const int NB_SSA           = 1<<3;
-  static const int NB_CAC			= 1<<4;
+  static const int NB_CAC			      = 1<<4;
 
   static const int NS_BIN     = 1<<0;
   static const int NS_MULTI   = 1<<1;
@@ -255,7 +255,7 @@ namespace NeighConst {
   static const int NS_TRI     = 1<<9;
   static const int NS_GHOST   = 1<<10;
   static const int NS_SSA     = 1<<11;
-  static const int NS_CAC	  = 1<<12;
+  static const int NS_CAC	    = 1<<12;
 
   static const int NP_NSQ           = 1<<0;
   static const int NP_BIN           = 1<<1;
@@ -282,7 +282,7 @@ namespace NeighConst {
   static const int NP_SKIP          = 1<<22;
   static const int NP_HALF_FULL     = 1<<23;
   static const int NP_OFF2ON        = 1<<24;
-  static const int NP_CAC			= 1<<25;
+  static const int NP_CAC			      = 1<<25;
 }
 
 }

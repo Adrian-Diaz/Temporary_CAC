@@ -910,8 +910,6 @@ int Neighbor::init_pair()
     }
   }
     
-  
-
   // debug output
 
 #ifdef NEIGH_LIST_DEBUG
@@ -1629,13 +1627,8 @@ int Neighbor::choose_bin(NeighRequest *rq)
     if (!rq->ssa != !(mask & NB_SSA)) continue;
     if (!rq->kokkos_device != !(mask & NB_KOKKOS_DEVICE)) continue;
     if (!rq->kokkos_host != !(mask & NB_KOKKOS_HOST)) continue;
-
-    if (rq->CAC) {
-		  if (!(mask & NB_CAC)) continue;
-	  }
-    else{
-      if ((mask & NB_CAC)) continue;
-    }
+    if (!rq->CAC != !(mask & NB_CAC)) continue;
+    
 
     return i+1;
   }
@@ -2118,7 +2111,6 @@ void Neighbor::build(int topoflag)
   }
   
   //call stencils in case new data introduced since setup has to be used
-  //if not empty void function is called
   if(stencil_post_create_flag){
   for (int i = 0; i < nstencil_perpetual; i++) {
     if(neigh_stencil[slist[i]]->post_create_flag){
@@ -2434,13 +2426,17 @@ int Neighbor::exclude_setting()
 
 bigint Neighbor::memory_usage()
 {
+  int m;
   bigint bytes = 0;
   bytes += memory->usage(xhold,maxhold,3);
   
   for (int i = 0; i < nlist; i++)
     if (lists[i]) bytes += lists[i]->memory_usage();
-  for (int i = 0; i < npair_perpetual; i++)
-    bytes += neigh_pair[i]->memory_usage(); 
+  for (int i = 0; i < npair_perpetual; i++){
+    m = plist[i];
+    if (!lists[m]->copy)
+    bytes += neigh_pair[m]->memory_usage();
+  } 
   for (int i = 0; i < nstencil; i++)
     bytes += neigh_stencil[i]->memory_usage();
   for (int i = 0; i < nbin; i++)

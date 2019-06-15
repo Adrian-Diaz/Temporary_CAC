@@ -105,7 +105,7 @@ Irregular::~Irregular()
 
 void Irregular::migrate_atoms(int sortflag, int preassign, int *procassign)
 { 
-  //ensure initial send buf is big enough in case maxexchange variables in comme are non-zero
+  //ensure initial send buf is big enough in case maxexchange variables in comm are non-zero
   if(comm->maxexchange_atom||comm->maxexchange_fix){
    memory->grow(buf_send,maxsend+BUFEXTRA+comm->maxexchange_atom+comm->maxexchange_fix,"comm:buf_send"); 
   }
