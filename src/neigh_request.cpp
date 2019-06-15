@@ -199,6 +199,7 @@ void NeighRequest::copy_request(NeighRequest *other, int skipflag)
 
   half = other->half;
   full = other->full;
+  CAC = other->CAC;
 
   occasional = other->occasional;
   newton = other->newton;
